@@ -263,7 +263,11 @@ async function main() {
 
   /* ── 6. previous month protection ──────────────────── */
   console.log("\n6) Month isolation & closed-month protection");
-  const prevMonth = (boot.months ?? []).find((m) => m.id !== monthId);
+  // বন্ধ করা আগের মাসটাই বেছে নাও — আগের রানে খোলা নতুন মাস তৈরি হয়ে থাকলে
+  // "প্রথম যেটা বর্তমান নয়" নিয়মে ভুল মাস পড়ত (খালি + খোলা), ফলে ৩টি চেক ফেল করত
+  const otherMonths = (boot.months ?? []).filter((m) => m.id !== monthId);
+  const prevMonth =
+    otherMonths.find((m) => m.isClosed) ?? otherMonths.slice().sort((a, b) => a.year - b.year || a.month - b.month)[0];
   const prevData = await req(mgr, "POST", "/api/mess", { action: "month.data", monthId: prevMonth.id });
   check("previous month is still viewable", prevData.status === 200 && (prevData.json?.data?.data?.data?.dailyMeals?.length ?? 0) > 0, `meals=${prevData.json?.data?.data?.data?.dailyMeals?.length}`);
   check("previous month is marked closed", prevData.json?.data?.data?.month?.isClosed === true);
@@ -394,7 +398,7 @@ async function main() {
 
   const suBoot = await req(su, "POST", "/api/mess", { action: "bootstrap" });
   check("new office starts with 0 meals (isolated)", (suBoot.json?.data?.data?.data?.dailyMeals?.length ?? -1) === 0, `meals=${suBoot.json?.data?.data?.data?.dailyMeals?.length}`);
-  check("new office cannot see Gobra data", suBoot.json?.data?.data?.office?.id === newOffice.id);
+  check("new office cannot see Gobra data", Boolean(newOffice) && suBoot.json?.data?.data?.office?.id === newOffice.id);
 
   const dupSignup = await req(jar(), "POST", "/api/auth/signup", {
     officeName: "Dup Office",
@@ -565,7 +569,16 @@ async function main() {
 
   /* ── 14. new month opening ─────────────────────────── */
   console.log("\n14) Month separation");
-  const nextM = boot.data.month === 12 ? { y: boot.data.year + 1, m: 1 } : { y: boot.data.year, m: boot.data.month + 1 };
+  // সর্বশেষ মাসের পরেরটা নাও (এমন একটা মাস যেটা এখনো খোলা হয়নি)। আগে সবসময় "বর্তমান+১"
+  // নেওয়া হতো, ফলে দ্বিতীয় রানে সেই মাসে সদস্য আগে থেকেই থাকায় copiedMembers=0 হতো —
+  // অর্থাৎ স্যুটটা একই ডেটাবেসে দুবার চালানো যেত না।
+  const monthIdx = (y, m) => y * 12 + m;
+  const latestIdx = (boot.months ?? []).reduce(
+    (mx, m) => Math.max(mx, monthIdx(m.year, m.month)),
+    monthIdx(boot.data.year, boot.data.month),
+  );
+  const nextIdx = latestIdx + 1;
+  const nextM = { y: Math.floor((nextIdx - 1) / 12), m: ((nextIdx - 1) % 12) + 1 };
   const opened2 = await req(mgr, "POST", "/api/mess", { action: "month.open", year: nextM.y, month: nextM.m, copyMembers: true, carryForwardBalance: 500 });
   check("manager can open next month", opened2.status === 200 && Boolean(opened2.json?.data?.data?.month?.id), opened2.text.slice(0, 160));
   check("new month copies the roster", (opened2.json?.data?.data?.copiedMembers ?? 0) >= 6, `copied=${opened2.json?.data?.data?.copiedMembers}`);

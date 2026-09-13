@@ -51,7 +51,15 @@ async function request<T>(url: string, init: RequestInit = {}): Promise<ApiEnvel
   try {
     json = text ? (JSON.parse(text) as ApiEnvelope<T>) : ({ ok: res.ok } as ApiEnvelope<T>);
   } catch {
-    throw new ApiError(`সার্ভার থেকে অপ্রত্যাশিত উত্তর (HTTP ${res.status})`, "bad-response", res.status);
+    // উত্তর JSON নয় — প্রায় সবসময় মানে রুটটাই অস্তিত্বহীন: ভুল/মৃত ডোমেইন (Vercel-এর
+    // "DEPLOYMENT_NOT_FOUND" টেক্সট পেজ), পুরনো ক্যাশ, বা প্রক্সি এরর পেজ। তাই শুধু কোড না
+    // দেখিয়ে কোন পাথে ব্যর্থ হলো আর কী করলে ঠিক হবে সেটাও বলে দিই।
+    const path = url.split("?")[0];
+    const hint =
+      res.status === 404 || res.status === 502 || res.status === 503
+        ? ` — ${path} পাওয়া যায়নি। পেজটি হার্ড রিফ্রেশ দিন (Ctrl/Cmd + Shift + R); তাতেও না হলে সঠিক ঠিকানা https://messmealmanager.vercel.app খুলুন।`
+        : "";
+    throw new ApiError(`সার্ভার থেকে অপ্রত্যাশিত উত্তর (HTTP ${res.status})${hint}`, "bad-response", res.status);
   }
 
   if (!res.ok || json.ok === false) {
