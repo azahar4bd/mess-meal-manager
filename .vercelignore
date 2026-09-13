@@ -1,0 +1,8 @@
+.deploy/
+.env.local
+.env*.local
+*.dump
+scripts/
+docs/
+google-apps-script/
+drizzle/meta/

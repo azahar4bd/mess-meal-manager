@@ -23,3 +23,9 @@ yarn-error.log*
 .env*.local
 .vercel
 *.log
+
+# ── deployment credentials (NEVER commit) ──────────────────────
+.deploy/
+*token*
+*secret*
+!.env.example
