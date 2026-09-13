@@ -1,0 +1,48 @@
+{
+  "name": "mess-meal-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-Office Mess Meal Manager — meals, bazar, fund, income, reports, Google Sheets sync",
+  "scripts": {
+    "dev": "next dev -p 3000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p 3000 -H 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx --env-file=.env.local scripts/seed.ts",
+    "db:reset": "tsx --env-file=.env.local scripts/reset.ts",
+    "db:up": "sudo pg_ctlcluster 17 main start",
+    "setup": "npm run db:migrate:sql && npm run db:seed",
+    "test:api": "node scripts/test-api.mjs",
+    "test:sheet": "node scripts/test-apps-script.mjs",
+    "test": "npm run test:setup && node scripts/test-api.mjs && node scripts/test-apps-script.mjs",
+    "db:migrate:sql": "tsx --env-file=.env.local scripts/migrate.ts",
+    "db:migrate:remote": "tsx scripts/migrate.ts",
+    "setup:status": "curl -s $VERCEL_PROJECT_PRODUCTION_URL/api/setup/status || curl -s http://localhost:3000/api/setup/status",
+    "test:setup": "node scripts/test-setup.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "bcryptjs": "^3.0.2",
+    "drizzle-orm": "^0.45.2",
+    "next": "16.3.5",
+    "pg": "^8.16.3",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "@types/pg": "^8.15.2",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "autoprefixer": "^10.4.21",
+    "drizzle-kit": "^0.31.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.3"
+  }
+}

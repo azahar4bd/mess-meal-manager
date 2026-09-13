@@ -1,0 +1,274 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f6f8;
+  --card: #ffffff;
+  --text: #101828;
+  --muted: #667085;
+  --border: #e4e7ec;
+  --brand: #226e4a;
+  --brand-soft: #eef7f2;
+  --danger: #b42318;
+  --danger-soft: #fee4e2;
+  --warn: #b54708;
+  --warn-soft: #fffaeb;
+  --ok: #027a48;
+  --ok-soft: #d1fadf;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+}
+
+.dark {
+  --bg: #0b1220;
+  --card: #121a2b;
+  --text: #e6ebf2;
+  --muted: #98a2b3;
+  --border: #22304a;
+  --brand: #4fa478;
+  --brand-soft: #12291f;
+  --danger: #f97066;
+  --danger-soft: #331a1a;
+  --warn: #fdb022;
+  --warn-soft: #33270f;
+  --ok: #47cd89;
+  --ok-soft: #10291d;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-bengali), "Noto Sans Bengali", "Hind Siliguri", "SolaimanLipi", system-ui,
+    -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border bg-[var(--card)] shadow-[var(--shadow)];
+    border-color: var(--border);
+  }
+  .card-pad {
+    @apply p-3 sm:p-4;
+  }
+  .section-title {
+    @apply text-[15px] font-bold text-[var(--text)];
+  }
+  .muted {
+    color: var(--muted);
+  }
+  .label {
+    @apply mb-1 block text-[12px] font-semibold;
+    color: var(--muted);
+  }
+  .input {
+    @apply w-full rounded-lg border px-3 py-2.5 text-[15px] outline-none transition;
+    background: var(--card);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .input:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent);
+  }
+  .input:disabled {
+    opacity: 0.6;
+  }
+  .input-sm {
+    @apply px-2 py-1.5 text-[13px];
+  }
+  select.input {
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.5' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 text-[14px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-55;
+    min-height: 44px;
+  }
+  .btn-primary {
+    background: var(--brand);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover {
+    background: var(--brand-soft);
+  }
+  .btn-danger {
+    background: var(--danger);
+    color: #fff;
+  }
+  .btn-soft {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+  .btn-sm {
+    @apply px-2.5 py-1.5 text-[12.5px];
+    min-height: 34px;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold;
+  }
+  .pill-ok {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .pill-warn {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .pill-danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+  .pill-muted {
+    background: color-mix(in srgb, var(--muted) 16%, transparent);
+    color: var(--muted);
+  }
+  .pill-brand {
+    background: var(--brand-soft);
+    color: var(--brand);
+  }
+  .table-wrap {
+    @apply w-full overflow-x-auto rounded-lg border;
+    border-color: var(--border);
+  }
+  table.data {
+    @apply w-full border-collapse text-[13px];
+    min-width: 560px;
+  }
+  table.data th {
+    @apply sticky top-0 whitespace-nowrap px-2.5 py-2 text-left text-[12px] font-bold;
+    background: var(--brand-soft);
+    color: var(--brand);
+    border-bottom: 1px solid var(--border);
+  }
+  table.data td {
+    @apply whitespace-nowrap px-2.5 py-2;
+    border-bottom: 1px solid var(--border);
+  }
+  table.data tbody tr:hover td {
+    background: color-mix(in srgb, var(--brand) 5%, transparent);
+  }
+  table.data td.num,
+  table.data th.num {
+    @apply text-right tabular-nums;
+  }
+  table.data tfoot td {
+    @apply font-bold;
+    background: color-mix(in srgb, var(--brand) 7%, transparent);
+  }
+  .kpi {
+    @apply card card-pad flex flex-col gap-0.5;
+  }
+  .kpi-k {
+    @apply text-[11.5px] font-semibold;
+    color: var(--muted);
+  }
+  .kpi-v {
+    @apply text-[19px] font-extrabold leading-tight;
+    color: var(--text);
+  }
+  .link {
+    color: var(--brand);
+    @apply font-semibold underline underline-offset-2;
+  }
+}
+
+/* meal grid — compact numeric cells */
+.meal-cell {
+  @apply w-[58px] rounded-md border px-1 py-1 text-center text-[14px] font-bold tabular-nums outline-none;
+  background: var(--card);
+  border-color: var(--border);
+  color: var(--text);
+}
+.meal-cell:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 20%, transparent);
+}
+.meal-cell.zero {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* skeleton loader */
+.skeleton {
+  @apply relative overflow-hidden rounded-md;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--card) 55%, transparent), transparent);
+  animation: shimmer 1.4s infinite;
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.18s ease-out;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.2s ease-out;
+}
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

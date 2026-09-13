@@ -1,0 +1,232 @@
+/**
+ * ══════════════════════════════════════════════════════════════
+ *  BUSINESS RULES ENGINE  (spec §30–§38, §85–§88, §121)
+ *
+ *  Rule 1  Permanent Fund is separate.
+ *  Rule 2  Fund is NOT deducted from the monthly meal charge.
+ *  Rule 3  Meal rate = (Bazar − Other Income) / Total Meals
+ *  Rule 4  Individual Extra goes to the assigned member.
+ *  Rule 5  Shared Extra is divided among active members.
+ *  Rule 6  Each office has isolated data.
+ *  Rule 7  Each month is isolated.
+ *  Rule 8  Previous months remain viewable.
+ *
+ *  ⚠ These rules must never change. Every report, dashboard, PDF,
+ *    CSV and Google Sheet is produced by this single module so the
+ *    numbers can never drift apart.
+ * ══════════════════════════════════════════════════════════════
+ */
+
+import { round2, round4, toNumber } from "./format";
+import type {
+  BazarDTO,
+  DepositDTO,
+  ExtraDTO,
+  IncomeDTO,
+  MealRowDTO,
+  MemberCalculation,
+  MemberDTO,
+  MonthSummary,
+} from "./types";
+
+export interface CalcInput {
+  members: MemberDTO[];
+  dailyMeals: MealRowDTO[];
+  bazarExpenses: BazarDTO[];
+  otherIncomes: IncomeDTO[];
+  deposits: DepositDTO[];
+  extraExpenses: ExtraDTO[];
+  /** optional: restrict the calculation to a date range (report filter) */
+  fromDate?: string | null;
+  toDate?: string | null;
+  /** carried-forward cash balance from the previous month */
+  carryForwardBalance?: number;
+}
+
+const inRange = (date: string, from?: string | null, to?: string | null): boolean => {
+  if (!date) return false;
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+  return true;
+};
+
+/**
+ * Full month summary + per-member calculation.
+ */
+export function calculateMonth(input: CalcInput): MonthSummary {
+  const { fromDate = null, toDate = null } = input;
+
+  const members = (input.members ?? []).filter(Boolean);
+  const activeMembers = members.filter((m) => m.isActive !== false);
+  const activeCount = activeMembers.length;
+
+  const meals = (input.dailyMeals ?? []).filter((r) => inRange(r.date, fromDate, toDate));
+  const bazar = (input.bazarExpenses ?? []).filter((r) => inRange(r.date, fromDate, toDate));
+  const incomes = (input.otherIncomes ?? []).filter((r) => inRange(r.date, fromDate, toDate));
+  const deposits = (input.deposits ?? []).filter((r) => inRange(r.date, fromDate, toDate));
+  const extras = (input.extraExpenses ?? []).filter((r) => inRange(r.date, fromDate, toDate));
+
+  /* ── totals ─────────────────────────────────────────────── */
+  const totalMill = round2(meals.reduce((s, r) => s + toNumber(r.meals), 0));
+  const totalBazarCost = round2(bazar.reduce((s, r) => s + toNumber(r.amount), 0));
+  const totalOthersIncome = round2(incomes.reduce((s, r) => s + toNumber(r.amount), 0));
+
+  // Rule 3 — net meal cost, then meal rate
+  const netCost = round2(totalBazarCost - totalOthersIncome);
+  const rawRate = totalMill > 0 ? netCost / totalMill : 0;
+  const perMillRate = round2(rawRate);
+
+  // Rule 1/2 — permanent fund is capital, tracked separately
+  const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
+  const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
+  const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
+
+  // Rule 5 — shared extra split across ACTIVE members
+  const totalSharedExtraRaw = extras
+    .filter((e) => e.type === "shared")
+    .reduce((s, r) => s + toNumber(r.amount), 0);
+  const totalSharedExtra = round2(totalSharedExtraRaw);
+  const sharedPerMember = activeCount > 0 ? totalSharedExtraRaw / activeCount : 0;
+
+  // Rule 4 — individual extras grouped by member
+  const individualByMember = new Map<string, number>();
+  for (const e of extras.filter((x) => x.type === "individual")) {
+    const key = e.memberId || `name:${(e.memberName || "").trim().toLowerCase()}`;
+    individualByMember.set(key, (individualByMember.get(key) ?? 0) + toNumber(e.amount));
+  }
+  const totalIndividualExtra = round2(
+    extras.filter((e) => e.type === "individual").reduce((s, r) => s + toNumber(r.amount), 0),
+  );
+
+  // meals per member
+  const mealsByMember = new Map<string, number>();
+  const mealsByMemberName = new Map<string, number>();
+  for (const r of meals) {
+    const v = toNumber(r.meals);
+    if (r.memberId) mealsByMember.set(r.memberId, (mealsByMember.get(r.memberId) ?? 0) + v);
+    const nm = (r.memberName || "").trim().toLowerCase();
+    if (nm) mealsByMemberName.set(nm, (mealsByMemberName.get(nm) ?? 0) + v);
+  }
+
+  // deposits per member
+  const depositsByMember = new Map<string, number>();
+  const depositsByName = new Map<string, number>();
+  for (const d of deposits) {
+    const v = toNumber(d.amount);
+    if (d.memberId) depositsByMember.set(d.memberId, (depositsByMember.get(d.memberId) ?? 0) + v);
+    const nm = (d.memberName || "").trim().toLowerCase();
+    if (nm) depositsByName.set(nm, (depositsByName.get(nm) ?? 0) + v);
+  }
+
+  /* ── per member ─────────────────────────────────────────── */
+  const memberCalculations: MemberCalculation[] = members.map((m) => {
+    const nm = (m.name || "").trim().toLowerCase();
+    const totalMemberMeals = round2(mealsByMember.get(m.id) ?? mealsByMemberName.get(nm) ?? 0);
+    const mealCost = round2(totalMemberMeals * perMillRate);
+    const individualExtra = round2(
+      (individualByMember.get(m.id) ?? individualByMember.get(`name:${nm}`) ?? 0),
+    );
+    const sharedExtra = m.isActive !== false ? round2(sharedPerMember) : 0;
+
+    // Rule 1/2 — total cost NEVER subtracts the permanent fund
+    const totalCost = round2(mealCost + individualExtra + sharedExtra);
+
+    const totalDeposit = round2(depositsByMember.get(m.id) ?? depositsByName.get(nm) ?? 0);
+    const permanentFund = totalDeposit;
+
+    // Dena-Paona (spec §37) — obligation vs. what the member actually deposited
+    const denaPoana = round2(totalDeposit - totalCost);
+    const status: MemberCalculation["status"] =
+      Math.abs(denaPoana) < 0.005 ? "সমান" : denaPoana < 0 ? "দিবে" : "পাবে";
+    const statusEn: MemberCalculation["statusEn"] =
+      Math.abs(denaPoana) < 0.005 ? "Settled" : denaPoana < 0 ? "Due" : "Receive";
+
+    return {
+      memberId: m.id,
+      name: m.name,
+      role: m.role || "member",
+      phone: m.phone || "",
+      room: m.room || "",
+      isActive: m.isActive !== false,
+      totalMill: totalMemberMeals,
+      perMillRate,
+      mealCost,
+      individualExtra,
+      sharedExtra,
+      totalCost,
+      totalDeposit,
+      permanentFund,
+      denaPoana,
+      balance: denaPoana,
+      status,
+      statusEn,
+    };
+  });
+
+  /* ── last balance (spec §86) ────────────────────────────── */
+  const operating = totalBazarCost + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
+  const carry = toNumber(input.carryForwardBalance, 0);
+  const lastBalance = round2(carry + totalFund - operating);
+
+  return {
+    totalMembers: members.length,
+    activeMembers: activeCount,
+    totalMill,
+    totalBazarCost,
+    totalOthersIncome,
+    netCost,
+    perMillRate,
+    totalFund,
+    totalSharedExtra,
+    totalIndividualExtra,
+    totalDepositsThisMonth,
+    lastBalance,
+    memberCalculations,
+  };
+}
+
+/** meal matrix: day → memberId → meals (for the daily meal grid) */
+export function buildMealMatrix(
+  members: MemberDTO[],
+  meals: MealRowDTO[],
+  totalDays: number,
+): Record<number, Record<string, number>> {
+  const matrix: Record<number, Record<string, number>> = {};
+  for (let d = 1; d <= totalDays; d++) matrix[d] = {};
+  for (const m of members) {
+    for (let d = 1; d <= totalDays; d++) matrix[d][m.id] = 0;
+  }
+  for (const r of meals) {
+    if (!matrix[r.day]) matrix[r.day] = {};
+    matrix[r.day][r.memberId] = toNumber(r.meals);
+  }
+  return matrix;
+}
+
+export function dayTotals(matrix: Record<number, Record<string, number>>, totalDays: number): number[] {
+  const out: number[] = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const row = matrix[d] ?? {};
+    out.push(round2(Object.values(row).reduce((s, v) => s + toNumber(v), 0)));
+  }
+  return out;
+}
+
+/** bazar grouped by category (report + sheet summary) */
+export function bazarByCategory(rows: BazarDTO[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) out[r.category] = round2((out[r.category] ?? 0) + toNumber(r.amount));
+  return out;
+}
+
+/** bazar grouped by buyer */
+export function bazarByBuyer(rows: BazarDTO[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    const k = r.buyerName || "—";
+    out[k] = round2((out[k] ?? 0) + toNumber(r.amount));
+  }
+  return out;
+}
+
+export { round2, round4 };

@@ -1,0 +1,194 @@
+"use client";
+
+import React, { useMemo } from "react";
+import { useApp } from "@/components/app-context";
+import { EntryPanel, type ColumnDef, type FieldDef, type FormState } from "@/components/ui/entry-panel";
+import { Badge, Card } from "@/components/ui";
+import { formatMoney, round2, toNumber } from "@/lib/format";
+import { isoOfDay, toDisplayDate, toIsoDate, todayIso } from "@/lib/date";
+import type { DepositDTO } from "@/lib/types";
+
+export function FundView() {
+  const app = useApp();
+  const data = app.data;
+  const month = app.month;
+  const summary = app.summary;
+  const canWrite = app.can("fund.write") && !(month?.isClosed && app.role !== "admin");
+
+  const defaultDate = useMemo(() => {
+    if (!month) return todayIso();
+    const today = todayIso();
+    return today.startsWith(`${month.year}-${String(month.month).padStart(2, "0")}`)
+      ? today
+      : isoOfDay(month.year, month.month, 1);
+  }, [month]);
+
+  const rows = data?.deposits ?? [];
+  const members = (data?.members ?? []).map((m) => ({ id: m.id, name: m.name, isActive: m.isActive }));
+
+  const perMemberFund = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      const key = r.memberId ?? `name:${(r.memberName || "").toLowerCase()}`;
+      map.set(key, round2((map.get(key) ?? 0) + toNumber(r.amount)));
+    }
+    return map;
+  }, [rows]);
+
+  const fields: FieldDef[] = [
+    { key: "date", label: "তারিখ / Date", type: "date", required: true, half: true },
+    { key: "memberId", label: "সদস্য / Member", type: "member", required: true, half: true },
+    { key: "amount", label: "পরিমাণ / Amount (৳)", type: "money", required: true, placeholder: "2000", half: true },
+    {
+      key: "type",
+      label: "ধরন / Type",
+      type: "select",
+      half: true,
+      options: [
+        { value: "permanent_fund", label: "স্থায়ী তহবিল / permanent_fund" },
+        { value: "adjustment", label: "সমন্বয় / adjustment" },
+        { value: "refund", label: "ফেরত / refund" },
+      ],
+    },
+    { key: "note", label: "নোট / Note", type: "textarea", placeholder: "Permanent capital deposit" },
+  ];
+
+  const initialValues = (): FormState => ({
+    date: toIsoDate(defaultDate),
+    memberId: "",
+    amount: "",
+    type: "permanent_fund",
+    note: "",
+  });
+
+  const toForm = (row: DepositDTO): FormState => ({
+    date: toIsoDate(row.date),
+    memberId: row.memberId ?? "",
+    memberName: row.memberName ?? "",
+    amount: String(row.amount ?? ""),
+    type: row.type || "permanent_fund",
+    note: row.note ?? "",
+  });
+
+  const onSubmit = async (values: FormState, editingId: string | null): Promise<boolean> => {
+    const amount = round2(toNumber(values.amount));
+    if (!values.memberId) {
+      app.toast("সদস্য নির্বাচন করুন", "error");
+      return false;
+    }
+    if (amount <= 0) {
+      app.toast("পরিমাণ ০ এর বেশি হতে হবে", "error");
+      return false;
+    }
+    const payload = {
+      date: toIsoDate(values.date),
+      memberId: values.memberId,
+      amount,
+      note: values.note,
+      type: values.type || "permanent_fund",
+    };
+    const res = await app.call<DepositDTO>(editingId ? "deposit.update" : "deposit.create", editingId ? { id: editingId, ...payload } : payload);
+    if (!res) return false;
+    app.toast(editingId ? "জমা এন্ট্রি হালনাগাদ হয়েছে ✓" : `জমা যোগ হয়েছে ✓ ৳ ${formatMoney(amount)}`, "success");
+    return true;
+  };
+
+  const onDelete = async (row: DepositDTO): Promise<boolean> => {
+    const res = await app.call<{ deleted: boolean }>("deposit.delete", { id: row.id });
+    if (!res) return false;
+    app.toast("জমা এন্ট্রি মুছে ফেলা হয়েছে", "success");
+    return true;
+  };
+
+  const columns: ColumnDef<DepositDTO>[] = [
+    { key: "date", header: "তারিখ / Date", render: (r) => <span className="tabular-nums">{toDisplayDate(r.date)}</span> },
+    { key: "member", header: "সদস্য / Member", render: (r) => <span className="font-semibold">{r.memberName || "—"}</span> },
+    {
+      key: "amount",
+      header: "পরিমাণ / Amount",
+      align: "right",
+      render: (r) => <span className="font-bold tabular-nums text-[var(--ok)]">৳ {formatMoney(r.amount)}</span>,
+      footer: (list) => `৳ ${formatMoney(list.reduce((s, r) => s + toNumber(r.amount), 0))}`,
+    },
+    {
+      key: "type",
+      header: "ধরন / Type",
+      align: "center",
+      render: (r) => (
+        <Badge tone={r.type === "permanent_fund" ? "brand" : r.type === "refund" ? "warn" : "muted"}>
+          {r.type === "permanent_fund" ? "স্থায়ী তহবিল" : r.type}
+        </Badge>
+      ),
+    },
+    { key: "note", header: "নোট / Note", hideOnMobile: true, render: (r) => <span className="muted max-w-[200px] truncate">{r.note || "—"}</span> },
+  ];
+
+  const closedNotice = month?.isClosed && app.role !== "admin" ? "🔒 এই মাসটি বন্ধ — শুধু অ্যাডমিন পরিবর্তন করতে পারবেন।" : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] px-3 py-2.5 text-[12.5px] font-semibold text-[var(--warn)]">
+        ⚠ <strong>স্থায়ী তহবিল = স্থায়ী মূলধন (Permanent Capital)।</strong> এটি মাসিক মিল খরচ থেকে বাদ দেওয়া যাবে না —
+        রিপোর্টে “Permanent Fund” ও “দেনা-পাওনা” আলাদা দুটি স্তম্ভ হিসেবে থাকবে।
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Card bodyClass="p-3">
+          <div className="kpi-k">মোট স্থায়ী তহবিল</div>
+          <div className="kpi-v text-[var(--brand)]">৳ {formatMoney(summary?.totalFund ?? 0)}</div>
+        </Card>
+        <Card bodyClass="p-3">
+          <div className="kpi-k">এই মাসের জমা</div>
+          <div className="kpi-v">৳ {formatMoney(summary?.totalDepositsThisMonth ?? 0)}</div>
+        </Card>
+        <Card bodyClass="p-3">
+          <div className="kpi-k">জমা এন্ট্রি</div>
+          <div className="kpi-v">{rows.length}</div>
+        </Card>
+        <Card bodyClass="p-3">
+          <div className="kpi-k">লাস্ট ব্যালেন্স</div>
+          <div className="kpi-v" style={{ color: (summary?.lastBalance ?? 0) >= 0 ? "var(--ok)" : "var(--danger)" }}>
+            ৳ {formatMoney(summary?.lastBalance ?? 0)}
+          </div>
+        </Card>
+      </div>
+
+      <EntryPanel<DepositDTO>
+        title="জমা ও তহবিল / Member Fund & Deposits"
+        subtitle={`${month?.monthName ?? ""} • সদস্য প্রতি স্থায়ী তহবিল`}
+        fields={fields}
+        rows={rows}
+        columns={columns}
+        canWrite={canWrite}
+        closedNotice={closedNotice}
+        initialValues={initialValues}
+        toForm={toForm}
+        onSubmit={onSubmit}
+        onDelete={canWrite ? onDelete : undefined}
+        emptyTitle="কোনো জমা এন্ট্রি নেই"
+        emptyHint="সদস্যের স্থায়ী তহবিল / জমা এখানে যোগ করুন।"
+        emptyIcon="💰"
+        addLabel="+ নতুন জমা"
+        formTitle="জমা এন্ট্রি"
+        members={members}
+        search={(r) => `${r.memberName} ${r.note} ${r.type} ${toDisplayDate(r.date)}`}
+      />
+
+      {rows.length > 0 ? (
+        <Card title="সদস্য অনুযায়ী তহবিল / Fund per Member" bodyClass="p-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+            {(data?.members ?? []).map((m) => {
+              const amount = perMemberFund.get(m.id) ?? perMemberFund.get(`name:${m.name.toLowerCase()}`) ?? 0;
+              return (
+                <div key={m.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2">
+                  <span className="min-w-0 truncate text-[12.5px] font-semibold">{m.name}</span>
+                  <span className="shrink-0 text-[13px] font-bold tabular-nums text-[var(--brand)]">৳ {formatMoney(amount)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
