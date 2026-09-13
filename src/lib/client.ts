@@ -29,6 +29,17 @@ export interface ApiEnvelope<T> {
   [k: string]: unknown;
 }
 
+/**
+ * একমাত্র জায়গা যেখানে API পাথ তৈরি হয় — '/api' প্রিফিক্স যেন কোনোদিন বাদ না পড়ে।
+ * (আগে mess()/syncRaw() সরাসরি "/mess" ও "/sync" কল করত → সবসময় 404, অথচ API টেস্টগুলো
+ * সরাসরি /api/mess কল করায় বাগটা ধরা পড়েনি। তাই এখন প্রতিটি হেল্পার এই ফাংশন দিয়েই যায়।)
+ */
+export function apiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path; // সম্পূর্ণ URL (যেমন Apps Script) অপরিবর্তিত
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return p.startsWith("/api/") ? p : `/api${p}`;
+}
+
 async function request<T>(url: string, init: RequestInit = {}): Promise<ApiEnvelope<T>> {
   let res: Response;
   try {
@@ -77,18 +88,18 @@ export async function apiGet<T>(path: string, params: Record<string, string | nu
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") qs.set(k, String(v));
   const suffix = qs.toString() ? `?${qs.toString()}` : "";
-  const json = await request<T>(`/api${path}${suffix}`);
+  const json = await request<T>(`${apiUrl(path)}${suffix}`);
   return (json.data ?? json) as T;
 }
 
 export async function apiPost<T>(path: string, body: Record<string, unknown> = {}): Promise<T> {
-  const json = await request<T>(`/api${path}`, { method: "POST", body: JSON.stringify(body) });
+  const json = await request<T>(apiUrl(path), { method: "POST", body: JSON.stringify(body) });
   return (json.data ?? json) as T;
 }
 
 /** POST /api/mess with an action — the main data channel */
 export async function mess<T = unknown>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
-  const json = await request<{ action: string; data: T }>("/mess", {
+  const json = await request<{ action: string; data: T }>(apiUrl("/mess"), {
     method: "POST",
     body: JSON.stringify({ action, ...payload }),
   });
@@ -101,11 +112,11 @@ export async function mess<T = unknown>(action: string, payload: Record<string, 
 
 /** POST /api/sync — returns the raw Apps-Script-shaped response (spec §99) */
 export async function syncRaw(body: Record<string, unknown> = {}): Promise<ApiEnvelope<unknown>> {
-  return request("/sync", { method: "POST", body: JSON.stringify(body) });
+  return request(apiUrl("/sync"), { method: "POST", body: JSON.stringify(body) });
 }
 
 export async function postForm<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const json = await request<T>(path, { method: "POST", body: JSON.stringify(body) });
+  const json = await request<T>(apiUrl(path), { method: "POST", body: JSON.stringify(body) });
   return json.data as T;
 }
 
