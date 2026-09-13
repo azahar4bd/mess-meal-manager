@@ -145,22 +145,43 @@ sudo certbot --nginx -d mess.example.com
 
 ---
 
-## 4 · Vercel + Neon (serverless)
+## 4 · Vercel + Neon (serverless) — free tier
 
-1. **Database:** create a Neon (or Supabase/RDS) project → copy the pooled connection string.
-2. **Vercel:** import the repo → Framework preset **Next.js**.
-3. **Env vars** (Project → Settings → Environment Variables): `DATABASE_URL`, `SESSION_SECRET`, `GOOGLE_SCRIPT_WEB_APP_URL`, `NODE_ENV=production`.
-4. **Schema:** run once locally against the remote DB —
-   ```bash
-   DATABASE_URL="postgresql://…neon…" npx drizzle-kit push --force
-   ```
-   or `DATABASE_URL="…" npx drizzle-kit migrate`.
-5. **Deploy.** Vercel runs `npm run build` automatically.
+👉 **সম্পূর্ণ ধাপে ধাপে বাংলা গাইড: [`docs/vercel-neon.md`](vercel-neon.md)** (~১৫ মিনিট)
 
-Notes for serverless:
-- Use the **pooled** connection string (`-pooler` host) so `pg` doesn't exhaust connections.
-- Rate limiting and the audit trail are per-instance/in-memory for the limiter only — the audit log itself is in PostgreSQL, so it survives.
-- Cold starts add ~300 ms to the first request; the UI shows skeletons meanwhile.
+সংক্ষিপ্ত সংস্করণ:
+
+```bash
+# 1) কোড GitHub-এ
+git remote add origin https://github.com/<you>/mess-meal-manager.git && git push -u origin main
+
+# 2) Neon → Create Project → Connect → "Connection pooling" ON → URL কপি
+#    postgresql://user:pass@ep-xxxx-POOLER.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+
+# 3) স্কিমা (ল্যাপটপ থেকে — রিমোট Neon-এ সরাসরি)
+DATABASE_URL="postgresql://…-pooler…neon.tech/neondb?sslmode=require" npm run db:migrate:remote
+
+# 4) Vercel → Import repo → env vars → Deploy
+```
+
+Vercel env vars: `DATABASE_URL` (pooler URL), `SESSION_SECRET` (`openssl rand -hex 32`), `NODE_ENV=production`, ঐচ্ছিক `GOOGLE_SCRIPT_WEB_APP_URL`, `AUTO_SYNC=0`, `SHOW_PASSWORDS_IN_ADMIN=0`.
+
+শেল ছাড়া মাইগ্রেট করতে (ব্রাউজার থেকে): Vercel-এ `MIGRATION_SECRET` সেট করে একবার
+`POST /api/migrations {"secret":"…"}` কল করুন → তারপর ভেরিয়েবলটি মুছে ফেলে Redeploy দিন।
+
+যাচাই: `GET /api/setup/status` → `{"ok":true,"ready":true,"database":{"migrated":true,"tables":13}}`
+
+**Neon কেন আলাদা ড্রাইভার চায়:** serverless ফাংশনে TCP পুল কানেকশন শেষ করে দেয়, তাই
+`src/db/index.ts` হোস্টে `neon.tech` দেখলে স্বয়ংক্রিয়ভাবে `@neondatabase/serverless` (WebSocket)
+ড্রাইভার ব্যবহার করে। কোডের বাকি সব অংশ অপরিবর্তিত — একই Drizzle API। বাধ্য করতে:
+`DB_DRIVER=neon` বা `DB_DRIVER=pg`।
+
+Serverless-এ খেয়াল রাখার বিষয়:
+- সবসময় **pooler** (`-pooler.`) হোস্ট ব্যবহার করুন, `?sslmode=require` সহ
+- Neon Free tier-এ ৫ মিনিট নিষ্ক্রিয়তার পর compute ঘুমায় → প্রথম রিকোয়েস্টে ~৫০০ ms cold start
+- রেট লিমিটার প্রতি-ইনস্ট্যান্স ইন-মেমরি (অডিট লগ ও সব ডেটা PostgreSQL-এ, তাই নিরাপদ);
+  একাধিক ইনস্ট্যান্সে কঠোর লিমিট দরকার হলে `src/lib/rate-limit.ts`-এ Redis/Upstash স্টোর বসান
+- `vercel.json` রিজিওন `sin1` (Singapore) — বাংলাদেশ থেকে সবচেয়ে কম latency
 
 ---
 
@@ -247,7 +268,7 @@ Nightly cron:
 - [ ] PostgreSQL password is strong; DB not exposed to `0.0.0.0`
 - [ ] HTTPS enabled (cookies are `Secure` in production)
 - [ ] `npm run build` succeeds with 0 TypeScript errors
-- [ ] `npm run test` → 141 API checks + 70 sheet checks pass
+- [ ] `npm run test` → 154 API checks + 70 sheet checks pass
 - [ ] `GET /api/health` returns `database: "online"` and `timezone: "Asia/Dhaka"`
 - [ ] Backups scheduled and a restore has been rehearsed
 - [ ] Google Apps Script deployed **only if** Sheets reporting is wanted (optional)

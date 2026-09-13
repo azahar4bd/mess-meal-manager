@@ -396,7 +396,61 @@ Same document as `format=html`, with `Content-Disposition: inline; filename="…
 
 ---
 
-## 5 · Google Apps Script endpoint (deployed separately)
+## 5 · Deployment / ops endpoints
+
+### `GET /api/setup/status` — public readiness probe
+
+Answers "is this deployment usable?" without leaking data (counts only):
+
+```jsonc
+{
+  "ok": true, "ready": true, "app": "Mess Meal Manager", "version": "1.0.0",
+  "database": { "ok": true, "driver": "neon-serverless (websocket)", "migrated": true,
+                "tables": 13, "missingTables": [], "error": null },
+  "counts": { "offices": 3, "users": 9, "months": 6 },
+  "googleSheets": { "configured": false },
+  "nextSteps": ["সব প্রস্তুত — /login থেকে লগইন করুন।"],
+  "latencyMs": 214, "time": "2026-09-13T16:02:11.000Z"
+}
+```
+
+`ready` is true only when the database is reachable, all 13 app tables exist and at least one office has been created. `nextSteps` always contains the exact Bengali instruction for whatever is missing.
+
+### `POST /api/migrations` — one-shot schema setup (Vercel + Neon)
+
+```jsonc
+// request
+{ "secret": "<MIGRATION_SECRET>" }        // or ?secret=… / x-reset-secret header
+
+// response
+{ "ok": true, "driver": "neon-serverless (websocket)",
+  "applied": ["0000_init"], "skipped": [], "baselined": [], "failed": null,
+  "tables": ["audit_logs", "…"], "counts": { "offices": 0, "users": 0, "months": 0 },
+  "message": "1টি মাইগ্রেশন প্রয়োগ হয়েছে (0000_init)",
+  "hint": "স্কিমা প্রস্তুত। এখন GET /api/setup/status দেখুন, তারপর MIGRATION_SECRET মুছে ফেলে আবার ডিপ্লয় দিন।" }
+```
+
+| Status | When |
+|---|---|
+| 404 | `MIGRATION_SECRET` is not set on the server (endpoint disabled — cannot be probed) |
+| 403 | wrong/missing secret |
+| 200 | migrations applied or already up to date |
+| 500 | a migration failed — the transaction was rolled back, `failed` + `message` explain why |
+
+Behaviour: reads `drizzle/meta/_journal.json`, applies each `drizzle/*.sql` inside one transaction per file, records it in `__migrations`, and **never re-applies** an applied migration. DDL is rewritten to be re-runnable (`CREATE TYPE`/`ADD CONSTRAINT` get `DO $$ … IF NOT EXISTS` guards), and a database created earlier by `drizzle-kit push` is **baselined** (recorded without executing) instead of erroring. Idempotent → safe to call on every deploy.
+
+### `POST /api/dev/reset-rate-limits` — clear the in-memory limiter
+
+```jsonc
+{ "secret": "<RATE_LIMIT_RESET_SECRET>" }
+→ { "ok": true, "clearedBuckets": 69, "remainingBuckets": 0, "limits": { … } }
+```
+
+Allowed only for an authenticated **platform admin**, or with the exact `RATE_LIMIT_RESET_SECRET`. Otherwise **404**. Used by the E2E suite (`npm run test`) so repeated runs are not throttled; also the escape hatch when a real user is locked out. Per-process only — on multi-instance deployments it clears the instance that served the request.
+
+---
+
+## 6 · Google Apps Script endpoint (deployed separately)
 
 See [`docs/google-apps-script.md`](google-apps-script.md) for setup and [`google-apps-script/Code.gs`](../google-apps-script/Code.gs) for the source.
 
@@ -413,7 +467,7 @@ See [`docs/google-apps-script.md`](google-apps-script.md) for setup and [`google
 
 ---
 
-## 6 · Rate limits
+## 7 · Rate limits
 
 | Scope | Limit | Key |
 |---|---|---|
@@ -428,7 +482,7 @@ Exceeding a limit returns **429** with `Retry-After`. The limiter is in-memory p
 
 ---
 
-## 7 · curl cookbook
+## 8 · curl cookbook
 
 ```bash
 BASE=http://localhost:3000
@@ -457,4 +511,11 @@ curl -s -b $J -X POST $BASE/api/sync -H 'content-type: application/json' -d '{"a
 
 # logout
 curl -s -b $J -c $J -X POST $BASE/api/auth/logout
+
+# deployment readiness
+curl -s $BASE/api/setup/status | python3 -m json.tool
+
+# one-shot schema setup on Vercel (then delete MIGRATION_SECRET!)
+curl -s -X POST $BASE/api/migrations -H 'content-type: application/json' \
+  -d '{"secret":"'"$MIGRATION_SECRET"'"}'
 ```

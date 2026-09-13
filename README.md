@@ -73,8 +73,8 @@ nano .env.local        # DATABASE_URL + SESSION_SECRET ঠিক করুন
 #   SESSION_SECRET তৈরি: openssl rand -hex 32
 
 # 4) টেবিল তৈরি + ডেমো ডেটা
-npm run db:push        # (অথবা npm run db:migrate — drizzle/0000_init.sql)
-npm run db:seed
+npm run db:migrate:sql # drizzle/0000_init.sql প্রয়োগ (idempotent)
+npm run db:seed        # (ডেভে: npm run db:push ও চলবে)
 
 # 5) প্রোডাকশন বিল্ড + সার্ভার
 npm run build
@@ -82,6 +82,13 @@ npm run start          # http://localhost:3000
 ```
 
 ডেভেলপমেন্ট মোডে: `npm run dev`
+
+**ক্লাউডে (ফ্রি) ডিপ্লয় করতে চান?** → [`docs/vercel-neon.md`](docs/vercel-neon.md)
+Neon-এর URL দিলেই অ্যাপ স্বয়ংক্রিয়ভাবে serverless ড্রাইভারে চলে যায়:
+
+```bash
+DATABASE_URL="postgresql://…-pooler.…neon.tech/neondb?sslmode=require" npm run db:migrate:remote
+```
 
 > সব স্ক্রিপ্ট: `dev`, `build`, `start`, `typecheck`, `db:generate`, `db:migrate`, `db:push`, `db:studio`, `db:seed`, `db:reset`, `test`, `test:api`, `test:sheet`
 
@@ -178,6 +185,9 @@ mess-meal-manager/
 │  │  ├─ api/
 │  │  │  ├─ auth/{login,logout,me,signup,join}/route.ts   ← সেশন + রেজিস্ট্রেশন
 │  │  │  ├─ health/route.ts                              ← ডেটাবেস/টাইমজোন চেক
+│  │  │  ├─ migrations/route.ts                          ← ★ এক-শট স্কিমা সেটআপ (Vercel+Neon)
+│  │  │  ├─ setup/status/route.ts                        ← ডিপ্লয়মেন্ট রেডিনেস প্রোব
+│  │  │  └─ dev/reset-rate-limits/route.ts               ← লিমিটার রিসেট (অ্যাডমিন/সিক্রেট)
 │  │  │  ├─ mess/route.ts                                ← ★ মূল API হাব (৫৪টি action)
 │  │  │  ├─ sync/route.ts                                ← গুগল শিট সিঙ্ক
 │  │  │  └─ report/{export,pdf}/route.ts                 ← CSV / প্রিন্ট-রেডি PDF
@@ -191,12 +201,13 @@ mess-meal-manager/
 │  │  ├─ MessApp.tsx                                      ← শেল, নেভিগেশন, অফিস/মাস সুইচার
 │  │  ├─ ui/{index.tsx,entry-panel.tsx}                   ← ডিজাইন প্রিমিটিভ
 │  │  └─ views/                                           ← ১২টি স্ক্রিন (সব ফিচার)
-│  ├─ db/{schema.ts,index.ts}                             ← Drizzle স্কিমা + কানেকশন
+│  ├─ db/{schema.ts,index.ts}                             ← Drizzle স্কিমা + কানেকশন (pg / Neon অটো)
 │  └─ lib/
 │     ├─ permissions.ts   ← ★ রোল ম্যাট্রিক্স + মেনু
 │     ├─ mess-data.ts     ← ★ সব DB রিড/রাইট (অফিস+মাস স্কোপড)
 │     ├─ calc.ts          ← ★ মিল রেট / খরচ / দেনা-পাওনা
 │     ├─ sheets.ts + sheet-structure.ts  ← ৮ ট্যাবের শিট পে-লোড
+│     ├─ migrate.ts       ← ★ রানটাইম SQL মাইগ্রেশন রানার (idempotent)
 │     ├─ api.ts           ← সেশন, পারমিশন, রেট-লিমিট, এরর হ্যান্ডলার
 │     ├─ auth.ts password.ts audit.ts rate-limit.ts
 │     ├─ date.ts format.ts validate.ts random.ts types.ts
@@ -207,9 +218,12 @@ mess-meal-manager/
 ├─ scripts/
 │  ├─ seed.ts            ← ডেমো ডেটা (idempotent)
 │  ├─ reset.ts           ← সব টেবিল ড্রপ
-│  ├─ test-api.mjs       ← ১৪১টি E2E API চেক
+│  ├─ migrate.ts         ← রিমোট (Neon) মাইগ্রেশন CLI
+│  ├─ test-setup.mjs     ← টেস্টের আগে ডেমো DB রিস্টোর (গার্ডেড)
+│  ├─ test-api.mjs       ← ১৫৪টি E2E API চেক
 │  └─ test-apps-script.mjs ← ৭০টি Apps Script সিмуляশন চেক
 ├─ drizzle/0000_init.sql ← মাইগ্রেশন
+├─ vercel.json           ← Vercel কনফিগ (region sin1, maxDuration)
 ├─ docs/                 ← ডিপ্লয়মেন্ট, Apps Script, API, DB ডক
 └─ .env.example
 ```
@@ -220,9 +234,9 @@ mess-meal-manager/
 
 ```bash
 npm run build        # TypeScript 0 error + প্রোডাকশন বিল্ড
-npm run test:api     # ১৪১টি E2E চেক (অথ, আইসোলেশন, হিসাব, এক্সপোর্ট, সিঙ্ক…)
+npm run test:api     # ১৫৪টি E2E চেক (অথ, আইসোলেশন, হিসাব, এক্সপোর্ট, সিঙ্ক…)
 npm run test:sheet   # ৭০টি চেক — আসল Code.gs + আসল পে-লোড দিয়ে সিমুলেশন
-npm run test         # দুটোই
+npm run test         # দুটোই (প্রথমে ডেমো DB রিস্টোর করে, তাই বারবার চালানো যায়)
 ```
 
 `test:sheet` আসল `google-apps-script/Code.gs` ফাইলটাই লোড করে, অ্যাপের কাছ থেকে আসল `sheet.payload` নিয়ে, একটি সিমুলেটেড SpreadsheetApp-এ চালায় — ফলে ট্যাবের নাম, হেডার, সারি সংখ্যা ও সেল টাইপ হুবহু যাচাই হয় (গুগল শিটে ডিপ্লয় করার আগেই)।
@@ -233,7 +247,8 @@ npm run test         # দুটোই
 
 | ফাইল | বিষয় |
 |------|-------|
-| [`docs/deployment.md`](docs/deployment.md) | লোকাল/ভিপিএস/Vercel+Neon/Railway ডিপ্লয়মেন্ট, এনভি ভেরিয়েবল, ব্যাকআপ, সিকিউরিটি চেকলিস্ট |
+| [`docs/vercel-neon.md`](docs/vercel-neon.md) | ★ **Vercel + Neon ফ্রি ডিপ্লয়মেন্ট** — ধাপে ধাপে (GitHub → Neon → মাইগ্রেশন → env → যাচাই) |
+| [`docs/deployment.md`](docs/deployment.md) | লোকাল/ভিপিএস/Vercel+Neon/Railway/Docker ডিপ্লয়মেন্ট, এনভি ভেরিয়েবল, ব্যাকআপ, সিকিউরিটি চেকলিস্ট |
 | [`docs/google-apps-script.md`](docs/google-apps-script.md) | শিট তৈরি → Apps Script → Web App ডিপ্লয় → অ্যাপে URL বসানো (স্ক্রিনশট-স্টাইল ধাপ) |
 | [`docs/api.md`](docs/api.md) | প্রতিটি এন্ডপয়েন্ট ও ৫২টি action-এর রিকোয়েস্ট/রেসপন্স উদাহরণ |
 | [`docs/database.md`](docs/database.md) | টেবিল, কলাম, ইউনিক কনস্ট্রেইন্ট, ইনডেক্স ও বিজনেস রুল ম্যাপিং |
