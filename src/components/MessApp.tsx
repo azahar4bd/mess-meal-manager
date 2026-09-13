@@ -57,6 +57,15 @@ function Shell({ initialTab }: { initialTab?: string }) {
     document.documentElement.classList.toggle("dark", app.theme === "dark");
   }, [app.theme]);
 
+  // অ্যাডমিনের হাতে একটাও অফিস না থাকলে তাকে সরাসরি অ্যাডমিন প্যানেলে রাখো — অন্য ট্যাবে
+  // দেখার মতো কোনো ডেটা নেই, আর অফিস তৈরি করার একমাত্র জায়গা ওই প্যানেলই।
+  useEffect(() => {
+    if (app.user?.role === "admin" && !app.office && app.offices.length === 0 && app.tab !== "admin") {
+      app.setTab("admin");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.user?.role, app.office, app.offices.length]);
+
   if (app.loading && !app.user) {
     return (
       <div className="min-h-screen">
@@ -85,7 +94,12 @@ function Shell({ initialTab }: { initialTab?: string }) {
     );
   }
 
-  if (app.bootError === "office-required" || (!app.office && app.user.role === "admin")) {
+  // আগে এখানে অ্যাডমিনও আটকে যেত: কোনো অফিস না থাকলে SelectOfficeScreen দেখাত, সেই স্ক্রিন
+  // "/signup"-এ পাঠাত, কিন্তু লগইন থাকায় /signup আবার এই স্ক্রিনেই ফিরিয়ে আনত — ফলে প্রথম অফিস
+  // তৈরির কোনো পথই খোলা থাকত না (chicken-and-egg)। এখন একটাও অফিস না থাকলে অ্যাডমিন সরাসরি
+  // অ্যাডমিন প্যানেলে ঢুকতে পারে; অফিস থাকলে কিন্তু নির্বাচিত না হলে আগের মতো পিকারই দেখাবে।
+  const adminWithoutAnyOffice = app.user.role === "admin" && !app.office && app.offices.length === 0;
+  if (!adminWithoutAnyOffice && (app.bootError === "office-required" || (!app.office && app.user.role === "admin"))) {
     return (
       <>
         <SelectOfficeScreen />
@@ -108,6 +122,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <ContextBar />
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4">
+        {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
         <TabRouter />
       </main>
       <MobileTabBar />
@@ -116,9 +131,33 @@ function Shell({ initialTab }: { initialTab?: string }) {
   );
 }
 
+/** কোনো অফিসই তৈরি হয়নি — অ্যাডমিনকে কী করতে হবে স্পষ্ট করে বলা */
+function NoOfficeNotice() {
+  return (
+    <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--brand-soft)] p-3">
+      <div className="text-[13.5px] font-extrabold">এখনো কোনো অফিস / মেস তৈরি হয়নি</div>
+      <p className="muted mt-1 text-[12.5px] leading-relaxed">
+        নিচের <strong>অ্যাডমিন</strong> প্যানেলের <strong>অফিস</strong> ট্যাব থেকে প্রথম অফিস বানান। ফর্মে চাইলে
+        ম্যানেজারের User ID ও পাসওয়ার্ডও দিতে পারেন — তাহলে অফিসের সাথে ম্যানেজারের লগইন একই ধাপে তৈরি হয়ে
+        যাবে, আলাদা করে <strong>ইউজার</strong> ট্যাবে যেতে হবে না।
+      </p>
+    </div>
+  );
+}
+
 function TabRouter() {
   const app = useApp();
   const tab = app.tab;
+
+  // অফিস ছাড়া ডেটা-ট্যাবগুলোতে দেখার মতো কিছু নেই — অ্যাডমিন প্যানেল ছাড়া সব ট্যাবে পরিষ্কার বার্তা
+  if (!app.office && tab !== "admin") {
+    return (
+      <EmptyState
+        title="কোনো অফিস নির্বাচিত নেই"
+        hint="অ্যাডমিন প্যানেলের “অফিস” ট্যাব থেকে অফিস তৈরি করুন, তারপর ওপরের সুইচার থেকে অফিস বেছে নিন।"
+      />
+    );
+  }
 
   if (!app.can("report.view") && !app.can("meals.view")) {
     return <EmptyState title="আপনার কোনো ট্যাবে প্রবেশাধিকার নেই" hint="ম্যানেজার বা অ্যাডমিনের সঙ্গে যোগাযোগ করুন।" />;

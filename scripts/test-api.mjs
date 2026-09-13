@@ -477,6 +477,40 @@ async function main() {
   });
   check("admin can create an office", created.status === 200 && Boolean(created.json?.data?.data?.id), created.text.slice(0, 140));
   const createdId = created.json?.data?.data?.id;
+
+  // একই ধাপে অফিস + ম্যানেজার অ্যাকাউন্ট তৈরি (নতুন ফিচার)
+  const cmbMgrId = `031${stamp}`;
+  const cmbOffice = await req(admin, "POST", "/api/mess", {
+    action: "admin.office.create",
+    name: `Office With Manager ${stamp}`,
+    branch: "Test",
+    managerName: "Combined Manager",
+    managerPhone: cmbMgrId,
+    status: "active",
+    managerUserId: cmbMgrId,
+    managerPassword: "manager123",
+  });
+  const cmbData = cmbOffice.json?.data?.data;
+  check(
+    "office + manager account created in one step",
+    cmbOffice.status === 200 && Boolean(cmbData?.id) && Boolean(cmbData?.managerId),
+    `status=${cmbOffice.status} ${cmbOffice.text.slice(0, 140)}`,
+  );
+  const cmbLogin = await req(jar(), "POST", "/api/auth/login", { login: cmbMgrId, password: "manager123" });
+  check("the manager created with the office can log in", cmbLogin.status === 200, `status=${cmbLogin.status} ${cmbLogin.text.slice(0, 120)}`);
+  const cmbDup = await req(admin, "POST", "/api/mess", {
+    action: "admin.office.create",
+    name: `Dup Manager Office ${stamp}`,
+    managerUserId: cmbMgrId,
+    managerPassword: "manager123",
+  });
+  check("duplicate manager userId is rejected (409)", cmbDup.status === 409, `status=${cmbDup.status} ${cmbDup.text.slice(0, 120)}`);
+  const cmbAfter = await req(admin, "POST", "/api/mess", { action: "admin.offices.list" });
+  check(
+    "no orphan office left behind after the rejected create",
+    cmbAfter.status === 200 && !cmbAfter.text.includes(`Dup Manager Office ${stamp}`),
+    cmbAfter.text.slice(0, 140),
+  );
   const deactivated = await req(admin, "POST", "/api/mess", { action: "admin.office.status", id: createdId, status: "inactive" });
   check("admin can deactivate an office", deactivated.status === 200 && deactivated.json?.data?.data?.status === "inactive");
 

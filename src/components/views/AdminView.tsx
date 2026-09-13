@@ -191,6 +191,9 @@ const emptyOfficeForm = {
   sheetUrl: "",
   scriptUrl: "",
   note: "",
+  // শুধু নতুন অফিস তৈরির সময় ব্যবহৃত — একই ধাপে ম্যানেজারের লগইনও তৈরি করা যায়
+  managerUserId: "",
+  managerPassword: "",
 };
 
 function OfficesPanel() {
@@ -245,6 +248,8 @@ function OfficesPanel() {
       sheetUrl: o.sheetUrl,
       scriptUrl: o.scriptUrl,
       note: o.note,
+      managerUserId: "",
+      managerPassword: "",
     });
     setFormOpen(true);
   };
@@ -254,12 +259,22 @@ function OfficesPanel() {
       app.toast("অফিসের নাম লিখুন", "error");
       return;
     }
+    const wantManager = !editing && form.managerUserId.trim().length > 0;
+    if (wantManager && form.managerPassword.trim().length < 4) {
+      app.toast("ম্যানেজারের User ID দিলে পাসওয়ার্ডও দিতে হবে (৪+ অক্ষর)", "error");
+      return;
+    }
     setBusy(true);
     const action = editing ? "admin.office.update" : "admin.office.create";
-    const res = await app.call<OfficeDTO>(action, editing ? { ...form, id: editing } : form);
+    const { managerUserId, managerPassword, ...officeFields } = form;
+    const res = await app.call<OfficeDTO>(
+      action,
+      editing ? { ...officeFields, id: editing } : { ...officeFields, managerUserId, managerPassword },
+    );
     setBusy(false);
     if (res) {
-      app.toast(editing ? "অফিস হালনাগাদ হয়েছে ✓" : `নতুন অফিস তৈরি হয়েছে ✓ কোড: ${res.code}`, "success");
+      const extra = wantManager ? ` + ম্যানেজার ${managerUserId.trim()} তৈরি হয়েছে` : "";
+      app.toast(editing ? "অফিস হালনাগাদ হয়েছে ✓" : `নতুন অফিস তৈরি হয়েছে ✓ কোড: ${res.code}${extra}`, "success");
       setFormOpen(false);
       await load();
     }
@@ -443,6 +458,20 @@ function OfficesPanel() {
           <Field label="ঠিকানা">
             <TextInput value={form.address} onChange={set("address")} />
           </Field>
+          {!editing ? (
+            <>
+              <Field
+                label="ম্যানেজারের User ID / মোবাইল (ঐচ্ছিক)"
+                hint="দিলে অফিসের সাথে ম্যানেজারের লগইনও এখনই তৈরি হয়ে যাবে"
+                className="sm:col-span-2"
+              >
+                <TextInput value={form.managerUserId} onChange={set("managerUserId")} placeholder="01711111111" inputMode="tel" />
+              </Field>
+              <Field label="ম্যানেজারের পাসওয়ার্ড (ঐচ্ছিক)" hint="কমপক্ষে ৪ অক্ষর — bcrypt দিয়ে হ্যাশ হবে" className="sm:col-span-2">
+                <TextInput value={form.managerPassword} onChange={set("managerPassword")} type="text" placeholder="••••••••" />
+              </Field>
+            </>
+          ) : null}
           <Field label="Google Sheet URL">
             <TextInput value={form.sheetUrl} onChange={set("sheetUrl")} placeholder="https://docs.google.com/spreadsheets/d/…" />
           </Field>

@@ -733,6 +733,22 @@ const handlers: Record<string, ActionHandler> = {
     if (!can(ctx.user.role, "office.manage")) deny(ctx, "office.manage");
     const name = str(body.name);
     if (name.length < 2) throw new AuthError("bad-request", "অফিসের নাম লিখুন", 400);
+
+    // ঐচ্ছিক: একই ধাপে ম্যানেজারের লগইনও তৈরি করা যায় (আলাদা করে ইউজার ট্যাবে যেতে হয় না)।
+    // অফিস বানানোর *আগেই* যাচাই করে নিই, যাতে ব্যর্থ হলে অর্ধেক-তৈরি অফিস পড়ে না থাকে।
+    const managerUserId = str(body.managerUserId);
+    const managerPassword = str(body.managerPassword);
+    if (managerUserId) {
+      if (managerUserId.length < 4)
+        throw new AuthError("bad-request", "ম্যানেজারের User ID কমপক্ষে ৪ অক্ষরের হতে হবে", 400);
+      if (managerPassword.length < 4)
+        throw new AuthError("bad-request", "ম্যানেজারের পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে", 400);
+      if (await findUserByLogin(managerUserId))
+        throw new ServiceError("এই User ID দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট আছে — ম্যানেজারের জন্য ভিন্ন নম্বর দিন", 409, {
+          managerUserId: "ইতিমধ্যে ব্যবহৃত",
+        });
+    }
+
     const { adminSaveOffice } = await import("@/lib/service");
     const office = await adminSaveOffice({
       name,
@@ -747,8 +763,32 @@ const handlers: Record<string, ActionHandler> = {
       scriptUrl: str(body.scriptUrl),
       note: str(body.note),
     });
+
+    let managerId = "";
+    if (office && managerUserId) {
+      try {
+        const manager = await createUser({
+          userId: managerUserId,
+          name: str(body.managerName) || name,
+          email: str(body.managerEmail).toLowerCase(),
+          phone: str(body.managerPhone) || managerUserId,
+          branch: str(body.branch),
+          officeId: office.id,
+          role: "manager",
+          status: "active",
+          password: managerPassword,
+        });
+        managerId = manager.id;
+        await logAction(ctx, "admin.user.create", "user", manager.id, `অফিসের সাথে ম্যানেজার তৈরি: ${manager.name} (${manager.userId})`);
+      } catch (err) {
+        // অফিসটা রেখে দিয়ে অর্ধেক অবস্থা ফেলে রাখব না — ক্ষতিপূরণ হিসেবে সদ্য তৈরি অফিস মুছে দিই
+        await db.delete(offices).where(eq(offices.id, office.id));
+        throw err;
+      }
+    }
+
     await logAction(ctx, "admin.office.create", "office", office?.id ?? "", `অফিস তৈরি/হালনাগাদ: ${name}`);
-    return office ? officeDTO(office) : null;
+    return office ? { ...officeDTO(office), managerId } : null;
   },
 
   "admin.office.update": async (ctx, body) => {

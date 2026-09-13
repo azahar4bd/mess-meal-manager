@@ -359,7 +359,12 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fields ?? {});
-        setFormError(err.message);
+        // নম্বরটি আগেই ব্যবহৃত (যেমন নিজের অ্যাডমিন লগইন) — তখন কী করণীয় সেটা বলে দিই
+        setFormError(
+          /ইতিমধ্যে/.test(err.message)
+            ? `${err.message}। আপনি প্ল্যাটফর্ম অ্যাডমিন হলে লগইন করে অ্যাডমিন প্যানেল → “অফিস” ট্যাব থেকে অফিস বানান (সেখানে ম্যানেজারের আলাদা লগইনও একই ফর্মে তৈরি করা যায়); অথবা ম্যানেজারের জন্য একটি ভিন্ন মোবাইল নম্বর দিন।`
+            : err.message,
+        );
       } else {
         setFormError("অফিস তৈরি করা যায়নি");
       }
@@ -393,6 +398,10 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
         <h2 className="text-[17px] font-extrabold">নতুন অফিস / মেস তৈরি করুন</h2>
         <p className="muted text-[12px]">
           একটি অফিস + তার ম্যানেজার অ্যাকাউন্ট তৈরি হবে। অফিস কোড স্বয়ংক্রিয়ভাবে তৈরি হবে।
+        </p>
+        <p className="muted mt-1 text-[11.5px]">
+          নোট: এখানে দেওয়া মোবাইল নম্বর আগে থেকে ব্যবহৃত হলে (যেমন আপনার অ্যাডমিন লগইন) নতুন অফিস তৈরি হবে না —
+          তখন অ্যাডমিন প্যানেল ব্যবহার করুন বা ভিন্ন নম্বর দিন। সাইনআপ সফল হলে আপনি ওই অফিসের <strong>ম্যানেজার</strong> হিসেবে লগইন হয়ে যাবেন।
         </p>
       </div>
 
