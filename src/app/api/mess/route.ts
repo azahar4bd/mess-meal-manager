@@ -828,9 +828,19 @@ const handlers: Record<string, ActionHandler> = {
     if (userId.length < 4) throw new AuthError("bad-request", "User ID কমপক্ষে ৪ অক্ষরের হতে হবে", 400);
     if (await findUserByLogin(userId)) throw new ServiceError("এই User ID আগেই ব্যবহৃত হয়েছে", 409);
     const officeId = ctx.user.role === "admin" ? str(body.officeId) || null : ctx.activeOfficeId;
-    if (ctx.user.role !== "admin" && !officeId) throw new AuthError("office-required", "অফিস নির্বাচন করুন", 400);
     const role = normalizeRole(str(body.role));
     if (role === "admin" && ctx.user.role !== "admin") deny(ctx, "user.manage");
+    // শুধু প্ল্যাটফর্ম admin-এর officeId null হতে পারে। manager/member/audit অবশ্যই একটা অফিসে যুক্ত
+    // থাকবে — না হলে অফিসবিহীন ইউজার তৈরি হয়, যার কোনো ডেটা-অ্যাক্সেস নেই আর রিপোর্টেও আসে না।
+    if (role !== "admin" && !officeId)
+      throw new AuthError(
+        "office-required",
+        "এই রোলের জন্য অফিস নির্বাচন করা আবশ্যক (অফিসবিহীন হতে পারে শুধু প্ল্যাটফর্ম admin)",
+        400,
+      );
+    // দুর্বল ডিফল্ট পাসওয়ার্ড ("1234") আর দেওয়া হবে না — নতুন ইউজারের পাসওয়ার্ড বাধ্যতামূলক।
+    const password = str(body.password);
+    if (password.length < 4) throw new AuthError("bad-request", "পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে", 400);
     const created = await createUser({
       userId,
       name: str(body.name) || userId,
@@ -840,7 +850,7 @@ const handlers: Record<string, ActionHandler> = {
       officeId,
       role,
       status: normalizeUserStatus(str(body.status), role),
-      password: str(body.password) || "1234",
+      password,
     });
     await logAction(ctx, "admin.user.create", "user", created.id, `নতুন ইউজার: ${created.name} (${role})`);
     return { id: created.id, userId: created.userId, name: created.name, role: created.role, status: created.status, officeId: created.officeId };
@@ -871,6 +881,11 @@ const handlers: Record<string, ActionHandler> = {
     }
     if (body.status !== undefined) patch.status = normalizeUserStatus(str(body.status), target.role);
     if (body.officeId !== undefined && ctx.user.role === "admin") patch.officeId = str(body.officeId) || null;
+    // হালনাগাদের ফলে যেন কোনো manager/member/audit অফিসবিহীন না হয়ে পড়ে
+    const nextRole = (patch.role as string | undefined) ?? target.role;
+    const nextOfficeId = "officeId" in patch ? (patch.officeId as string | null) : target.officeId;
+    if (nextRole !== "admin" && !nextOfficeId)
+      throw new AuthError("office-required", "এই রোলের জন্য অফিস আবশ্যক — ইউজারকে অফিসবিহীন করা যাবে না", 400);
 
     const rows = await db.update(users).set(patch).where(eq(users.id, id)).returning();
     const updated = rows[0]!;

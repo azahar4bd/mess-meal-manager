@@ -492,6 +492,29 @@ async function main() {
   });
   check("admin can create a user in any office", newUser.status === 200 && newUser.json?.data?.data?.officeId === "office_barishal", newUser.text.slice(0, 160));
 
+  // ── office-less user guards (only a platform admin may have officeId=null) ──
+  const officelessMgr = await req(admin, "POST", "/api/mess", {
+    action: "admin.user.create", userId: `025${stamp}`, name: "Officeless Manager", phone: `025${stamp}`,
+    officeId: "", role: "manager", status: "active", password: "manager123",
+  });
+  check("non-admin role cannot be created without an office", officelessMgr.status === 400 && officelessMgr.json?.code === "office-required", `status=${officelessMgr.status} ${officelessMgr.text.slice(0, 120)}`);
+
+  const weakPw = await req(admin, "POST", "/api/mess", {
+    action: "admin.user.create", userId: `026${stamp}`, name: "Weak Password", phone: `026${stamp}`,
+    officeId: "office_barishal", role: "member", status: "active", password: "12",
+  });
+  check("short password rejected (no weak \"1234\" fallback)", weakPw.status === 400, `status=${weakPw.status} ${weakPw.text.slice(0, 120)}`);
+
+  const orphanUpdate = await req(admin, "POST", "/api/mess", { action: "admin.user.update", id: newUser.json?.data?.data?.id, officeId: "" });
+  check("admin cannot strip an existing user's office", orphanUpdate.status === 400 && orphanUpdate.json?.code === "office-required", `status=${orphanUpdate.status} ${orphanUpdate.text.slice(0, 120)}`);
+
+  const secondAdmin = await req(admin, "POST", "/api/mess", {
+    action: "admin.user.create", userId: `027${stamp}`, name: "Second Platform Admin", phone: `027${stamp}`,
+    officeId: "", role: "admin", status: "active", password: "admin1234",
+  });
+  check("platform admin may still be office-less", secondAdmin.status === 200 && secondAdmin.json?.data?.data?.officeId === null, `status=${secondAdmin.status} ${secondAdmin.text.slice(0, 120)}`);
+  if (secondAdmin.json?.data?.data?.id) await req(admin, "POST", "/api/mess", { action: "admin.user.delete", id: secondAdmin.json.data.data.id });
+
   const resetPw = await req(admin, "POST", "/api/mess", { action: "admin.user.resetPassword", id: newUser.json?.data?.data?.id, password: "brandnew1" });
   check("admin can reset a password", resetPw.status === 200 && resetPw.json?.data?.data?.ok === true, resetPw.text.slice(0, 140));
   const loginNewPw = await req(jar(), "POST", "/api/auth/login", { login: `014${stamp}`, password: "brandnew1" });

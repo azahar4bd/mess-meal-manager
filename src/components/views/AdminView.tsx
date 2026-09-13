@@ -581,6 +581,10 @@ function UsersPanel() {
       app.toast("নতুন ইউজারের জন্য পাসওয়ার্ড (৪+ অক্ষর) দিন", "error");
       return;
     }
+    if (app.role === "admin" && form.role !== "admin" && !form.officeId) {
+      app.toast("এই রোলের জন্য অফিস বেছে নিন — অফিসবিহীন হতে পারে শুধু প্ল্যাটফর্ম admin", "error");
+      return;
+    }
     setBusy(true);
     const payload: Record<string, unknown> = { ...form };
     if (editing) {
