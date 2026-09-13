@@ -7,6 +7,9 @@
 
 ---
 
+> 🌐 **লাইভ ডেমো ডিপ্লয়মেন্ট:** <https://mess-meal-manager-orcin.vercel.app>
+> (Vercel Hobby + Neon; প্রথম অফিস খুলতে `/signup` ব্যবহার করুন)
+
 ## সূচি
 
 1. [ফিচার লিস্ট](#১--ফিচার-লিস্ট)
