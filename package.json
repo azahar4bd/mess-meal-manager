@@ -22,7 +22,9 @@
     "db:migrate:sql": "tsx --env-file=.env.local scripts/migrate.ts",
     "db:migrate:remote": "tsx scripts/migrate.ts",
     "setup:status": "curl -s $VERCEL_PROJECT_PRODUCTION_URL/api/setup/status || curl -s http://localhost:3000/api/setup/status",
-    "test:setup": "node scripts/test-setup.mjs"
+    "test:setup": "node scripts/test-setup.mjs",
+    "admin:create": "tsx --env-file=.env.local scripts/create-admin.ts",
+    "admin:create:remote": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

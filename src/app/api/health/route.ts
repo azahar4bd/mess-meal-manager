@@ -46,10 +46,16 @@ export async function GET() {
     };
     return NextResponse.json({ ok: true, ...result }, { status: 200 });
   } catch (err) {
+    const stats = poolStats();
     result.database = {
       ok: false,
+      driver: stats.driver,
+      serverless: IS_NEON,
+      latencyMs: Date.now() - started,
       error: (err as Error).message,
-      hint: "PostgreSQL চালু করুন এবং DATABASE_URL ঠিক আছে কিনা দেখুন",
+      hint: IS_NEON
+        ? "Neon-এ সংযোগ হচ্ছে না — DATABASE_URL-এ -pooler হোস্ট ও ?sslmode=require আছে কিনা দেখুন"
+        : "PostgreSQL চালু করুন এবং DATABASE_URL ঠিক আছে কিনা দেখুন",
     };
     result.googleSheets = { configured: Boolean(resolveScriptUrl()) };
     void users;

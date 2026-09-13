@@ -58,8 +58,22 @@ git push -u origin main
 1. [console.neon.tech](https://console.neon.tech) → **Sign up with GitHub**
 2. **Create Project**
    - Project name: `mess-meal-manager`
-   - Region: **AWS Asia Pacific (Singapore) — `ap-southeast-1`** ← বাংলাদেশ থেকে সবচেয়ে কম latency
-     (তালিকায় না থাকলে `AWS Frankfurt (eu-central-1)` নিন)
+   - Region: **AWS US East — `iad1` / `aws-us-east-2`** ← Vercel Hobby-এর ফাংশন সবসময় `iad1`-এ চলে,
+     তাই ডেটাবেসও সেখানে রাখলে সবচেয়ে দ্রুত হয় (মাপা ফলাফল নিচে)।
+     তালিকায় US East না থাকলে `AWS Frankfurt (eu-central-1)` নিন।
+
+> **⚠️ Region নিয়ে সাধারণ ভুল:** "বাংলাদেশ থেকে কাছে" ভেবে Singapore/India নেবেন না।
+> ব্রাউজার কখনো সরাসরি ডেটাবেসে কথা বলে না — ব্রাউজার কথা বলে **Vercel ফাংশনের** সাথে, আর
+> ফাংশন কথা বলে ডেটাবেসের সাথে। তাই হিসাবটা হলো:
+>
+> | Neon region | ফাংশন→DB প্রতি কুয়েরি | বাস্তব API কল (মাপা) | মাইগ্রেশন (৫১টি স্টেটমেন্ট) |
+> |---|---|---|---|
+> | `ap-southeast-1` (Singapore) + Vercel `iad1` | ~340 ms | median **1.77 s** · signup 3.9 s | 17.3 s |
+> | `iad1` / US East + Vercel `iad1` | ~1–5 ms | median **~0.3–0.5 s** (প্রত্যাশিত) | ~1–2 s |
+>
+> অর্থাৎ একই অ্যাপ ৪–৫ গুণ দ্রুত হয় শুধু region ঠিক রাখলে। ইতিমধ্যে Singapore-এ বানিয়ে ফেললে
+> নতুন প্রজেক্ট US East-এ বানিয়ে নতুন connection string দিন, তারপর আবার ধাপ ৩–৫ চালান
+> (পুরনো ডেটা থাকলে `pg_dump` → নতুন DB-তে রিস্টোর)।
    - Postgres version: সর্বশেষ (16/17)
 3. প্রজেক্ট ড্যাশবোর্ডে **Connect** বাটন → Connection Details উইজেট:
    - Branch: `main`
@@ -69,7 +83,7 @@ git push -u origin main
 4. **Copy** চাপুন — URL টা এমন দেখাবে:
 
 ```
-postgresql://neondb_owner:AbC123xYz@ep-cool-darkness-a1b2c3d4-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require
+postgresql://neondb_owner:AbC123xYz@ep-cool-darkness-a1b2c3d4-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require
                                                     └──────┬──────┘
                                      হোস্টে "-pooler" থাকাটা বাধ্যতামূলক
 ```
@@ -209,6 +223,26 @@ https://আপনার-প্রজেক্ট.vercel.app/api/migrations?secre
 4. সদস্যরা `/join` পেজে ওই অফিস কোড দিয়ে আবেদন করবে → আপনি **সদস্য** ট্যাব থেকে অনুমোদন দেবেন
 
 **ডেমো ডেটা দিয়ে থাকলে:** README-এর লগইন টেবিল ব্যবহার করুন (`01700000000` / `admin`)।
+
+### প্ল্যাটফর্ম অ্যাডমিন তৈরি করা (খালি ডেটাবেস হলে দরকার)
+
+`/signup` দিয়ে খোলা প্রথম ইউজার হয় ওই অফিসের **ম্যানেজার** — সে শুধু নিজের অফিস দেখতে পায়।
+একাধিক অফিস দেখা/অফিস ও ইউজার ম্যানেজ করতে **প্ল্যাটফর্ম অ্যাডমিন** লাগে, যেটা খালি ডেটাবেসে
+আপনাআপনি তৈরি হয় না। বানানোর উপায়:
+
+```bash
+# প্রোডাকশন (Neon) ডেটাবেসে — URL সরাসরি দিয়ে:
+DATABASE_URL="postgresql://neondb_owner:…neon.tech/neondb?sslmode=require" \
+  npm run admin:create:remote -- --userId=01700000000 --password='আপনার-শক্তিশালী-পাসওয়ার্ড' --name='Platform Admin'
+
+# লোকাল ডেটাবেসে (.env.local থেকে URL নেয়):
+npm run admin:create -- --userId=01700000000 --password='আপনার-পাসওয়ার্ড'
+```
+
+স্ক্রিপ্টটি idempotent — userId আগে থেকে থাকলে সেটিকে admin/active-এ উন্নীত করে পাসওয়ার্ড নতুন করে
+হ্যাশ করে, তাই এটি "অ্যাডমিন পাসওয়ার্ড হারিয়ে গেছে" রিকভারি টুল হিসেবেও কাজ করে।
+পাসওয়ার্ড কখনো প্লেইন টেক্সটে সেভ হয় না (bcrypt), আর কমান্ড-লাইন হিস্টোরিতে পাসওয়ার্ড থেকে গেলে
+লগইন করে অ্যাপের ভেতর থেকে বদলে নেবেন।
 
 ---
 

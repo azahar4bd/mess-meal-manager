@@ -110,6 +110,11 @@ DATABASE_URL="postgresql://…-pooler.…neon.tech/neondb?sslmode=require" npm r
 | **পেন্ডিং জয়েনার** | `01799999999` | `member123` | লগইন হবে, অনুমোদনের অপেক্ষায় |
 | **ম্যানেজার** (Barishal) | `01911111111` | `manager123` | অন্য অফিস (আইসোলেশন টেস্ট) |
 
+> ⚠️ এই লগইনগুলো **শুধু লোকাল/ডেমো** ডেটাবেসের জন্য। প্রোডাকশনে খালি ডেটাবেস নিয়ে শুরু করলে
+> `/signup`-এর প্রথম ইউজার হয় ওই অফিসের **ম্যানেজার** — প্ল্যাটফর্ম অ্যাডমিন নয়। একাধিক অফিস
+> ম্যানেজ করার অ্যাডমিন বানাতে: `npm run admin:create:remote -- --userId=… --password=…`
+> (বিস্তারিত `docs/vercel-neon.md` ধাপ ৬)।
+
 অফিস কোড (মেম্বার জয়েনের জন্য): **GOBRA01**, **BARISHAL01**, **DHAKA01**
 
 > ⚠️ প্রোডাকশনে নেওয়ার আগে এই পাসওয়ার্ডগুলো অবশ্যই বদলে দিন।
@@ -240,6 +245,14 @@ npm run build        # TypeScript 0 error + প্রোডাকশন বি�
 npm run test:api     # ১৫৪টি E2E চেক (অথ, আইসোলেশন, হিসাব, এক্সপোর্ট, সিঙ্ক…)
 npm run test:sheet   # ৭০টি চেক — আসল Code.gs + আসল পে-লোড দিয়ে সিমুলেশন
 npm run test         # দুটোই (প্রথমে ডেমো DB রিস্টোর করে, তাই বারবার চালানো যায়)
+```
+
+```bash
+# ডেটাবেস / অ্যাডমিন অপারেশন
+npm run db:migrate:sql                                   # লোকাল DB-তে স্কিমা মাইগ্রেশন (.env.local)
+DATABASE_URL="postgresql://…neon.tech/neondb?sslmode=require" npm run db:migrate:remote   # Neon-এ মাইগ্রেশন
+npm run admin:create -- --userId=… --password=…          # লোকাল DB-তে প্ল্যাটফর্ম অ্যাডমিন
+npm run admin:create:remote -- --userId=… --password=…   # Neon/প্রোডাকশন DB-তে (DATABASE_URL লাগবে)
 ```
 
 `test:sheet` আসল `google-apps-script/Code.gs` ফাইলটাই লোড করে, অ্যাপের কাছ থেকে আসল `sheet.payload` নিয়ে, একটি সিমুলেটেড SpreadsheetApp-এ চালায় — ফলে ট্যাবের নাম, হেডার, সারি সংখ্যা ও সেল টাইপ হুবহু যাচাই হয় (গুগল শিটে ডিপ্লয় করার আগেই)।
