@@ -265,6 +265,22 @@ Apps Script ডিপ্লয়ের সম্পূর্ণ গাইড: [
 
 ---
 
+## Git অটো-ডিপ্লয় (এই প্রজেক্টে এখন সক্রিয়)
+
+রিপো: https://github.com/azahar4bd/mess-meal-manager → Vercel প্রজেক্ট `mess-meal-manager`-এর সাথে যুক্ত
+(Production Branch = `main`)। তাই:
+
+```bash
+git add -A && git commit -m "যা বদলালেন তার বর্ণনা"
+git push origin main          # ← এতেই Vercel বিল্ড করে প্রোডাকশনে ডিপ্লয় করবে
+```
+
+- প্রতিটি push-এ প্রোডাকশন ডিপ্লয়মেন্ট হয়; pull request খুললে আলাদা **Preview URL** পাওয়া যায়।
+- এনভি ভেরিয়েবলগুলো প্রজেক্ট-লেভেলে সেট করা, তাই Git বা CLI — দুই পথেই একই কনফিগ ব্যবহৃত হয়।
+- স্কিমা বদলালে ডিপ্লয়ের পরে একবার মাইগ্রেশন চালাতে হয়: `POST /api/migrations` (ধাপ ৫ দেখুন)
+  অথবা `DATABASE_URL="<neon-url>" npm run db:migrate:remote`।
+- বিকল্প পথ (Git লিঙ্ক না থাকলে): `vercel deploy --prod --yes` — CLI ডিপ্লয়ও কাজ করে।
+
 ## পরবর্তী আপডেট ডিপ্লয় করা
 
 ```bash

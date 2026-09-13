@@ -7,7 +7,11 @@
 
 ---
 
-> 🌐 **লাইভ ডেমো ডিপ্লয়মেন্ট:** <https://mess-meal-manager-orcin.vercel.app>
+> 🌐 **লাইভ ডেমো ডিপ্লয়মেন্ট:** <https://mess-meal-manager-orcin.vercel.app
+**সোর্স কোড:** https://github.com/azahar4bd/mess-meal-manager (private) — `main` ব্রাঞ্চে push করলেই Vercel নিজে থেকে প্রোডাকশনে ডিপ্লয় করে।
+
+**ডেটাবেস:** Neon (PostgreSQL) · region `aws-us-east-1` (US East) ← Vercel-এর `iad1` ফাংশনের সাথে একই এলাকা, তাই প্রতি কুয়েরিতে ~২৫ms।
+>
 > (Vercel Hobby + Neon; প্রথম অফিস খুলতে `/signup` ব্যবহার করুন)
 
 ## সূচি
