@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppProvider, useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
+import { AppNoticeTicker } from "@/components/UiContent";
 import {
   Badge,
   ConfirmDialog,
@@ -120,6 +121,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
 
   return (
     <div className="min-h-screen pb-24">
+      <AppNoticeTicker />
       <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <ContextBar />
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
@@ -346,6 +348,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [copyMembers, setCopyMembers] = useState(true);
+  const [carryBalances, setCarryBalances] = useState(false);
   const [carry, setCarry] = useState(0);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -364,7 +367,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
 
   const submit = async () => {
     setBusy(true);
-    const created = await app.openNewMonth(year, month, { copyMembers, carryForwardBalance: carry, note });
+    const created = await app.openNewMonth(year, month, { copyMembers, carryForwardBalance: carry, note, carryMemberBalances: carryBalances });
     setBusy(false);
     if (created) onClose();
   };
@@ -402,10 +405,25 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
           </Field>
         </div>
 
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 text-[12.5px]">
+        <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 text-[12.5px]">
           <label className="flex items-center gap-2 font-semibold">
             <input type="checkbox" checked={copyMembers} onChange={(e) => setCopyMembers(e.target.checked)} className="h-4 w-4" />
             আগের মাসের সদস্য তালিকা কপি করুন
+          </label>
+          <label className={`flex items-start gap-2 font-semibold ${copyMembers ? "" : "opacity-55"}`}>
+            <input
+              type="checkbox"
+              checked={carryBalances && copyMembers}
+              disabled={!copyMembers}
+              onChange={(e) => setCarryBalances(e.target.checked)}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              আগের মাসের দেনা-পাওনা নতুন মাসে ক্যারি করুন
+              <span className="muted block text-[11.5px] font-medium">
+                টিক না দিলে নতুন মাস শূন্য থেকে শুরু — বাকি শুধু পুরনো মাসের রিপোর্টে থাকবে
+              </span>
+            </span>
           </label>
         </div>
 

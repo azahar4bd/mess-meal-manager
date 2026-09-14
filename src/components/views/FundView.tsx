@@ -45,8 +45,9 @@ export function FundView() {
       type: "select",
       half: true,
       options: [
-        { value: "permanent_fund", label: "স্থায়ী তহবিল / permanent_fund" },
+        { value: "member_deposit", label: "সদস্যের জমা / মাসিক পরিশোধ" },
         { value: "adjustment", label: "সমন্বয় / adjustment" },
+        { value: "permanent_fund", label: "স্থায়ী তহবিল / permanent_fund" },
         { value: "refund", label: "ফেরত / refund" },
       ],
     },
@@ -57,7 +58,7 @@ export function FundView() {
     date: toIsoDate(defaultDate),
     memberId: "",
     amount: "",
-    type: "permanent_fund",
+    type: "member_deposit",
     note: "",
   });
 
@@ -116,7 +117,15 @@ export function FundView() {
       align: "center",
       render: (r) => (
         <Badge tone={r.type === "permanent_fund" ? "brand" : r.type === "refund" ? "warn" : "muted"}>
-          {r.type === "permanent_fund" ? "স্থায়ী তহবিল" : r.type}
+          {r.type === "permanent_fund"
+            ? "স্থায়ী তহবিল"
+            : r.type === "member_deposit"
+              ? "সদস্যের জমা"
+              : r.type === "adjustment"
+                ? "সমন্বয়"
+                : r.type === "refund"
+                  ? "ফেরত"
+                  : r.type}
         </Badge>
       ),
     },
@@ -139,8 +148,8 @@ export function FundView() {
           <div className="kpi-v">৳ {formatMoney(summary?.totalDepositsThisMonth ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
-          <div className="kpi-k">জমা এন্ট্রি</div>
-          <div className="kpi-v">{rows.length}</div>
+          <div className="kpi-k">সদস্যের জমা (ফান্ড বাদে)</div>
+          <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalMemberPayments ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
           <div className="kpi-k">লাস্ট ব্যালেন্স</div>
@@ -149,10 +158,13 @@ export function FundView() {
           </div>
         </Card>
       </div>
+      <p className="muted -mt-1 px-1 text-[11.5px]">
+        স্থায়ী তহবিল সম্পূর্ণ আলাদা খাত — দেনা-পাওনায় মেশে না। দেনা-পাওনায় ধরা হয় “সদস্যের জমা”, “সমন্বয়” ও নিজের টাকা থেকে করা বাজার।
+      </p>
 
       <EntryPanel<DepositDTO>
         title="জমা ও তহবিল / Member Fund & Deposits"
-        subtitle={`${month?.monthName ?? ""} • সদস্য প্রতি স্থায়ী তহবিল`}
+        subtitle={`${month?.monthName ?? ""} • সদস্যের জমা ও স্থায়ী তহবিল (আলাদা খাত)`}
         fields={fields}
         rows={rows}
         columns={columns}
@@ -163,7 +175,7 @@ export function FundView() {
         onSubmit={onSubmit}
         onDelete={canWrite ? onDelete : undefined}
         emptyTitle="কোনো জমা এন্ট্রি নেই"
-        emptyHint="সদস্যের স্থায়ী তহবিল / জমা এখানে যোগ করুন।"
+        emptyHint="সদস্যের জমা, সমন্বয় বা স্থায়ী তহবিল এখানে যোগ করুন।"
         emptyIcon="💰"
         addLabel="+ নতুন জমা"
         formTitle="জমা এন্ট্রি"

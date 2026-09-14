@@ -62,7 +62,22 @@ function check(name, cond, extra = "") {
 
 const stamp = Date.now().toString().slice(-6);
 
+/** ইন-মেমরি রেট-লিমিট বাকেট ক্লিয়ার করা (বারবার রান করতে গিয়ে 429 এড়ায়) */
+async function resetRateLimits() {
+  const secret = process.env.RATE_LIMIT_RESET_SECRET ?? "test-reset-secret";
+  try {
+    await fetch(`${BASE}/api/dev/reset-rate-limits`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-reset-secret": secret },
+      body: JSON.stringify({ secret }),
+    });
+  } catch {
+    /* সার্ভার এখনো তৈরি হচ্ছে হলে উপেক্ষা */
+  }
+}
+
 async function main() {
+  await resetRateLimits();
   console.log(`\n═══ E2E API tests → ${BASE} ═══\n`);
 
   /* ── 0. clear in-memory rate limits so repeated runs are not throttled ── */
@@ -698,7 +713,143 @@ async function main() {
   const usersStill = await req(admin, "POST", "/api/mess", { action: "admin.users.list" });
   check("users table still intact after injection attempt", usersStill.status === 200 && (usersStill.json?.data?.data?.length ?? 0) > 5);
 
+  /* ── 18. ফান্ড আলাদা • নিজের টাকার বাজার • ক্যারি-ফরোয়ার্ড • এডিটেবল কনটেন্ট ── */
+  console.log("\n18) Fund separation, self-paid bazar, carry-forward & editable content");
+
+  // সেকশন ১৫-এ ম্যানেজার লগআউট করেছে — তাই এখানে তাজা সেশন নিয়ে কাজ করা হয়
+  const mgrS = jar();
+  const mgrRelogin = await req(mgrS, "POST", "/api/auth/login", { login: "01711111111", password: "manager123" });
+  check("ম্যানেজারের তাজা সেশন (সেকশন ১৮)", mgrRelogin.status === 200 && mgrRelogin.json?.ok === true, mgrRelogin.text.slice(0, 120));
+  const memS = jar();
+  const memRelogin = await req(memS, "POST", "/api/auth/login", { login: "01722222222", password: "member123" });
+  check("সদস্যের তাজা সেশন (সেকশন ১৮)", memRelogin.status === 200 && memRelogin.json?.ok === true, memRelogin.text.slice(0, 120));
+
+  const summaryOf = async (j, mid) => {
+    const r = await req(j, "POST", "/api/mess", { action: "report.summary", monthId: mid });
+    return r.json?.data?.data?.summary ?? null;
+  };
+  const calcOf = (sum, id) => (sum?.memberCalculations ?? []).find((c) => c.memberId === id) ?? null;
+
+  const s0 = await summaryOf(mgrS, monthId);
+  const c0 = calcOf(s0, target.id);
+  check("রিপোর্টে সদস্যপ্রতি selfPaidBazar ফিল্ড আছে", typeof c0?.selfPaidBazar === "number", `selfPaidBazar=${c0?.selfPaidBazar}`);
+  check("সামারিতে totalSelfPaidBazar আছে", typeof s0?.totalSelfPaidBazar === "number", `total=${s0?.totalSelfPaidBazar}`);
+  check("সামারিতে totalMemberPayments (ফান্ড বাদে জমা) আছে", typeof s0?.totalMemberPayments === "number", `payments=${s0?.totalMemberPayments}`);
+  check("totalMemberPayments = সব জমা − স্থায়ী ফান্ড", Math.abs(s0.totalMemberPayments - (s0.totalDepositsThisMonth - s0.totalFund)) < 0.01, `${s0.totalMemberPayments} vs ${s0.totalDepositsThisMonth}−${s0.totalFund}`);
+
+  /* (ক) স্থায়ী ফান্ড দেনা-পাওনায় মেলে না */
+  const fundRow = await req(mgrS, "POST", "/api/mess", { action: "deposit.create", monthId, date: iso, memberId: target.id, amount: 4000, type: "permanent_fund", note: "fund-separation-check" });
+  check("permanent_fund জমা যোগ হয়", fundRow.status === 200 && fundRow.json?.data?.data?.type === "permanent_fund", fundRow.text.slice(0, 140));
+  const s1 = await summaryOf(mgrS, monthId);
+  const c1 = calcOf(s1, target.id);
+  check("ফান্ড নিজের স্তম্ভেই যোগ হয় (+৪০০০)", Math.abs(c1.permanentFund - (c0.permanentFund + 4000)) < 0.01, `${c0.permanentFund} → ${c1.permanentFund}`);
+  check("ফান্ড দেনা-পাওনা বদলায় না", Math.abs(c1.denaPoana - c0.denaPoana) < 0.01, `${c0.denaPoana} → ${c1.denaPoana}`);
+  check("ফান্ড সদস্যের জমা (payments) হিসাবে ধরা হয় না", Math.abs(c1.totalDeposit - c0.totalDeposit) < 0.01, `${c0.totalDeposit} → ${c1.totalDeposit}`);
+
+  /* (খ) সাধারণ জমা দেনা-পাওনা বাড়ায় */
+  const payRow = await req(mgrS, "POST", "/api/mess", { action: "deposit.create", monthId, date: iso, memberId: target.id, amount: 1500, type: "member_deposit", note: "member-payment-check" });
+  check("member_deposit টাইপ গ্রহণযোগ্য", payRow.status === 200 && payRow.json?.data?.data?.type === "member_deposit", payRow.text.slice(0, 140));
+  const s2 = await summaryOf(mgrS, monthId);
+  const c2 = calcOf(s2, target.id);
+  check("সাধারণ জমা দেনা-পাওনায় যোগ হয় (+১৫০০)", Math.abs(c2.denaPoana - (c1.denaPoana + 1500)) < 0.01, `${c1.denaPoana} → ${c2.denaPoana}`);
+  check("সাধারণ জমা ফান্ড স্তম্ভে যায় না", Math.abs(c2.permanentFund - c1.permanentFund) < 0.01, `${c1.permanentFund} → ${c2.permanentFund}`);
+
+  /* (গ) নিজের পকেটের টাকা থেকে বাজার → মাস শেষে পাওনা সমন্বয় */
+  const selfBazar = await req(mgrS, "POST", "/api/mess", {
+    action: "bazar.create", monthId, date: iso, memberId: target.id, buyerName: target.name,
+    amount: 900, category: "Fish", items: "নিজের টাকা থেকে মাছ", paidByMemberId: target.id,
+  });
+  const selfRow = selfBazar.json?.data?.data;
+  check("বাজার এন্ট্রিতে paidByMemberId সংরক্ষিত হয়", selfBazar.status === 200 && selfRow?.paidByMemberId === target.id, `paidBy=${selfRow?.paidByMemberId}`);
+  const s3 = await summaryOf(mgrS, monthId);
+  const c3 = calcOf(s3, target.id);
+  check("নিজের টাকার বাজার আলাদা স্তম্ভে যোগ হয় (+৯০০)", Math.abs(c3.selfPaidBazar - (c2.selfPaidBazar + 900)) < 0.01, `${c2.selfPaidBazar} → ${c3.selfPaidBazar}`);
+  check("সামারির totalSelfPaidBazar-এও যোগ হয়", Math.abs(s3.totalSelfPaidBazar - (s2.totalSelfPaidBazar + 900)) < 0.01, `${s2.totalSelfPaidBazar} → ${s3.totalSelfPaidBazar}`);
+  const costDelta = c3.totalCost - c2.totalCost;
+  check("দেনা-পাওনা = +নিজের বাজার − বাড়তি মিল খরচ", Math.abs(c3.denaPoana - (c2.denaPoana + 900 - costDelta)) < 0.05, `dp ${c2.denaPoana} → ${c3.denaPoana}, খরচ বাড়ল ${costDelta}`);
+  check("নিজের টাকার বাজারও মিল রেটে ধরা পড়ে (খরচ বাড়ে)", s3.perMillRate >= s2.perMillRate, `${s2.perMillRate} → ${s3.perMillRate}`);
+  await req(mgrS, "POST", "/api/mess", { action: "bazar.delete", monthId, id: selfRow.id });
+  const s4 = await summaryOf(mgrS, monthId);
+  const c4 = calcOf(s4, target.id);
+  check("এন্ট্রি মুছলে নিজের টাকার বাজারও ফিরে যায়", Math.abs(c4.selfPaidBazar - c2.selfPaidBazar) < 0.01, `${c3.selfPaidBazar} → ${c4.selfPaidBazar}`);
+
+  /* (ঘ) মাস শেষের বাকি নতুন মাসে ক্যারি */
+  const nY = boot.data.month === 12 ? boot.data.year + 1 : boot.data.year;
+  const nM = boot.data.month === 12 ? 1 : boot.data.month + 1;
+  const listMonths = async () => (await req(mgrS, "POST", "/api/mess", { action: "months.list" })).json?.data?.data ?? [];
+  const pick = (list, y, m) => list.find((x) => Number(x.year) === y && Number(x.month) === m) ?? null;
+  const nBefore = pick(await listMonths(), nY, nM);
+  const nBeforeSum = nBefore ? await summaryOf(mgrS, nBefore.id) : null;
+  const carryOpen = await req(mgrS, "POST", "/api/mess", { action: "month.open", year: nY, month: nM, copyMembers: true, carryMemberBalances: true });
+  check("ক্যারি-ফরোয়ার্ড টিক দিয়ে মাস খোলা যায়", carryOpen.status === 200, carryOpen.text.slice(0, 160));
+  const carriedCount = carryOpen.json?.data?.data?.carriedBalances ?? -1;
+  const expectedCarry = (s4.memberCalculations ?? []).filter((c) => Math.abs(c.denaPoana) >= 1).length;
+  check("বাকি থাকা সদস্যদের সমন্বয় ক্যারি হয়েছে", carriedCount >= 1 && carriedCount <= expectedCarry, `carried=${carriedCount}, বাকি আছে ${expectedCarry} জনের`);
+  const nAfterSum = await summaryOf(mgrS, carryOpen.json?.data?.data?.month?.id);
+  const depBefore = new Map((nBeforeSum?.memberCalculations ?? []).map((c) => [c.name, c.totalDeposit]));
+  let matched = 0;
+  for (const c of nAfterSum?.memberCalculations ?? []) {
+    const src = (s4.memberCalculations ?? []).find((x) => x.name === c.name);
+    if (!src || Math.abs(src.denaPoana) < 1) continue;
+    if (Math.abs(c.totalDeposit - ((depBefore.get(c.name) ?? 0) + src.denaPoana)) < 0.01) matched += 1;
+  }
+  check("প্রতিটি সদস্যের বাকি নতুন মাসে সমন্বয় জমা হিসেবে বসেছে", matched === carriedCount, `matched=${matched}, carried=${carriedCount}`);
+  check("নতুন মাসে মিল ০ থেকে শুরু হয়", (nAfterSum?.totalMill ?? -1) === 0, `totalMill=${nAfterSum?.totalMill}`);
+
+  /* (ঙ) টিক না দিলে শূন্য থেকে শুরু */
+  const n2Y = nM === 12 ? nY + 1 : nY;
+  const n2M = nM === 12 ? 1 : nM + 1;
+  const n2Before = pick(await listMonths(), n2Y, n2M);
+  const n2BeforeSum = n2Before ? await summaryOf(mgrS, n2Before.id) : null;
+  const plainOpen = await req(mgrS, "POST", "/api/mess", { action: "month.open", year: n2Y, month: n2M, copyMembers: true });
+  check("টিক ছাড়া মাস খুললে carriedBalances = 0", plainOpen.status === 200 && (plainOpen.json?.data?.data?.carriedBalances ?? -1) === 0, plainOpen.text.slice(0, 160));
+  const n2AfterSum = await summaryOf(mgrS, plainOpen.json?.data?.data?.month?.id);
+  const depSum = (sum) => (sum?.memberCalculations ?? []).reduce((a, c) => a + c.totalDeposit, 0);
+  check("টিক ছাড়া নতুন মাসে কোনো বাকি ক্যারি হয় না (শূন্য থেকে শুরু)", Math.abs(depSum(n2AfterSum) - depSum(n2BeforeSum)) < 0.01, `${depSum(n2BeforeSum)} → ${depSum(n2AfterSum)}`);
+
+  /* (চ) এডিটেবল টেক্সট ও স্ক্রলিং নোটিশ বোর্ড */
+  const pubRes = await fetch(`${BASE}/api/ui-content`);
+  const pubJson = await pubRes.json().catch(() => null);
+  check("লগইন ছাড়াই /api/ui-content টেক্সট দেয়", pubRes.status === 200 && pubJson?.ok === true && typeof pubJson?.data?.texts?.heroTitle === "string", `status=${pubRes.status}`);
+  const memEditor = await req(memS, "POST", "/api/mess", { action: "ui.editor", scope: "office" });
+  check("সদস্য কনটেন্ট এডিটর খুলতে পারে না (403)", memEditor.status === 403, `status=${memEditor.status}`);
+  const mgrEditor = await req(mgrS, "POST", "/api/mess", { action: "ui.editor", scope: "office" });
+  check("ম্যানেজার এডিটর খুলতে পারে (টেক্সট + নোটিশ)", mgrEditor.status === 200 && typeof mgrEditor.json?.data?.data?.texts?.dashboardTitle === "string" && Array.isArray(mgrEditor.json?.data?.data?.notices), mgrEditor.text.slice(0, 140));
+  const setTxt = await req(mgrS, "POST", "/api/mess", { action: "ui.updateTexts", scope: "office", texts: { dashboardTitle: "পরীক্ষা ড্যাশবোর্ড", dashboardSubtitle: "সাবটাইটেল টেস্ট" } });
+  check("অফিসের নিজের টেক্সট বদলানো যায়", setTxt.status === 200 && setTxt.json?.data?.data?.texts?.dashboardTitle === "পরীক্ষা ড্যাশবোর্ড", setTxt.text.slice(0, 140));
+  const contentNow = await req(mgrS, "POST", "/api/mess", { action: "ui.content" });
+  check("বদলানো টেক্সট সংরক্ষিত থাকে", contentNow.json?.data?.data?.texts?.dashboardSubtitle === "সাবটাইটেল টেস্ট", contentNow.text.slice(0, 140));
+  const noticeSave = await req(mgrS, "POST", "/api/mess", {
+    action: "ui.updateNotices", scope: "office",
+    notices: [{ text: "আজ সন্ধ্যায় বাজার হবে", active: true }, { text: "পুরনো নোটিশ", active: false }],
+  });
+  const savedList = noticeSave.json?.data?.data?.notices ?? [];
+  const activeList = noticeSave.json?.data?.data?.active ?? [];
+  check("নোটিশ বোর্ডে ২টি সংরক্ষিত হয়", noticeSave.status === 200 && savedList.length === 2, JSON.stringify(savedList).slice(0, 140));
+  check("নিষ্ক্রিয় নোটিশ টিকারে দেখা যায় না", activeList.some((n) => String(n.text).includes("আজ সন্ধ্যায়")) && !activeList.some((n) => String(n.text).includes("পুরনো নোটিশ")), JSON.stringify(activeList).slice(0, 140));
+  const memTexts = await req(memS, "POST", "/api/mess", { action: "ui.updateTexts", scope: "office", texts: { dashboardTitle: "হ্যাক" } });
+  check("সদস্য টেক্সট বদলাতে পারে না (403)", memTexts.status === 403, `status=${memTexts.status}`);
+  const mgrGlobal = await req(mgrS, "POST", "/api/mess", { action: "ui.updateTexts", scope: "global", texts: { heroTitle: "হ্যাক" } });
+  check("ম্যানেজার গ্লোবাল টেক্সট বদলাতে পারে না (403)", mgrGlobal.status === 403, `status=${mgrGlobal.status}`);
+  const admGlobal = await req(admin, "POST", "/api/mess", { action: "ui.updateTexts", scope: "global", texts: { heroTitle: "প্ল্যাটফর্ম টাইটেল", heroBadge: "প্ল্যাটফর্ম ব্যাজ" } });
+  check("প্ল্যাটফর্ম অ্যাডমিন গ্লোবাল টেক্সট বদলাতে পারে", admGlobal.status === 200 && admGlobal.json?.data?.data?.texts?.heroTitle === "প্ল্যাটফর্ম টাইটেল", admGlobal.text.slice(0, 140));
+  const pub2 = await (await fetch(`${BASE}/api/ui-content`)).json().catch(() => null);
+  check("গ্লোবাল টেক্সট লগইন পেজে (পাবলিক) দেখা যায়", pub2?.data?.texts?.heroTitle === "প্ল্যাটফর্ম টাইটেল", pub2?.data?.texts?.heroTitle);
+  const overrideTxt = await req(mgrS, "POST", "/api/mess", { action: "ui.updateTexts", scope: "office", texts: { heroTitle: "অফিসের নিজের টাইটেল" } });
+  check("অফিসের টেক্সট গ্লোবালকে ওভাররাইড করে", overrideTxt.json?.data?.data?.texts?.heroTitle === "অফিসের নিজের টাইটেল", overrideTxt.text.slice(0, 140));
+
+  /* ক্লিনআপ — খালি ঘর মানে ডিফল্ট (ফাঁকা স্ক্রিন হবে না) */
+  await req(mgrS, "POST", "/api/mess", { action: "ui.updateTexts", scope: "office", texts: { dashboardTitle: "", dashboardSubtitle: "", heroTitle: "" } });
+  await req(mgrS, "POST", "/api/mess", { action: "ui.updateNotices", scope: "office", notices: [] });
+  await req(admin, "POST", "/api/mess", { action: "ui.updateTexts", scope: "global", texts: { heroTitle: "", heroBadge: "" } });
+  const pub3 = await (await fetch(`${BASE}/api/ui-content`)).json().catch(() => null);
+  check("খালি করে দিলে ডিফল্ট টেক্সট ফিরে আসে", typeof pub3?.data?.texts?.heroTitle === "string" && pub3.data.texts.heroTitle.length > 0, String(pub3?.data?.texts?.heroTitle).slice(0, 60));
+  const clearedContent = await req(mgrS, "POST", "/api/mess", { action: "ui.content" });
+  check("অফিসের টেক্সটও ডিফল্টে ফিরেছে", clearedContent.json?.data?.data?.texts?.dashboardTitle === pub3?.data?.texts?.dashboardTitle, `${clearedContent.json?.data?.data?.texts?.dashboardTitle}`);
+  check("নোটিশ মুছে ফেলা যায়", ((await req(mgrS, "POST", "/api/mess", { action: "ui.content" })).json?.data?.data?.notices ?? []).filter((n) => String(n.text).includes("আজ সন্ধ্যায়")).length === 0);
+
   /* ── summary ───────────────────────────────────────── */
+  await resetRateLimits();
   console.log(`\n═══ ${pass} passed, ${fail} failed ═══`);
   if (failures.length) {
     console.log("\nFailures:");

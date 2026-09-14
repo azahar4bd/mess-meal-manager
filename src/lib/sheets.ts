@@ -186,8 +186,10 @@ export function buildSyncPayload(
       round2(m.individualExtra),
       round2(m.sharedExtra),
       round2(m.totalCost),
-      round2(m.permanentFund),
+      round2(m.totalDeposit),
+      round2(m.selfPaidBazar),
       round2(m.denaPoana),
+      round2(m.permanentFund),
       `${m.status} / ${m.statusEn}`,
     ]),
   };

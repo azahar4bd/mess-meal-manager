@@ -139,6 +139,8 @@ export interface BazarDTO {
   day: number;
   memberId: string | null;
   buyerName: string;
+  /** এই সদস্য নিজের পকেটের টাকা থেকে বাজারটি করেছেন → মাস শেষে সমন্বয় হবে */
+  paidByMemberId: string;
   category: BazarCategory;
   items: string;
   lines: BazarLine[];
@@ -193,7 +195,11 @@ export interface MemberCalculation {
   individualExtra: number;
   sharedExtra: number;
   totalCost: number;
+  /** মাসের জমা/সমন্বয় — স্থায়ী ফান্ড বাদে */
   totalDeposit: number;
+  /** নিজের টাকা থেকে করা বাজার (পাওনা হিসেবে যোগ হয়) */
+  selfPaidBazar: number;
+  /** শুধু permanent_fund ধরনের জমা — দেনা-পাওনার সঙ্গে মেলে না */
   permanentFund: number;
   denaPoana: number;
   balance: number;
@@ -211,9 +217,13 @@ export interface MonthSummary {
   netCost: number;
   perMillRate: number;
   totalFund: number;
+  /** সদস্যরা নিজের পকেট থেকে যে বাজার করেছে (তাদের পাওনা) */
+  totalSelfPaidBazar: number;
   totalSharedExtra: number;
   totalIndividualExtra: number;
   totalDepositsThisMonth: number;
+  /** ফান্ড বাদে সদস্যের জমা/সমন্বয় (দেনা-পাওনায় এটাই ধরা হয়) */
+  totalMemberPayments: number;
   lastBalance: number;
   memberCalculations: MemberCalculation[];
 }

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { apiPost, ApiError } from "@/lib/client";
 import { Field, TextInput, Badge } from "@/components/ui";
 import { useApp } from "@/components/app-context";
+import { NoticeTicker } from "@/components/UiContent";
+import { DEFAULT_TEXTS, type Notice, type UiTexts } from "@/lib/ui-content-types";
 import type { Role } from "@/lib/types";
 
 export type AuthMode = "login" | "signup" | "join";
@@ -28,14 +30,7 @@ interface JoinResult {
   message?: string;
 }
 
-const FEATURES_BN = [
-  "একই অ্যাপে একাধিক অফিস / মেস — সম্পূর্ণ আলাদা হিসাব",
-  "দৈনিক মিল, বাজার খরচ, স্থায়ী তহবিল ও অন্যান্য আয়",
-  "স্বয়ংক্রিয় মিল রেট ও দেনা-পাওনা হিসাব",
-  "মাসিক রিপোর্ট — PDF ও CSV এক্সপোর্ট",
-  "Google Sheets ফুল সিংক (৮টি ট্যাব)",
-  "রোল ভিত্তিক নিরাপত্তা: Admin / Manager / Member / Audit",
-];
+
 
 export function AuthScreen({
   initialMode = "login",
@@ -55,6 +50,7 @@ export function AuthScreen({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState("");
   const [health, setHealth] = useState<{ ok: boolean; db: boolean; message: string } | null>(null);
+  const [ui, setUi] = useState<{ texts: UiTexts; notices: Notice[] } | null>(null);
 
   useEffect(() => {
     // the URL decides the mode: /login, /signup, /join or /?auth=…
@@ -87,6 +83,23 @@ export function AuthScreen({
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/ui-content", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { data?: { texts?: UiTexts; notices?: Notice[] } }) => {
+        if (alive && j?.data?.texts) setUi({ texts: { ...DEFAULT_TEXTS, ...j.data.texts }, notices: j.data.notices ?? [] });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const texts = ui?.texts ?? DEFAULT_TEXTS;
+  const notices = ui?.notices ?? [];
+  const heroFeatures = (texts.heroFeatures || "").split("\n").map((x) => x.trim()).filter(Boolean);
+
   const switchMode = (m: AuthMode) => {
     setMode(m);
     setErrors({});
@@ -100,6 +113,7 @@ export function AuthScreen({
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
+      <NoticeTicker notices={notices} />
       <div className="mx-auto grid min-h-screen w-full max-w-6xl items-stretch gap-0 lg:grid-cols-[1.05fr_1fr]">
         {/* ── brand panel ─────────────────────────────── */}
         <aside className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand)] p-8 text-white lg:flex">
@@ -115,23 +129,16 @@ export function AuthScreen({
             <div className="flex items-center gap-3">
               <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-[22px] font-black">M</span>
               <div>
-                <div className="text-[20px] font-extrabold leading-tight">Mess Meal Manager</div>
-                <div className="text-[12.5px] text-white/80">মাল্টি-অফিস মেস মিল ম্যানেজমেন্ট প্ল্যাটফর্ম</div>
+                <div className="text-[20px] font-extrabold leading-tight">{texts.appName}</div>
+                <div className="text-[12.5px] text-white/80">{texts.heroBadge}</div>
               </div>
             </div>
 
-            <h1 className="mt-10 text-[27px] font-extrabold leading-snug">
-              এক অ্যাপ। <br />
-              একাধিক অফিস। <br />
-              সম্পূর্ণ আলাদা হিসাব।
-            </h1>
-            <p className="mt-3 max-w-md text-[13.5px] text-white/85">
-              প্রতিটি অফিসের আলাদা ম্যানেজার, আলাদা সদস্য, আলাদা মাস, আলাদা মিল/বাজার/তহবিল হিসাব এবং আলাদা রিপোর্ট। এক
-              অফিসের তথ্য অন্য অফিস থেকে কেউ দেখতে বা বদলাতে পারবে না।
-            </p>
+            <h1 className="mt-10 whitespace-pre-line text-[27px] font-extrabold leading-snug">{texts.heroTitle}</h1>
+            <p className="mt-3 max-w-md text-[13.5px] text-white/85">{texts.heroDescription}</p>
 
             <ul className="mt-7 space-y-2.5">
-              {FEATURES_BN.map((f) => (
+              {heroFeatures.map((f) => (
                 <li key={f} className="flex items-start gap-2.5 text-[13px] text-white/92">
                   <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20 text-[11px]">✓</span>
                   <span>{f}</span>
@@ -155,8 +162,8 @@ export function AuthScreen({
               <div className="flex items-center gap-2">
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--brand)] text-[17px] font-black text-white">M</span>
                 <div>
-                  <div className="text-[15px] font-extrabold leading-tight">Mess Meal Manager</div>
-                  <div className="muted text-[11px]">মাল্টি-অফিস মেস হিসাব</div>
+                  <div className="text-[15px] font-extrabold leading-tight">{texts.appName}</div>
+                  <div className="muted text-[11px]">{texts.heroBadge}</div>
                 </div>
               </div>
             </div>
@@ -208,7 +215,7 @@ export function AuthScreen({
               )}
             </div>
 
-            <p className="muted mt-3 text-center text-[11px]">© {new Date().getFullYear()} Mess Meal Manager</p>
+            <p className="muted mt-3 text-center text-[11px]">© {new Date().getFullYear()} {texts.appName}</p>
           </div>
         </main>
       </div>

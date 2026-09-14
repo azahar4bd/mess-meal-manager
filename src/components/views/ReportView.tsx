@@ -212,7 +212,7 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data" style={{ minWidth: 900 }}>
+                <table className="data" style={{ minWidth: 1180 }}>
                   <thead>
                     <tr>
                       <th>সদস্য / Member</th>
@@ -221,9 +221,11 @@ export function ReportView() {
                       <th className="num">মিল খরচ</th>
                       <th className="num">ইন্ডি. অতিরিক্ত</th>
                       <th className="num">শেয়ার্ড অতিরিক্ত</th>
-                      <th className="num">মোট খরচ</th>
-                      <th className="num">স্থায়ী ফান্ড</th>
+                      <th className="num">মোট খরচ (−)</th>
+                      <th className="num">জমা / সমন্বয়</th>
+                      <th className="num">নিজের টাকা থেকে বাজার</th>
                       <th className="num">দেনা-পাওনা</th>
+                      <th className="num">স্থায়ী ফান্ড</th>
                       <th className="text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>
@@ -243,9 +245,17 @@ export function ReportView() {
                         <td className="num tabular-nums">{formatMoney(m.mealCost)}</td>
                         <td className="num tabular-nums">{formatMoney(m.individualExtra)}</td>
                         <td className="num tabular-nums">{formatMoney(m.sharedExtra)}</td>
-                        <td className="num font-bold tabular-nums">{formatMoney(m.totalCost)}</td>
-                        <td className="num tabular-nums text-[var(--brand)]">{formatMoney(m.permanentFund)}</td>
-                        <td className="num font-bold tabular-nums">{formatMoney(Math.abs(m.denaPoana))}</td>
+                        <td className="num font-bold tabular-nums text-[var(--danger)]">−৳{formatMoney(m.totalCost)}</td>
+                        <td className="num tabular-nums text-[var(--ok)]">+৳{formatMoney(m.totalDeposit)}</td>
+                        <td className="num tabular-nums text-[var(--ok)]">
+                          {m.selfPaidBazar > 0 ? `+৳${formatMoney(m.selfPaidBazar)}` : "—"}
+                        </td>
+                        <td className="num font-extrabold tabular-nums">
+                          <span style={{ color: m.denaPoana < 0 ? "var(--danger)" : m.denaPoana > 0 ? "var(--ok)" : "var(--muted)" }}>
+                            {m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳{formatMoney(Math.abs(m.denaPoana))}
+                          </span>
+                        </td>
+                        <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(m.permanentFund)}</td>
                         <td className="text-center">
                           <Badge tone={m.statusEn === "Due" ? "danger" : m.statusEn === "Receive" ? "ok" : "muted"}>
                             {m.status} / {m.statusEn}
@@ -262,13 +272,18 @@ export function ReportView() {
                       <td className="num tabular-nums">{formatMoney(round2(calcs.reduce((s, m) => s + m.mealCost, 0)))}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalIndividualExtra)}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalSharedExtra)}</td>
-                      <td className="num tabular-nums">{formatMoney(totalCost)}</td>
-                      <td className="num tabular-nums">{formatMoney(summary.totalFund)}</td>
+                      <td className="num tabular-nums">−৳{formatMoney(totalCost)}</td>
+                      <td className="num tabular-nums">৳{formatMoney(calcs.reduce((s, m) => s + m.totalDeposit, 0))}</td>
+                      <td className="num tabular-nums">৳{formatMoney(summary.totalSelfPaidBazar)}</td>
                       <td className="num tabular-nums">দিবে ৳{formatMoney(totalDue)} • পাবে ৳{formatMoney(totalReceive)}</td>
+                      <td className="num tabular-nums">৳{formatMoney(summary.totalFund)}</td>
                       <td />
                     </tr>
                   </tfoot>
                 </table>
+                <p className="muted border-t border-[var(--border)] px-3 py-2 text-[11.5px]">
+                  দেনা-পাওনা = জমা/সমন্বয় + নিজের টাকা থেকে বাজার − মোট খরচ • স্থায়ী ফান্ড আলাদা খাত, এই হিসাবে মেশে না
+                </p>
               </div>
             )}
           </Card>

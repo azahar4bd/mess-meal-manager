@@ -3,7 +3,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { EntryPanel, type ColumnDef, type FieldDef, type FieldExtraCtx, type FormState } from "@/components/ui/entry-panel";
-import { BazarItemsModal, linesTotal } from "@/components/BazarItemsModal";
+import { BazarItemsModal, linesToText, linesTotal } from "@/components/BazarItemsModal";
 import { formatMoney0, round2, toNumber } from "@/lib/format";
 import { isoOfDay, toDisplayDate, toIsoDate, todayIso } from "@/lib/date";
 import type { BazarCategory, BazarDTO, BazarLine } from "@/lib/types";
@@ -45,6 +45,13 @@ export function BazarView() {
   const fields: FieldDef[] = [
     { key: "date", label: "তারিখ / Date", type: "date", required: true, half: true },
     { key: "memberId", label: "ক্রেতা / Buyer", type: "member", required: true, half: true },
+    {
+      key: "paidByMemberId",
+      label: "নিজের টাকা থেকে কিনেছে / Paid by",
+      type: "member",
+      half: true,
+      hint: "নির্বাচন করলে মাস শেষে তার দেনা-পাওনায় সমন্বয় হবে",
+    },
     { key: "amount", label: "পরিমাণ / Amount (৳)", type: "money", required: true, placeholder: "500", half: true },
     { key: "items", label: "আইটেম / Items", type: "text", placeholder: "আলু, পেঁয়াজ", half: true },
     { key: "note", label: "নোট / Note", type: "textarea", placeholder: "সকালের বাজার" },
@@ -53,6 +60,7 @@ export function BazarView() {
   const initialValues = (): FormState => ({
     date: toIsoDate(defaultDate),
     memberId: "",
+    paidByMemberId: "",
     category: "Groceries",
     amount: "",
     items: "",
@@ -62,6 +70,7 @@ export function BazarView() {
   const toForm = (row: BazarDTO): FormState => ({
     date: toIsoDate(row.date),
     memberId: row.memberId || (row.buyerName ? `${CUSTOM}${row.buyerName}` : ""),
+    paidByMemberId: row.paidByMemberId ?? "",
     category: row.category ?? "Groceries",
     amount: String(row.amount ?? ""),
     items: row.items ?? "",
@@ -82,6 +91,7 @@ export function BazarView() {
       date: toIsoDate(values.date),
       memberId: isCustom ? null : rawMember || null,
       buyerName: (isCustom ? rawMember.slice(CUSTOM.length) : (member?.name ?? "")).trim(),
+      paidByMemberId: (values.paidByMemberId ?? "").startsWith(CUSTOM) ? "" : values.paidByMemberId ?? "",
       category: (values.category || "Groceries") as BazarCategory,
       items: values.items,
       lines,
@@ -113,8 +123,10 @@ export function BazarView() {
 
   /** পপআপে সেভ চাপলে মোট টাকা পরিমাণের ঘরে বসে যায় (পরে ম্যানুয়ালি বদলানো যায়) */
   const applyItems = (next: BazarLine[], total: number) => {
-    setLines(next.map((l) => ({ ...l })));
+    const saved = next.map((l) => ({ ...l }));
+    setLines(saved);
     setFieldRef.current("amount", String(round2(total)));
+    setFieldRef.current("items", linesToText(saved));
     setItemsOpen(false);
     app.toast(`মোট ৳ ${formatMoney0(total)} পরিমাণের ঘরে বসেছে ✓`, "success");
   };
@@ -124,29 +136,39 @@ export function BazarView() {
       setFieldRef.current = ctx.setValue;
       const t = linesTotal(lines);
       return (
-        <button
-          type="button"
-          className="mb-1.5 flex w-full items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--brand-soft)] px-3 py-2 text-left text-[12.5px] font-bold transition hover:brightness-[0.97]"
-          style={{ color: "var(--brand)" }}
-          onClick={() => setItemsOpen(true)}
-          disabled={!canWrite}
-          title="আইটেম ধরে ধরে হিসাব করুন"
-        >
-          <span aria-hidden className="text-[16px]">
+        <div className="-mt-1 mb-1 flex items-center justify-end gap-1.5">
+          {lines.length ? (
+            <span className="muted text-[11px] font-semibold tabular-nums">
+              {lines.length} আইটেম • ৳ {formatMoney0(t)}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setItemsOpen(true)}
+            disabled={!canWrite}
+            aria-label="আইটেম পপআপ খুলুন"
+            title="আইটেম ধরে ধরে হিসাব করুন (পপআপ)"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--border)] bg-[var(--brand-soft)] text-[15px] leading-none transition hover:brightness-95 disabled:opacity-50"
+          >
             🧾
-          </span>
-          <span className="min-w-0 flex-1 truncate">
-            {lines.length ? `${lines.length}টি আইটেম • ৳ ${formatMoney0(t)}` : "আইটেম পপআপে হিসাব করুন"}
-          </span>
-          <span className="muted text-[11px]">{lines.length ? "বদলান ↗" : "খুলুন ↗"}</span>
-        </button>
+          </button>
+        </div>
       );
     },
   };
 
   const columns: ColumnDef<BazarDTO>[] = [
     { key: "date", header: "তারিখ / Date", render: (r) => <span className="tabular-nums">{toDisplayDate(r.date)}</span> },
-    { key: "buyer", header: "ক্রেতা / Buyer", render: (r) => <span className="font-semibold">{r.buyerName || "—"}</span> },
+    {
+      key: "buyer",
+      header: "ক্রেতা / Buyer",
+      render: (r) => (
+        <span className="flex items-center gap-1.5">
+          <span className="font-semibold">{r.buyerName || "—"}</span>
+          {r.paidByMemberId ? <span className="pill pill-warn">নিজের টাকা</span> : null}
+        </span>
+      ),
+    },
     {
       key: "items",
       header: "আইটেম / Items",

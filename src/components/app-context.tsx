@@ -64,7 +64,11 @@ export interface AppContextValue {
   refresh: () => Promise<void>;
   bootstrap: () => Promise<void>;
   selectMonth: (monthId: string) => Promise<void>;
-  openNewMonth: (year: number, month: number, opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string }) => Promise<MonthDTO | null>;
+  openNewMonth: (
+    year: number,
+    month: number,
+    opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean },
+  ) => Promise<MonthDTO | null>;
   switchOffice: (officeId: string) => Promise<void>;
   logout: () => Promise<void>;
   signIn: (payload: Record<string, unknown>) => Promise<void>;
@@ -295,16 +299,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const openNewMonth = useCallback(
-    async (year: number, m: number, opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string }) => {
-      const created = await call<{ month: MonthDTO; copiedMembers: number }>("month.open", {
+    async (
+      year: number,
+      m: number,
+      opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean },
+    ) => {
+      const created = await call<{ month: MonthDTO; copiedMembers: number; carriedBalances: number }>("month.open", {
         year,
         month: m,
         copyMembers: opts?.copyMembers ?? true,
         carryForwardBalance: opts?.carryForwardBalance ?? 0,
         note: opts?.note ?? "",
+        carryMemberBalances: opts?.carryMemberBalances ?? false,
       });
       if (!created) return null;
-      toast(`নতুন মাস খোলা হয়েছে: ${created.month.monthName}${created.copiedMembers ? ` (${created.copiedMembers} জন সদস্য কপি হয়েছে)` : ""}`, "success");
+      toast(
+        `নতুন মাস খোলা হয়েছে: ${created.month.monthName}${created.copiedMembers ? ` (${created.copiedMembers} জন সদস্য কপি)` : ""}${created.carriedBalances ? ` • ${created.carriedBalances} জনের বাকি ক্যারি হয়েছে` : ""}`,
+        "success",
+      );
       const monthsList = await mess<MonthDTO[]>("months.list").catch(() => null);
       if (monthsList) setMonths(monthsList);
       await selectMonth(created.month.id);

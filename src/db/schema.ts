@@ -251,6 +251,7 @@ export const bazarExpenses = pgTable(
     day: integer("day").notNull(),
     memberId: text("member_id"),
     buyerName: text("buyer_name").notNull().default(""),
+    paidByMemberId: text("paid_by_member_id").notNull().default(""),
     category: bazarCategoryEnum("category").notNull().default("Groceries"),
     items: text("items").notNull().default(""),
     itemsJson: text("items_json").notNull().default("[]"),
@@ -293,7 +294,7 @@ export const deposits = pgTable(
     memberName: text("member_name").notNull().default(""),
     amount: numeric("amount", { precision: 14, scale: 2 }).notNull().default("0"),
     note: text("note").notNull().default(""),
-    type: text("type").notNull().default("permanent_fund"), // permanent_fund | refund | adjustment
+    type: text("type").notNull().default("permanent_fund"), // member_deposit | adjustment | permanent_fund | refund
     createdBy: text("created_by").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

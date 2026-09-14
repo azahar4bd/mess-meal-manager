@@ -162,6 +162,7 @@ export function bazarDTO(r: BazarExpense): BazarDTO {
     day: r.day,
     memberId: r.memberId,
     buyerName: r.buyerName,
+    paidByMemberId: r.paidByMemberId ?? "",
     category: r.category,
     items: r.items,
     lines: parseBazarLines(r.itemsJson),
@@ -386,9 +387,9 @@ export async function openMonth(
   officeId: string,
   year: number,
   month: number,
-  opts: { copyMembers?: boolean; carryForwardBalance?: number; note?: string } = {},
-): Promise<{ month: MessMonth; copiedMembers: number }> {
-  const { copyMembers = true, carryForwardBalance = 0, note = "" } = opts;
+  opts: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean } = {},
+): Promise<{ month: MessMonth; copiedMembers: number; carriedBalances: number }> {
+  const { copyMembers = true, carryForwardBalance = 0, note = "", carryMemberBalances = false } = opts;
 
   const prevYear = month === 1 ? year - 1 : year;
   const prevMonth = month === 1 ? 12 : month - 1;
@@ -437,7 +438,44 @@ export async function openMonth(
     }
   }
 
-  return { month: created, copiedMembers };
+  /* ── আগের মাসের দেনা-পাওনা নতুন মাসে "সমন্বয়" জমা হিসেবে ক্যারি ──
+   *  টিক না দিলে নতুন মাস শূন্য থেকে শুরু হয় (পুরনো মাসের রিপোর্টে বাকি থেকেই যায়)। */
+  let carriedBalances = 0;
+  if (carryMemberBalances && prev) {
+    const newMembers = await listMembers(officeId, created.id);
+    if (newMembers.length) {
+      const { summary } = await getMonthSummary(officeId, prev.id);
+      const prevMembers = await listMembers(officeId, prev.id);
+      const byPhone = new Map(newMembers.filter((m) => m.phone).map((m) => [m.phone, m]));
+      const byName = new Map(newMembers.map((m) => [m.name.trim().toLowerCase(), m]));
+      const firstDay = isoOfDay(year, month, 1);
+      const prevLabel = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
+      for (const calcRow of summary?.memberCalculations ?? []) {
+        const amount = round2(calcRow.denaPoana);
+        if (Math.abs(amount) < 1) continue;
+        const src = prevMembers.find((m) => m.id === calcRow.memberId);
+        const key = (src?.name ?? calcRow.name).trim().toLowerCase();
+        const target = (src?.phone ? byPhone.get(src.phone) : undefined) ?? byName.get(key);
+        if (!target) continue;
+        await db.insert(deposits).values({
+          id: cryptoId("dep"),
+          officeId,
+          monthId: created.id,
+          date: firstDay,
+          day: 1,
+          memberId: target.id,
+          memberName: target.name,
+          amount: String(amount),
+          note: `${prevLabel} এর বাকি — ${amount > 0 ? "পাওনা" : "দেনা"} ৳${Math.abs(amount)}`,
+          type: "adjustment",
+          createdBy: "system:carry-forward",
+        });
+        carriedBalances += 1;
+      }
+    }
+  }
+
+  return { month: created, copiedMembers, carriedBalances };
 }
 
 export async function setMonthClosed(monthId: string, officeId: string, closed: boolean): Promise<MessMonth | null> {
@@ -739,6 +777,8 @@ export interface BazarInput {
   date: string;
   buyerName?: string;
   memberId?: string | null;
+  /** নিজের টাকা থেকে বাজার → মাস শেষে সমন্বয় হবে */
+  paidByMemberId?: string | null;
   category?: BazarExpense["category"];
   items?: string;
   /** আইটেম পপআপের লাইনগুলো — দিলে items টেক্সট স্বয়ংক্রিয়ভাবে সারাংশ হয়ে যায় */
@@ -761,6 +801,7 @@ export async function createBazar(officeId: string, month: MessMonth, input: Baz
       day: isoParts(iso).day,
       memberId: input.memberId ?? null,
       buyerName: input.buyerName ?? "",
+      paidByMemberId: input.paidByMemberId ?? "",
       category: input.category ?? "Groceries",
       items: itemsText,
       itemsJson: JSON.stringify(lines),
@@ -788,6 +829,7 @@ export async function updateBazar(
       day: isoParts(iso).day,
       memberId: input.memberId ?? null,
       buyerName: input.buyerName ?? "",
+      paidByMemberId: input.paidByMemberId ?? "",
       category: input.category ?? "Groceries",
       items: itemsText,
       itemsJson: JSON.stringify(lines),

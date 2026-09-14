@@ -19,6 +19,7 @@ import {
   TextInput,
 } from "@/components/ui";
 import { mess } from "@/lib/client";
+import { UiContentEditor } from "@/components/UiContent";
 import { toDisplayDateTime } from "@/lib/date";
 import { ROLE_LABEL } from "@/lib/permissions";
 import type { AuditLogDTO, OfficeDTO, Role } from "@/lib/types";
@@ -103,6 +104,7 @@ function OverviewPanel() {
   const app = useApp();
   const [summary, setSummary] = useState<AdminSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [contentOpen, setContentOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -170,7 +172,21 @@ function OverviewPanel() {
             </div>
           )}
         </Card>
+
+        <Card title="অ্যাপের টেক্সট ও নোটিশ / App Content" bodyClass="p-3">
+          <p className="muted mb-2.5 text-[12.5px]">
+            লগইন পেজের হিরো, হেডার/সাবটাইটেল, ফুটার এবং উপরের স্ক্রলিং নোটিশ — সব অফিসের জন্য কমন টেক্সট এখান থেকে বদলানো যায়।
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setContentOpen(true)}>✎ এডিট করুন</button>
+            <span className="muted self-center text-[11.5px]">
+              একক অফিসের টেক্সট বদলাতে ড্যাশবোর্ডের ✎ বাটন ব্যবহার করুন।
+            </span>
+          </div>
+        </Card>
       </div>
+
+      <UiContentEditor open={contentOpen} onClose={() => setContentOpen(false)} scope="global" />
     </div>
   );
 }

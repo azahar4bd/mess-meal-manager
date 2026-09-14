@@ -80,6 +80,8 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
   const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
   const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
+  /** ফান্ড বাদে সদস্যের সাধারণ জমা/সমন্বয় — শুধু এটাই দেনা-পাওনায় ধরা হয় */
+  const totalMemberPayments = round2(totalDepositsThisMonth - totalFund);
 
   // Rule 5 — shared extra split across ACTIVE members
   const totalSharedExtraRaw = extras
@@ -108,15 +110,29 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     if (nm) mealsByMemberName.set(nm, (mealsByMemberName.get(nm) ?? 0) + v);
   }
 
-  // deposits per member
-  const depositsByMember = new Map<string, number>();
-  const depositsByName = new Map<string, number>();
+  // deposits per member — স্থায়ী ফান্ড সম্পূর্ণ আলাদা খাত, বাকি জমা মাসের পরিশোধ
+  const paymentsByMember = new Map<string, number>();
+  const paymentsByName = new Map<string, number>();
+  const fundByMember = new Map<string, number>();
+  const fundByName = new Map<string, number>();
   for (const d of deposits) {
     const v = toNumber(d.amount);
-    if (d.memberId) depositsByMember.set(d.memberId, (depositsByMember.get(d.memberId) ?? 0) + v);
+    const isFund = (d.type || "permanent_fund") === "permanent_fund";
+    const byMember = isFund ? fundByMember : paymentsByMember;
+    const byName = isFund ? fundByName : paymentsByName;
+    if (d.memberId) byMember.set(d.memberId, (byMember.get(d.memberId) ?? 0) + v);
     const nm = (d.memberName || "").trim().toLowerCase();
-    if (nm) depositsByName.set(nm, (depositsByName.get(nm) ?? 0) + v);
+    if (nm) byName.set(nm, (byName.get(nm) ?? 0) + v);
   }
+
+  // নিজের পকেটের টাকা থেকে বাজার → সেই সদস্যের পাওনা (মাস শেষে সমন্বয়)
+  const selfPaidByMember = new Map<string, number>();
+  for (const r of bazar) {
+    const who = String(r.paidByMemberId ?? "").trim();
+    if (!who) continue;
+    selfPaidByMember.set(who, round2((selfPaidByMember.get(who) ?? 0) + toNumber(r.amount)));
+  }
+  const totalSelfPaidBazar = round2([...selfPaidByMember.values()].reduce((s, v) => s + v, 0));
 
   /* ── per member ─────────────────────────────────────────── */
   const memberCalculations: MemberCalculation[] = members.map((m) => {
@@ -131,11 +147,12 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     // Rule 1/2 — total cost NEVER subtracts the permanent fund
     const totalCost = round2(mealCost + individualExtra + sharedExtra);
 
-    const totalDeposit = round2(depositsByMember.get(m.id) ?? depositsByName.get(nm) ?? 0);
-    const permanentFund = totalDeposit;
+    const permanentFund = round2(fundByMember.get(m.id) ?? fundByName.get(nm) ?? 0);
+    const totalDeposit = round2(paymentsByMember.get(m.id) ?? paymentsByName.get(nm) ?? 0);
+    const selfPaidBazar = round2(selfPaidByMember.get(m.id) ?? 0);
 
-    // Dena-Paona (spec §37) — obligation vs. what the member actually deposited
-    const denaPoana = round2(totalDeposit - totalCost);
+    // Rule 1/2 — স্থায়ী ফান্ড দেনা-পাওনায় মেশে না; মোট খরচ সদস্যের দেনা (−)
+    const denaPoana = round2(totalDeposit + selfPaidBazar - totalCost);
     const status: MemberCalculation["status"] =
       Math.abs(denaPoana) < 0.005 ? "সমান" : denaPoana < 0 ? "দিবে" : "পাবে";
     const statusEn: MemberCalculation["statusEn"] =
@@ -154,6 +171,7 @@ export function calculateMonth(input: CalcInput): MonthSummary {
       sharedExtra,
       totalCost,
       totalDeposit,
+      selfPaidBazar,
       permanentFund,
       denaPoana,
       balance: denaPoana,
@@ -176,9 +194,11 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     netCost,
     perMillRate,
     totalFund,
+    totalSelfPaidBazar,
     totalSharedExtra,
     totalIndividualExtra,
     totalDepositsThisMonth,
+    totalMemberPayments,
     lastBalance,
     memberCalculations,
   };

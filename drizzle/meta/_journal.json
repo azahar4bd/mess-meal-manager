@@ -22,6 +22,13 @@
       "when": 1789361746379,
       "tag": "0002_member_order_bazar_items",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789403582754,
+      "tag": "0003_bazar_paid_by",
+      "breakpoints": true
     }
   ]
 }

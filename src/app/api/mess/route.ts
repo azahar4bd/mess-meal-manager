@@ -1,7 +1,16 @@
 import { NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { messMonths, offices, sessions, syncLogs, users, type User } from "@/db/schema";
+import { cryptoId, messMonths, offices, sessions, syncLogs, users, type User } from "@/db/schema";
+import {
+  getNotices,
+  getNoticesForEdit,
+  getTexts,
+  setNotices,
+  setTexts,
+  type Notice,
+  type UiTexts,
+} from "@/lib/ui-content";
 import { api, fail } from "@/lib/api";
 import { AuthError, setActiveOffice, type SessionContext } from "@/lib/auth";
 import { audit, listAllAuditLogs, listAuditLogs } from "@/lib/audit";
@@ -292,13 +301,21 @@ const handlers: Record<string, ActionHandler> = {
       throw new AuthError("bad-request", "সঠিক সাল ও মাস দিন", 400);
     }
     const copyMembers = body.copyMembers === undefined ? true : Boolean(body.copyMembers);
+    const carryMemberBalances = Boolean(body.carryMemberBalances);
     const result = await openMonth(office.id, year, month, {
       copyMembers,
       carryForwardBalance: num(body.carryForwardBalance, 0),
       note: str(body.note).slice(0, 200),
+      carryMemberBalances,
     });
-    await logAction(ctx, "month.open", "month", result.month.id, `নতুন মাস খোলা হয়েছে: ${monthLabel(year, month)}`);
-    return { month: monthDTO(result.month), copiedMembers: result.copiedMembers };
+    await logAction(
+      ctx,
+      "month.open",
+      "month",
+      result.month.id,
+      `নতুন মাস খোলা হয়েছে: ${monthLabel(year, month)}${result.carriedBalances ? ` (${result.carriedBalances} জনের বাকি ক্যারি)` : ""}`,
+    );
+    return { month: monthDTO(result.month), copiedMembers: result.copiedMembers, carriedBalances: result.carriedBalances };
   },
 
   "month.close": async (ctx, body) => {
@@ -387,6 +404,67 @@ const handlers: Record<string, ActionHandler> = {
     return { saved, members: rows.map(memberDTO) };
   },
 
+  /* ── এডিটেবল টেক্সট ও স্ক্রলিং নোটিশ বোর্ড ───────────── */
+  "ui.content": async (ctx) => {
+    const officeId = ctx.activeOfficeId;
+    const [texts, notices] = await Promise.all([getTexts(officeId), getNotices(officeId)]);
+    return { texts, notices };
+  },
+
+  "ui.editor": async (ctx, body) => {
+    const global = str(body.scope) === "global";
+    if (global) {
+      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
+    } else if (!can(ctx.user.role, "settings.write")) {
+      deny(ctx, "settings.write");
+    }
+    const officeId = global ? null : ctx.activeOfficeId;
+    if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
+    const [texts, notices] = await Promise.all([getTexts(officeId), getNoticesForEdit(officeId)]);
+    return { scope: global ? "global" : "office", texts, notices };
+  },
+
+  "ui.updateTexts": async (ctx, body) => {
+    const global = str(body.scope) === "global";
+    if (global) {
+      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
+    } else if (!can(ctx.user.role, "settings.write")) {
+      deny(ctx, "settings.write");
+    }
+    const officeId = global ? null : ctx.activeOfficeId;
+    if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
+    const raw = (body.texts ?? {}) as Record<string, unknown>;
+    const texts = await setTexts(officeId, raw as Partial<UiTexts>);
+    await logAction(ctx, "ui.updateTexts", global ? "platform" : "office", officeId ?? "global", "ইউআই টেক্সট হালনাগাদ");
+    return { texts };
+  },
+
+  "ui.updateNotices": async (ctx, body) => {
+    const global = str(body.scope) === "global";
+    if (global) {
+      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
+    } else if (!can(ctx.user.role, "settings.write")) {
+      deny(ctx, "settings.write");
+    }
+    const officeId = global ? null : ctx.activeOfficeId;
+    if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
+    const list: Notice[] = (Array.isArray(body.notices) ? body.notices : [])
+      .slice(0, 20)
+      .map((x) => {
+        const o = (x ?? {}) as Record<string, unknown>;
+        return {
+          id: str(o.id) || cryptoId("ntc"),
+          text: str(o.text).slice(0, 240),
+          active: o.active !== false,
+          createdAt: str(o.createdAt) || new Date().toISOString(),
+        };
+      })
+      .filter((n) => n.text.trim().length > 0);
+    await setNotices(officeId, list);
+    await logAction(ctx, "ui.updateNotices", global ? "platform" : "office", officeId ?? "global", `নোটিশ বোর্ড হালনাগাদ (${list.length}টি)`);
+    return { notices: list, active: await getNotices(officeId) };
+  },
+
   /* ── daily meals ─────────────────────────────────────── */
   "meals.list": async (ctx, body) => {
     if (!can(ctx.user.role, "meals.view")) deny(ctx, "meals.view");
@@ -468,6 +546,7 @@ const handlers: Record<string, ActionHandler> = {
         date: str(body.date),
         buyerName: str(body.buyerName).slice(0, 80),
         memberId: str(body.memberId) || null,
+        paidByMemberId: str(body.paidByMemberId).slice(0, 64) || null,
         category: normalizeCategory(str(body.category)),
         items: str(body.items).slice(0, 300),
         lines: parseLines(body.lines),
@@ -489,6 +568,7 @@ const handlers: Record<string, ActionHandler> = {
         date: str(body.date),
         buyerName: str(body.buyerName).slice(0, 80),
         memberId: str(body.memberId) || null,
+        paidByMemberId: str(body.paidByMemberId).slice(0, 64) || null,
         category: normalizeCategory(str(body.category)),
         items: str(body.items).slice(0, 300),
         lines: parseLines(body.lines),

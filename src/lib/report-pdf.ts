@@ -55,9 +55,11 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <td class="r">${formatMoney(m.mealCost)}</td>
         <td class="r">${formatMoney(m.individualExtra)}</td>
         <td class="r">${formatMoney(m.sharedExtra)}</td>
-        <td class="r b">${formatMoney(m.totalCost)}</td>
-        <td class="r">${formatMoney(m.permanentFund)}</td>
-        <td class="r b">${formatMoney(Math.abs(m.denaPoana))}</td>
+        <td class="r b">−৳${formatMoney(m.totalCost)}</td>
+        <td class="r">৳${formatMoney(m.totalDeposit)}</td>
+        <td class="r">${m.selfPaidBazar > 0 ? `৳${formatMoney(m.selfPaidBazar)}` : "—"}</td>
+        <td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(Math.abs(m.denaPoana))}</td>
+        <td class="r">৳${formatMoney(m.permanentFund)}</td>
         <td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(m.status)}</span></td>
       </tr>`,
     )
@@ -196,12 +198,12 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <tr>
           <th class="c">#</th><th>সদস্য</th><th class="r">মোট মিল</th>
           <th class="r">মিল রেট</th><th class="r">মিল খরচ</th><th class="r">ইন্ডি. অতিরিক্ত</th>
-          <th class="r">শেয়ার্ড অতিরিক্ত</th><th class="r">সর্বমোট খরচ</th><th class="r">স্থায়ী ফান্ড</th>
-          <th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th>
+          <th class="r">শেয়ার্ড অতিরিক্ত</th><th class="r">মোট খরচ (−)</th><th class="r">জমা / সমন্বয়</th>
+          <th class="r">নিজের টাকা থেকে বাজার</th><th class="r">দেনা-পাওনা</th><th class="r">স্থায়ী ফান্ড</th><th class="c">স্ট্যাটাস</th>
         </tr>
       </thead>
       <tbody>
-        ${memberRows || `<tr><td colspan="12" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`}
+        ${memberRows || `<tr><td colspan="13" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`}
       </tbody>
       <tfoot>
         <tr>
@@ -279,19 +281,23 @@ export function buildPrintHtml(input: PrintReportInput): string {
 
     <h2>৭. দেনা-পাওনা / Dena-Paona</h2>
     <table>
-      <thead><tr><th>সদস্য</th><th class="r">মোট খরচ</th><th class="r">জমা</th><th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th></tr></thead>
+      <thead><tr><th>সদস্য</th><th class="r">মোট খরচ (−)</th><th class="r">জমা / সমন্বয়</th><th class="r">নিজের টাকা থেকে বাজার</th><th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th></tr></thead>
       <tbody>
         ${
           summary.memberCalculations
             .map(
               (m) =>
-                `<tr><td>${esc(m.name)}</td><td class="r">${formatMoney(m.totalCost)}</td><td class="r">${formatMoney(
+                `<tr><td>${esc(m.name)}</td><td class="r">−৳${formatMoney(m.totalCost)}</td><td class="r">৳${formatMoney(
                   m.totalDeposit,
-                )}</td><td class="r b">${formatMoney(Math.abs(m.denaPoana))}</td><td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(
+                )}</td><td class="r">${
+                  m.selfPaidBazar > 0 ? `৳${formatMoney(m.selfPaidBazar)}` : "—"
+                }</td><td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(
+                  Math.abs(m.denaPoana),
+                )}</td><td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(
                   m.status,
                 )} / ${esc(m.statusEn)}</span></td></tr>`,
             )
-            .join("") || `<tr><td colspan="5" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`
+            .join("") || `<tr><td colspan="6" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`
         }
       </tbody>
       <tfoot>
@@ -299,6 +305,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
           <td class="r">মোট</td>
           <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalCost, 0)))}</td>
           <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalDeposit, 0)))}</td>
+          <td class="r">৳ ${formatMoney(summary.totalSelfPaidBazar)}</td>
           <td class="r">দিবে ৳ ${formatMoney(totalDue)} • পাবে ৳ ${formatMoney(totalReceive)}</td>
           <td class="c">—</td>
         </tr>

@@ -107,8 +107,10 @@ export const COLUMNS = {
     "IndividualExtra",
     "SharedExtra",
     "TotalMealCost",
-    "PermanentFund",
+    "Deposits",
+    "SelfPaidBazar",
     "DenaPoana",
+    "PermanentFund",
     "Status",
   ],
 } as const;
