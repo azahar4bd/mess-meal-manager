@@ -92,11 +92,13 @@ UI: হেডারের মাস সিলেক্টরে সব মাস
 
 | ফিচার | কোথায় |
 |---|---|
-| এন্ট্রি ফর্ম (তারিখ, বায়ার, ক্যাটাগরি, আইটেম, পরিমাণ, নোট) | `views/BazarView.tsx` + `ui/entry-panel.tsx` |
+| এন্ট্রি ফর্ম (তারিখ, ক্রেতা, আইটেম, পরিমাণ, নোট) | `views/BazarView.tsx` + `ui/entry-panel.tsx` |
+| আইটেম পপআপ (আইটেম/কোয়ান্টিটি/দাম → মোট, এডিট-ডিলিট, সেভ করলে পরিমাণের ঘরে বসে) | `BazarItemsModal.tsx` + `bazar_expenses.items_json` |
 | ৮টি ক্যাটাগরি (Groceries…Other) | `bazar_category` enum |
 | তারিখ অবশ্যই মাসের ভেতরে | `assertDateInMonth()` |
 | পরিমাণ > 0, numeric | `lib/validate.ts` |
-| ফিল্টার (তারিখ রেঞ্জ/ক্যাটাগরি), সর্ট, মোট | `views/BazarView.tsx` |
+| খোঁজ (ক্রেতা/আইটেম/নোট/তারিখ), মোট | `views/BazarView.tsx` |
+| সদস্যের কাস্টম ক্রম (ড্র্যাগ + ↑↓), মিল এন্ট্রিতেও একই ক্রম | `views/MembersView.tsx` + `members.sort_order` + `members.reorder` |
 | এডিট/ডিলিট (অফিস+মাস স্কোপড) | `updateBazar()`, `deleteBazar()` |
 | মিল রেটে প্রভাব | `calc.ts` → `totalBazar` (+ `bazarByCategory()`, `bazarByBuyer()`) |
 

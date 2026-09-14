@@ -3,25 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f4f6f8;
+  /* লাইট মোড — নরম, চোখে আরামদায়ক ঠান্ডা ছাই-নীল ব্যাকগ্রাউন্ড + হালকা রঙের আভা */
+  --bg: #eceff5;
+  --bg-glow-a: rgba(29, 107, 74, 0.12);
+  --bg-glow-b: rgba(59, 130, 246, 0.1);
   --card: #ffffff;
-  --text: #101828;
-  --muted: #667085;
-  --border: #e4e7ec;
-  --brand: #226e4a;
-  --brand-soft: #eef7f2;
+  --card-alt: #f6f8fb;
+  --text: #101c2e;
+  --muted: #5b6675;
+  --border: #dce2ec;
+  --brand: #1d6b4a;
+  --brand-soft: #e5f1eb;
   --danger: #b42318;
-  --danger-soft: #fee4e2;
-  --warn: #b54708;
-  --warn-soft: #fffaeb;
-  --ok: #027a48;
-  --ok-soft: #d1fadf;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --danger-soft: #fde7e5;
+  --warn: #9a5b06;
+  --warn-soft: #fff5e0;
+  --ok: #067647;
+  --ok-soft: #dcfae6;
+  --shadow: 0 1px 2px rgba(16, 28, 46, 0.05), 0 8px 22px -12px rgba(16, 28, 46, 0.28);
 }
 
 .dark {
   --bg: #0b1220;
+  --bg-glow-a: rgba(79, 164, 120, 0.07);
+  --bg-glow-b: rgba(56, 116, 203, 0.07);
   --card: #121a2b;
+  --card-alt: #16203366;
   --text: #e6ebf2;
   --muted: #98a2b3;
   --border: #22304a;
@@ -46,7 +53,12 @@ body {
 }
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: radial-gradient(1100px 520px at 100% -8%, var(--bg-glow-a), transparent 62%),
+    radial-gradient(880px 460px at -8% 6%, var(--bg-glow-b), transparent 58%),
+    radial-gradient(700px 420px at 50% 108%, var(--bg-glow-a), transparent 60%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: var(--text);
   font-family: var(--font-bengali), "Noto Sans Bengali", "Hind Siliguri", "SolaimanLipi", system-ui,
     -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -59,6 +71,10 @@ body {
   .card {
     @apply rounded-xl border bg-[var(--card)] shadow-[var(--shadow)];
     border-color: var(--border);
+  }
+  :root:not(.dark) .card {
+    border-color: color-mix(in srgb, var(--border) 88%, #ffffff);
+    box-shadow: 0 1px 2px rgba(16, 28, 46, 0.04), 0 10px 26px -16px rgba(16, 28, 46, 0.35);
   }
   .card-pad {
     @apply p-3 sm:p-4;
@@ -78,6 +94,10 @@ body {
     background: var(--card);
     border-color: var(--border);
     color: var(--text);
+  }
+  :root:not(.dark) .input {
+    border-color: #d3dae6;
+    box-shadow: inset 0 1px 2px rgba(16, 28, 46, 0.04);
   }
   .input:focus {
     border-color: var(--brand);
@@ -101,16 +121,21 @@ body {
     min-height: 44px;
   }
   .btn-primary {
-    background: var(--brand);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 88%, #ffffff) 0%, var(--brand) 100%);
     color: #fff;
+    box-shadow: 0 1px 2px rgba(16, 28, 46, 0.16), 0 6px 14px -8px color-mix(in srgb, var(--brand) 70%, transparent);
   }
   .btn-primary:hover {
-    filter: brightness(1.08);
+    filter: brightness(1.07);
+    transform: translateY(-0.5px);
   }
   .btn-ghost {
     background: transparent;
     color: var(--text);
     border: 1px solid var(--border);
+  }
+  :root:not(.dark) .btn-ghost {
+    background: color-mix(in srgb, var(--card) 70%, transparent);
   }
   .btn-ghost:hover {
     background: var(--brand-soft);
@@ -164,12 +189,20 @@ body {
     color: var(--brand);
     border-bottom: 1px solid var(--border);
   }
+  :root:not(.dark) table.data th {
+    background: linear-gradient(180deg, #eaf3ee 0%, var(--brand-soft) 100%);
+    color: #14563a;
+    border-bottom-color: #cfd9e4;
+  }
   table.data td {
     @apply whitespace-nowrap px-2.5 py-2;
     border-bottom: 1px solid var(--border);
   }
+  table.data tbody tr:nth-child(even) td {
+    background: var(--card-alt);
+  }
   table.data tbody tr:hover td {
-    background: color-mix(in srgb, var(--brand) 5%, transparent);
+    background: color-mix(in srgb, var(--brand) 7%, transparent);
   }
   table.data td.num,
   table.data th.num {
@@ -181,6 +214,9 @@ body {
   }
   .kpi {
     @apply card card-pad flex flex-col gap-0.5;
+  }
+  :root:not(.dark) .kpi {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   }
   .kpi-k {
     @apply text-[11.5px] font-semibold;

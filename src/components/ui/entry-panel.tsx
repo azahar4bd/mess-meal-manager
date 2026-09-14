@@ -47,6 +47,14 @@ export interface ColumnDef<T> {
   hideOnMobile?: boolean;
 }
 
+/** ফিল্ডের ভেতরে অতিরিক্ত কন্ট্রোল বসানোর সুযোগ (যেমন আইটেম পপআপের আইকন) */
+export interface FieldExtraCtx {
+  value: string;
+  setValue: (key: string, value: string) => void;
+  values: FormState;
+  editingId: string | null;
+}
+
 export interface EntryPanelProps<T extends { id: string }> {
   title: string;
   subtitle?: string;
@@ -69,6 +77,10 @@ export interface EntryPanelProps<T extends { id: string }> {
   toolbar?: React.ReactNode;
   loading?: boolean;
   formTitle?: string;
+  /** নির্দিষ্ট ফিল্ডের উপরে অতিরিক্ত UI (key = ফিল্ডের key) */
+  fieldExtra?: Record<string, (ctx: FieldExtraCtx) => React.ReactNode>;
+  /** এন্ট্রি ফর্ম খোলার সঙ্গে সঙ্গে — ড্রাফট লোড/রিসেট করার জন্য */
+  onFormOpen?: (editingId: string | null, values: FormState) => void;
 }
 
 export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) {
@@ -94,6 +106,8 @@ export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) 
     toolbar,
     loading,
     formTitle = "এন্ট্রি",
+    fieldExtra,
+    onFormOpen,
   } = props;
 
   const [formOpen, setFormOpen] = useState(false);
@@ -112,17 +126,21 @@ export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) 
   }, [rows, query, search]);
 
   const openCreate = () => {
+    const fresh = initialValues();
     setEditingId(null);
-    setValues(initialValues());
+    setValues(fresh);
     setErrors({});
     setFormOpen(true);
+    onFormOpen?.(null, fresh);
   };
 
   const openEdit = (row: T) => {
+    const loaded = toForm(row);
     setEditingId(row.id);
-    setValues(toForm(row));
+    setValues(loaded);
     setErrors({});
     setFormOpen(true);
+    onFormOpen?.(row.id, loaded);
   };
 
   const setField = (key: string, value: string) => setValues((p) => ({ ...p, [key]: value }));
@@ -210,8 +228,10 @@ export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) 
     }
 
     if (f.type === "money") {
+      const extra = fieldExtra?.[f.key]?.({ value, setValue: setField, values, editingId });
       return (
         <Field key={f.key} label={f.label} required={f.required} error={error} hint={f.hint}>
+          {extra}
           <MoneyInput
             value={value}
             disabled={disabled}

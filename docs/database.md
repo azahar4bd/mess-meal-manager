@@ -143,9 +143,12 @@ Logout / password reset / user delete all remove the rows → instant invalidati
 | `phone` | text `''` | |
 | `password` | text `''` | optional member-level password (bcrypt when used) |
 | `note` | text `''` | |
+| `sort_order` | integer `0` | ব্যবহারকারীর নিজের পছন্দমতো ক্রম (`members.reorder`) — সদস্য পেজ ও মিল এন্ট্রি/মাস গ্রিডে একই ক্রম |
 | `joined_at`, `created_at`, `updated_at` | timestamptz | |
 
 `UNIQUE members_month_phone_uq(month_id, phone)` · `INDEX members_office_idx`, `members_month_idx`
+
+তালিকা সবসময় `ORDER BY sort_order ASC, is_active ASC, name ASC` — নতুন সদস্য স্বয়ংক্রিয়ভাবে শেষের নম্বর পায়, আগের মাস থেকে কপি করলেও ক্রম বজায় থাকে।
 
 ### `daily_meals`
 | Column | Type | Notes |
@@ -171,7 +174,8 @@ Logout / password reset / user delete all remove the rows → instant invalidati
 | `day` | int NOT NULL | derived from `date` |
 | `member_id` | text NULL | who did the shopping (optional) |
 | `buyer_name` | text `''` | free-text fallback |
-| `category` | `bazar_category` = `Groceries` | |
+| `category` | `bazar_category` = `Groceries` | UI-তে আর নেওয়া হয় না |
+| `items_json` | text `'[]'` | আইটেম পপআপের লাইন `[{item,qty,price}]` |
 | `items` | text `''` | e.g. `চাল, ডাল, তেল` |
 | `amount` | numeric(14,2) = 0 | must be > 0 |
 | `note`, `created_by` | text `''` | |

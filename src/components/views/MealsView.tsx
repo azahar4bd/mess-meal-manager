@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, EmptyState, Loader, MealStepper, SegmentedButtons } from "@/components/ui";
-import { formatMeal, formatMoney, round2, toNumber } from "@/lib/format";
+import { formatMeal, formatMoney, formatRate, round2, toNumber } from "@/lib/format";
 import { isoOfDay, isValidIso, toDisplayDate, toIsoDate, weekdayBn, todayIso } from "@/lib/date";
 
 type ViewMode = "day" | "grid";
@@ -144,7 +144,7 @@ export function MealsView() {
           <h1 className="text-[19px] font-extrabold leading-tight">দৈনিক মিল / Daily Meals</h1>
           <p className="muted text-[12.5px]">
             {month.monthName} • {month.totalDays} দিন • মোট মিল {formatMeal(summary?.totalMill ?? 0)} • মিল রেট ৳{" "}
-            {formatMoney(summary?.perMillRate ?? 0)}
+            {formatRate(summary?.perMillRate ?? 0)}
           </p>
         </div>
         <SegmentedButtons
@@ -263,6 +263,7 @@ export function MealsView() {
       ) : (
         <Card
           title="মাস গ্রিড / Month Grid"
+          subtitle="উপরের সারিতে তারিখ, বাম পাশের কলমে সদস্যের নাম"
           action={
             canWrite ? (
               <button type="button" className="btn btn-primary btn-sm" disabled={!gridChanged || gridSaving} onClick={() => void saveGrid()}>
@@ -272,67 +273,75 @@ export function MealsView() {
           }
         >
           <div className="table-wrap" style={{ maxHeight: "62vh" }}>
-            <table className="data" style={{ minWidth: 120 + data.members.length * 62 }}>
+            <table className="data" style={{ minWidth: 130 + month.totalDays * 50 + 60 }}>
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 74 }}>
-                    দিন
+                  <th className="sticky left-0 top-0 z-20 bg-[var(--brand-soft)]" style={{ minWidth: 118 }}>
+                    সদস্য / Staff
                   </th>
-                  {data.members.map((m) => (
-                    <th key={m.id} className="num" style={{ minWidth: 56 }}>
-                      <span className="block max-w-[60px] truncate">{m.name}</span>
-                    </th>
-                  ))}
-                  <th className="num" style={{ minWidth: 56 }}>
+                  {Array.from({ length: month.totalDays }).map((_, i) => {
+                    const d = i + 1;
+                    return (
+                      <th key={d} className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 44 }}>
+                        <span className="block text-[12.5px] font-extrabold tabular-nums">{d}</span>
+                        <span className="muted block text-[9.5px] font-semibold">{weekdayBn(isoOfDay(month.year, month.month, d)).slice(0, 3)}</span>
+                      </th>
+                    );
+                  })}
+                  <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 56 }}>
                     মোট
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {Array.from({ length: month.totalDays }).map((_, i) => {
-                  const d = i + 1;
-                  const row = grid[d] ?? {};
-                  const total = round2(data.members.reduce((s, m) => s + toNumber(row[m.id]), 0));
+                {data.members.map((m) => {
+                  const memberTotal = round2(
+                    Array.from({ length: month.totalDays })
+                      .map((_, i) => toNumber((grid[i + 1] ?? {})[m.id]))
+                      .reduce((sum, v) => sum + v, 0),
+                  );
                   return (
-                    <tr key={d}>
-                      <td className="sticky left-0 z-10 bg-[var(--card)] font-bold tabular-nums">
-                        {d}
-                        <span className="muted ml-1 text-[10px]">{weekdayBn(isoOfDay(month.year, month.month, d)).slice(0, 3)}</span>
+                    <tr key={m.id} className={m.isActive ? "" : "opacity-60"}>
+                      <td className="sticky left-0 z-10 bg-[var(--card)]">
+                        <span className="block max-w-[116px] truncate text-[13px] font-bold">{m.name}</span>
+                        {m.isActive ? null : <span className="muted block text-[10px]">নিষ্ক্রিয়</span>}
                       </td>
-                      {data.members.map((m) => (
-                        <td key={m.id} className="num p-1">
-                          <input
-                            type="number"
-                            step="0.5"
-                            min={0}
-                            className={`meal-cell w-[52px] ${toNumber(row[m.id]) === 0 ? "zero" : ""}`}
-                            value={toNumber(row[m.id])}
-                            disabled={!canWrite || !m.isActive}
-                            onChange={(e) => setGridCell(d, m.id, Number(e.target.value))}
-                            aria-label={`${m.name} দিন ${d}`}
-                          />
-                        </td>
-                      ))}
-                      <td className="num font-bold tabular-nums">{formatMeal(total)}</td>
+                      {Array.from({ length: month.totalDays }).map((_, i) => {
+                        const d = i + 1;
+                        return (
+                          <td key={d} className="num p-1">
+                            <input
+                              type="number"
+                              step="0.5"
+                              min={0}
+                              className={`meal-cell ${toNumber((grid[d] ?? {})[m.id]) === 0 ? "zero" : ""}`}
+                              style={{ width: 46, minWidth: 46 }}
+                              value={toNumber((grid[d] ?? {})[m.id])}
+                              disabled={!canWrite || !m.isActive}
+                              onChange={(e) => setGridCell(d, m.id, Number(e.target.value))}
+                              aria-label={`${m.name} দিন ${d}`}
+                            />
+                          </td>
+                        );
+                      })}
+                      <td className="num font-bold tabular-nums">{formatMeal(memberTotal)}</td>
                     </tr>
                   );
                 })}
               </tbody>
               <tfoot>
                 <tr>
-                  <td className="sticky left-0 z-10">মোট</td>
-                  {data.members.map((m) => (
-                    <td key={m.id} className="num tabular-nums">
-                      {formatMeal(
-                        round2(
-                          Array.from({ length: month.totalDays })
-                            .map((_, i) => toNumber((grid[i + 1] ?? {})[m.id]))
-                            .reduce((s, v) => s + v, 0),
-                        ),
-                      )}
-                    </td>
-                  ))}
-                  <td className="num tabular-nums">{formatMeal(summary?.totalMill ?? 0)}</td>
+                  <td className="sticky left-0 z-10 font-bold">দৈনিক মোট</td>
+                  {Array.from({ length: month.totalDays }).map((_, i) => {
+                    const d = i + 1;
+                    const row = grid[d] ?? {};
+                    return (
+                      <td key={d} className="num font-bold tabular-nums">
+                        {formatMeal(round2(data.members.reduce((sum, m) => sum + toNumber(row[m.id]), 0)))}
+                      </td>
+                    );
+                  })}
+                  <td className="num font-extrabold tabular-nums">{formatMeal(summary?.totalMill ?? 0)}</td>
                 </tr>
               </tfoot>
             </table>

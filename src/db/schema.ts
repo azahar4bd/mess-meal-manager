@@ -185,6 +185,7 @@ export const members = pgTable(
     phone: text("phone").notNull().default(""),
     password: text("password").notNull().default(""), // optional legacy/demo field, hashed
     note: text("note").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -252,6 +253,7 @@ export const bazarExpenses = pgTable(
     buyerName: text("buyer_name").notNull().default(""),
     category: bazarCategoryEnum("category").notNull().default("Groceries"),
     items: text("items").notNull().default(""),
+    itemsJson: text("items_json").notNull().default("[]"),
     amount: numeric("amount", { precision: 14, scale: 2 }).notNull().default("0"),
     note: text("note").notNull().default(""),
     createdBy: text("created_by").notNull().default(""),

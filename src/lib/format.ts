@@ -25,10 +25,19 @@ export function round4(n: number): number {
   return Math.round((Number(n) + Number.EPSILON) * 10000) / 10000;
 }
 
-/** 1234.5 → "1,234.50" */
-export function formatMoney(n: number | string | null | undefined, digits = 2): string {
+/**
+ * টাকা — ডিফল্টভাবে পূর্ণসংখ্যায় (রাউন্ড) দেখানো হয়, যেমন 1234.56 → "1,235"।
+ * শুধু মিল রেট দশমিকে দেখাতে formatRate() ব্যবহার হয়। প্রয়োজনে digits দিয়ে
+ * দশমিক চেয়ে নেওয়া যায় (যেমন CSV/হিসাবের খাতা)।
+ */
+export function formatMoney(n: number | string | null | undefined, digits = 0): string {
   const v = toNumber(n, 0);
   return v.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+/** টাকা — পূর্ণসংখ্যায় (রাউন্ড); formatMoney-এরই স্পষ্ট রূপ */
+export function formatMoney0(n: number | string | null | undefined): string {
+  return formatMoney(n, 0);
 }
 
 /** compact: 1234567 → "12,34,567" style kept simple as 1,234,567 */

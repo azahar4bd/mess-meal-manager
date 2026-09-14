@@ -6,7 +6,7 @@
  * reachable from the "Download PDF" button (window.print) and from
  * GET /api/report/export?format=html (a standalone .html file).
  */
-import { formatMoney, formatMeal, round2 } from "@/lib/format";
+import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
 import { bazarByBuyer, bazarByCategory } from "@/lib/calc";
 import type { MessData, MonthSummary, OfficeDTO } from "@/lib/types";
@@ -51,7 +51,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <td class="c">${i + 1}</td>
         <td>${esc(m.name)}</td>
         <td class="r">${formatMeal(m.totalMill)}</td>
-        <td class="r">${formatMoney(m.perMillRate)}</td>
+        <td class="r">${formatRate(m.perMillRate)}</td>
         <td class="r">${formatMoney(m.mealCost)}</td>
         <td class="r">${formatMoney(m.individualExtra)}</td>
         <td class="r">${formatMoney(m.sharedExtra)}</td>
@@ -180,7 +180,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
     <div class="kpis">
       <div class="kpi"><div class="k">সক্রিয় সদস্য</div><div class="v">${summary.activeMembers}</div></div>
       <div class="kpi"><div class="k">মোট মিল</div><div class="v">${formatMeal(summary.totalMill)}</div></div>
-      <div class="kpi"><div class="k">মিল রেট</div><div class="v">৳ ${formatMoney(summary.perMillRate)}</div></div>
+      <div class="kpi"><div class="k">মিল রেট</div><div class="v">৳ ${formatRate(summary.perMillRate)}</div></div>
       <div class="kpi"><div class="k">মোট বাজার</div><div class="v">৳ ${formatMoney(summary.totalBazarCost)}</div></div>
       <div class="kpi"><div class="k">অন্যান্য আয়</div><div class="v">৳ ${formatMoney(summary.totalOthersIncome)}</div></div>
       <div class="kpi"><div class="k">নেট মিল খরচ</div><div class="v">৳ ${formatMoney(summary.netCost)}</div></div>
@@ -207,7 +207,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <tr>
           <td colspan="3" class="r">মোট</td>
           <td class="r">${formatMeal(summary.totalMill)}</td>
-          <td class="r">${formatMoney(summary.perMillRate)}</td>
+          <td class="r">${formatRate(summary.perMillRate)}</td>
           <td class="r">${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.mealCost, 0)))}</td>
           <td class="r">${formatMoney(summary.totalIndividualExtra)}</td>
           <td class="r">${formatMoney(summary.totalSharedExtra)}</td>
@@ -221,7 +221,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
     <div class="note">
       মিল রেট = (মোট বাজার − অন্য আয়) ÷ মোট মিল = (${formatMoney(summary.totalBazarCost)} − ${formatMoney(
         summary.totalOthersIncome,
-      )}) ÷ ${formatMeal(summary.totalMill)} = ৳ ${formatMoney(summary.perMillRate)}।
+      )}) ÷ ${formatMeal(summary.totalMill)} = ৳ ${formatRate(summary.perMillRate)}।
       স্থায়ী ফান্ড মিল খরচ থেকে বাদ দেওয়া হয় না (আলাদা স্তম্ভ)।
       শেয়ার্ড অতিরিক্ত = ${formatMoney(summary.totalSharedExtra)} ÷ ${summary.activeMembers} জন সক্রিয় সদস্য = ৳ ${formatMoney(
         summary.activeMembers ? summary.totalSharedExtra / summary.activeMembers : 0,

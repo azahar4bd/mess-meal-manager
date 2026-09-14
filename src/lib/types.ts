@@ -110,6 +110,7 @@ export interface MemberDTO {
   isActive: boolean;
   phone: string;
   note: string;
+  sortOrder: number;
   createdAt: string;
 }
 
@@ -124,6 +125,13 @@ export interface MealRowDTO {
   note: string;
 }
 
+/** বাজারের আইটেম-ভিত্তিক হিসাবের এক লাইন (আইটেম পপআপ থেকে যোগ করা) */
+export interface BazarLine {
+  item: string;
+  qty: number;
+  price: number;
+}
+
 export interface BazarDTO {
   id: string;
   monthId: string;
@@ -133,6 +141,7 @@ export interface BazarDTO {
   buyerName: string;
   category: BazarCategory;
   items: string;
+  lines: BazarLine[];
   amount: number;
   note: string;
 }

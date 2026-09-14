@@ -191,6 +191,7 @@ Public (no auth). Never throws — a dead database is reported as `ok:false` wit
 | `member.create` | `name`, `phone?`, `role?`, `note?`, `isActive?` | `members.write` |
 | `member.update` | `id`, + any of the above | `members.write` |
 | `member.delete` | `id` | `members.write` |
+| `members.reorder` | `ids[]` (নতুন ক্রমে সদস্য আইডি) | `members.write` |
 
 > `members` are **per month** (`members_month_phone_uq` = monthId + phone), so each month keeps its own roster.
 
@@ -219,11 +220,11 @@ Rules enforced server-side: `meals` must be a finite number, `0 ≤ meals ≤ 10
 | Action | Params | Capability |
 |---|---|---|
 | `bazar.list` | `monthId?` | `bazar.view` |
-| `bazar.create` | `date`, `buyerName`, `amount`, `category?`, `items?`, `memberId?`, `note?` | `bazar.write` |
+| `bazar.create` | `date`, `buyerName`, `amount`, `lines?`, `category?`, `items?`, `memberId?`, `note?` | `bazar.write` |
 | `bazar.update` | `id`, + same fields | `bazar.write` |
 | `bazar.delete` | `id` | `bazar.write` |
 
-`category` ∈ `Groceries, Vegetables, Meat, Fish, Rice, Oil, Spices, Other`. `date` must fall inside the month → otherwise 400 `তারিখ অবশ্যই September 2026 মাসের হতে হবে`. `amount` must be a positive finite number.
+`lines` = আইটেম পপআপের তালিকা `[{ item, qty, price }]` (সর্বোচ্চ ৬০টি) — দিলে `items` টেক্সট স্বয়ংক্রিয়ভাবে সারাংশ হয়ে যায় এবং `items_json` কলামে সংরক্ষিত হয়। `category` ∈ `Groceries, Vegetables, Meat, Fish, Rice, Oil, Spices, Other` (UI-তে আর নেওয়া হয় না, ডিফল্ট `Groceries`). `date` must fall inside the month → otherwise 400 `তারিখ অবশ্যই September 2026 মাসের হতে হবে`. `amount` must be a positive finite number.
 
 ### Fund / deposits
 

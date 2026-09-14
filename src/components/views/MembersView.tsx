@@ -6,7 +6,7 @@ import { GuideLine } from "@/components/GuideLine";
 import { EntryPanel, type ColumnDef, type FieldDef, type FormState } from "@/components/ui/entry-panel";
 import { Badge, Card, ConfirmDialog, EmptyState, Loader, Modal, StatusPill } from "@/components/ui";
 import { mess, ApiError } from "@/lib/client";
-import { formatMeal, formatMoney } from "@/lib/format";
+import { formatMeal, formatMoney0 } from "@/lib/format";
 import { toDisplayDateTime as fmtDt } from "@/lib/date";
 import type { MemberDTO } from "@/lib/types";
 
@@ -45,6 +45,48 @@ export function MembersView() {
   const rows = data?.members ?? [];
   const calcs = summary?.memberCalculations ?? [];
   const calcById = new Map(calcs.map((c) => [c.memberId, c]));
+
+  /* ── সদস্যের নিজের পছন্দমতো ক্রম — মিল এন্ট্রি/মাস গ্রিডেও হুবহু এটাই দেখায় ── */
+  const [order, setOrder] = useState<MemberDTO[]>(rows);
+  const [orderDirty, setOrderDirty] = useState(false);
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!orderDirty) setOrder(rows);
+  }, [rows, orderDirty]);
+
+  const moveMember = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= order.length) return;
+    const next = [...order];
+    const [row] = next.splice(index, 1);
+    next.splice(target, 0, row!);
+    setOrder(next);
+    setOrderDirty(true);
+  };
+
+  const dropMember = (index: number) => {
+    if (!dragId) return;
+    const from = order.findIndex((m) => m.id === dragId);
+    setDragId(null);
+    if (from < 0 || from === index) return;
+    const next = [...order];
+    const [row] = next.splice(from, 1);
+    next.splice(index, 0, row!);
+    setOrder(next);
+    setOrderDirty(true);
+  };
+
+  const saveOrder = async () => {
+    setOrderBusy(true);
+    const res = await app.call<{ saved: number }>("members.reorder", { ids: order.map((m) => m.id) });
+    setOrderBusy(false);
+    if (res) {
+      setOrderDirty(false);
+      app.toast("সদস্যের ক্রম সংরক্ষিত হয়েছে ✓", "success");
+    }
+  };
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -192,15 +234,15 @@ export function MembersView() {
       key: "cost",
       header: "মোট খরচ / Cost",
       align: "right",
-      render: (r) => <span className="font-bold tabular-nums">৳ {formatMoney(calcById.get(r.id)?.totalCost ?? 0)}</span>,
-      footer: (list) => `৳ ${formatMoney(list.reduce((s, r) => s + (calcById.get(r.id)?.totalCost ?? 0), 0))}`,
+      render: (r) => <span className="font-bold tabular-nums">৳ {formatMoney0(calcById.get(r.id)?.totalCost ?? 0)}</span>,
+      footer: (list) => `৳ ${formatMoney0(list.reduce((s, r) => s + (calcById.get(r.id)?.totalCost ?? 0), 0))}`,
     },
     {
       key: "fund",
       header: "স্থায়ী ফান্ড / Fund",
       align: "right",
       hideOnMobile: true,
-      render: (r) => <span className="tabular-nums text-[var(--brand)]">৳ {formatMoney(calcById.get(r.id)?.permanentFund ?? 0)}</span>,
+      render: (r) => <span className="tabular-nums text-[var(--brand)]">৳ {formatMoney0(calcById.get(r.id)?.permanentFund ?? 0)}</span>,
     },
     {
       key: "dena",
@@ -249,6 +291,69 @@ export function MembersView() {
               ))}
             </div>
           )}
+        </Card>
+      ) : null}
+
+      {canWrite && rows.length > 1 ? (
+        <Card
+          title="সদস্যের ক্রম / Custom Order"
+          subtitle="টেনে অথবা ↑↓ দিয়ে সাজান — মিল এন্ট্রি পেজেও একই ক্রম থাকবে"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={!orderDirty || orderBusy}
+                onClick={() => {
+                  setOrder(rows);
+                  setOrderDirty(false);
+                }}
+              >
+                পূর্বাবস্থা
+              </button>
+              <button type="button" className="btn btn-primary btn-sm" disabled={!orderDirty || orderBusy} onClick={() => void saveOrder()}>
+                {orderBusy ? "সংরক্ষণ হচ্ছে…" : "💾 ক্রম সংরক্ষণ"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-1.5">
+            {order.map((m, i) => (
+              <div
+                key={m.id}
+                draggable
+                onDragStart={() => setDragId(m.id)}
+                onDragEnd={() => setDragId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => dropMember(i)}
+                className={`flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2 transition ${
+                  dragId === m.id ? "opacity-40" : "opacity-100"
+                } ${m.isActive ? "" : "opacity-70"}`}
+                style={{ background: "var(--card)" }}
+              >
+                <span className="muted w-5 text-center text-[12px] font-bold tabular-nums">{i + 1}</span>
+                <span aria-hidden className="muted cursor-grab select-none text-[15px]">
+                  ⠿
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13.5px] font-bold">{m.name}</span>
+                <span className="muted hidden text-[11px] tabular-nums sm:block">{formatMeal(calcById.get(m.id)?.totalMill ?? 0)} মিল</span>
+                <div className="flex items-center gap-1">
+                  <button type="button" className="btn btn-ghost btn-sm h-8 w-8 px-0" disabled={i === 0} onClick={() => moveMember(i, -1)} aria-label="উপরে তুলুন">
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm h-8 w-8 px-0"
+                    disabled={i === order.length - 1}
+                    onClick={() => moveMember(i, 1)}
+                    aria-label="নিচে নামান"
+                  >
+                    ↓
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </Card>
       ) : null}
 

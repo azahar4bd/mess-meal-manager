@@ -32,10 +32,11 @@ import {
   toIsoDate,
 } from "@/lib/date";
 import { calculateMonth, type CalcInput } from "@/lib/calc";
-import { toNumber } from "@/lib/format";
+import { round2, toNumber } from "@/lib/format";
 import { slugify, ValidationError } from "@/lib/validate";
 import type {
   BazarDTO,
+  BazarLine,
   DepositDTO,
   ExtraDTO,
   IncomeDTO,
@@ -95,6 +96,7 @@ export function memberDTO(m: Member): MemberDTO {
     isActive: m.isActive,
     phone: m.phone,
     note: m.note,
+    sortOrder: m.sortOrder,
     createdAt: m.createdAt.toISOString(),
   };
 }
@@ -112,6 +114,46 @@ export function mealDTO(r: DailyMeal, memberName = ""): MealRowDTO {
   };
 }
 
+/** items_json কলাম থেকে আইটেমের লাইনগুলো নিরাপদে পড়া (ভাঙা JSON → খালি তালিকা) */
+export function parseBazarLines(raw: string | null | undefined): BazarLine[] {
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+      .map((x) => ({ item: String(x.item ?? "").slice(0, 60), qty: round2(toNumber(x.qty)), price: round2(toNumber(x.price)) }))
+      .filter((l) => l.item || l.qty || l.price)
+      .slice(0, 60);
+  } catch {
+    return [];
+  }
+}
+
+export function normalizeBazarLines(lines: BazarLine[] | undefined | null): BazarLine[] {
+  if (!Array.isArray(lines)) return [];
+  return lines
+    .map((l) => ({
+      item: String(l?.item ?? "").trim().slice(0, 60),
+      qty: Math.max(0, round2(toNumber(l?.qty))),
+      price: Math.max(0, round2(toNumber(l?.price))),
+    }))
+    .filter((l) => l.item.length > 0)
+    .slice(0, 60);
+}
+
+/** লাইনগুলো থেকে এক লাইনের সারাংশ — পুরনো "items" টেক্সট কলাম ও শিট রিপোর্টের জন্য */
+export function bazarLinesSummary(lines: BazarLine[]): string {
+  return lines
+    .map((l) => `${l.item} ${Number.isInteger(l.qty) ? l.qty : l.qty.toFixed(2)} × ৳${round2(l.price)}`)
+    .join(", ")
+    .slice(0, 300);
+}
+
+export function bazarLinesTotal(lines: BazarLine[]): number {
+  return round2(lines.reduce((sum, l) => sum + round2(l.qty * l.price), 0));
+}
+
 export function bazarDTO(r: BazarExpense): BazarDTO {
   return {
     id: r.id,
@@ -122,6 +164,7 @@ export function bazarDTO(r: BazarExpense): BazarDTO {
     buyerName: r.buyerName,
     category: r.category,
     items: r.items,
+    lines: parseBazarLines(r.itemsJson),
     amount: toNumber(r.amount),
     note: r.note,
   };
@@ -367,11 +410,15 @@ export async function openMonth(
     const existing = await db.select({ id: membersTable.id }).from(membersTable).where(eq(membersTable.monthId, created.id));
     if (existing.length === 0) {
       const source = prev
-        ? await db.select().from(membersTable).where(eq(membersTable.monthId, prev.id)).orderBy(asc(membersTable.createdAt))
+        ? await db
+            .select()
+            .from(membersTable)
+            .where(eq(membersTable.monthId, prev.id))
+            .orderBy(asc(membersTable.sortOrder), asc(membersTable.createdAt))
         : [];
       if (source.length) {
         await db.insert(membersTable).values(
-          source.map((m) => ({
+          source.map((m, i) => ({
             id: cryptoId("mem"),
             officeId,
             monthId: created.id,
@@ -381,6 +428,7 @@ export async function openMonth(
             phone: m.phone,
             note: m.note,
             password: "",
+            sortOrder: m.sortOrder || i + 1,
             joinedAt: new Date(),
           })),
         );
@@ -410,7 +458,7 @@ export async function listMembers(officeId: string, monthId: string): Promise<Me
     .select()
     .from(membersTable)
     .where(and(eq(membersTable.officeId, officeId), eq(membersTable.monthId, monthId)))
-    .orderBy(asc(membersTable.isActive), asc(membersTable.name));
+    .orderBy(asc(membersTable.sortOrder), asc(membersTable.isActive), asc(membersTable.name));
 }
 
 export async function getMember(officeId: string, memberId: string): Promise<Member | null> {
@@ -436,6 +484,10 @@ export async function createMember(
       .limit(1);
     if (dup[0]) throw new ValidationError("এই মোবাইল নম্বর দিয়ে এই মাসে ইতিমধ্যে একজন সদস্য আছেন", { phone: "ডুপ্লিকেট" }, 409);
   }
+  const maxRows = await db
+    .select({ maxOrder: sql<number>`coalesce(max(${membersTable.sortOrder}), 0)` })
+    .from(membersTable)
+    .where(eq(membersTable.monthId, monthId));
   const rows = await db
     .insert(membersTable)
     .values({
@@ -447,6 +499,7 @@ export async function createMember(
       role: input.role ?? "member",
       isActive: input.isActive ?? true,
       note: input.note ?? "",
+      sortOrder: Number(maxRows[0]?.maxOrder ?? 0) + 1,
       joinedAt: new Date(),
     })
     .returning();
@@ -474,17 +527,43 @@ export async function deleteMember(officeId: string, memberId: string): Promise<
   return rows.length > 0;
 }
 
+/**
+ * সদস্যদের নিজের পছন্দমতো ক্রম সংরক্ষণ করে (members.sort_order)।
+ * একই ক্রম সদস্য পেজ ও মিল এন্ট্রি/মাস গ্রিড — সব জায়গায় দেখায়।
+ */
+export async function reorderMembers(officeId: string, monthId: string, ids: string[]): Promise<number> {
+  let saved = 0;
+  for (let i = 0; i < ids.length; i += 1) {
+    const rows = await db
+      .update(membersTable)
+      .set({ sortOrder: i + 1, updatedAt: new Date() })
+      .where(and(eq(membersTable.id, ids[i]!), eq(membersTable.officeId, officeId), eq(membersTable.monthId, monthId)))
+      .returning({ id: membersTable.id });
+    if (rows.length) saved += 1;
+  }
+  return saved;
+}
+
 /** Copy the whole roster from one month into another (meals stay 0). */
 export async function copyRoster(officeId: string, fromMonthId: string, toMonthId: string): Promise<number> {
-  const source = await db.select().from(membersTable).where(eq(membersTable.monthId, fromMonthId));
+  const source = await db
+    .select()
+    .from(membersTable)
+    .where(eq(membersTable.monthId, fromMonthId))
+    .orderBy(asc(membersTable.sortOrder), asc(membersTable.createdAt));
   if (!source.length) return 0;
   const existing = await db.select({ phone: membersTable.phone, name: membersTable.name }).from(membersTable).where(eq(membersTable.monthId, toMonthId));
   const existingPhones = new Set(existing.map((e) => e.phone).filter(Boolean));
   const existingNames = new Set(existing.map((e) => e.name.toLowerCase()));
   const toInsert = source.filter((m) => !(m.phone && existingPhones.has(m.phone)) && !existingNames.has(m.name.toLowerCase()));
   if (!toInsert.length) return 0;
+  const maxRows = await db
+    .select({ maxOrder: sql<number>`coalesce(max(${membersTable.sortOrder}), 0)` })
+    .from(membersTable)
+    .where(eq(membersTable.monthId, toMonthId));
+  const base = Number(maxRows[0]?.maxOrder ?? 0);
   await db.insert(membersTable).values(
-    toInsert.map((m) => ({
+    toInsert.map((m, i) => ({
       id: cryptoId("mem"),
       officeId,
       monthId: toMonthId,
@@ -494,6 +573,7 @@ export async function copyRoster(officeId: string, fromMonthId: string, toMonthI
       phone: m.phone,
       note: m.note,
       password: "",
+      sortOrder: base + i + 1,
       joinedAt: new Date(),
     })),
   );
@@ -661,12 +741,16 @@ export interface BazarInput {
   memberId?: string | null;
   category?: BazarExpense["category"];
   items?: string;
+  /** আইটেম পপআপের লাইনগুলো — দিলে items টেক্সট স্বয়ংক্রিয়ভাবে সারাংশ হয়ে যায় */
+  lines?: BazarLine[];
   amount: number;
   note?: string;
 }
 
 export async function createBazar(officeId: string, month: MessMonth, input: BazarInput, actor: string): Promise<BazarExpense> {
   const iso = assertDateInMonth(month, input.date);
+  const lines = normalizeBazarLines(input.lines);
+  const itemsText = (input.items ?? "").trim() || (lines.length ? bazarLinesSummary(lines) : "");
   const rows = await db
     .insert(bazarExpenses)
     .values({
@@ -678,7 +762,8 @@ export async function createBazar(officeId: string, month: MessMonth, input: Baz
       memberId: input.memberId ?? null,
       buyerName: input.buyerName ?? "",
       category: input.category ?? "Groceries",
-      items: input.items ?? "",
+      items: itemsText,
+      itemsJson: JSON.stringify(lines),
       amount: String(Math.max(0, input.amount)),
       note: input.note ?? "",
       createdBy: actor,
@@ -694,6 +779,8 @@ export async function updateBazar(
   input: BazarInput,
 ): Promise<BazarExpense | null> {
   const iso = assertDateInMonth(month, input.date);
+  const lines = normalizeBazarLines(input.lines);
+  const itemsText = (input.items ?? "").trim() || (lines.length ? bazarLinesSummary(lines) : "");
   const rows = await db
     .update(bazarExpenses)
     .set({
@@ -702,7 +789,8 @@ export async function updateBazar(
       memberId: input.memberId ?? null,
       buyerName: input.buyerName ?? "",
       category: input.category ?? "Groceries",
-      items: input.items ?? "",
+      items: itemsText,
+      itemsJson: JSON.stringify(lines),
       amount: String(Math.max(0, input.amount)),
       note: input.note ?? "",
       updatedAt: new Date(),

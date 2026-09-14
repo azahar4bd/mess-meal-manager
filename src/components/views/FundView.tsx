@@ -127,10 +127,7 @@ export function FundView() {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-[var(--warn)] bg-[var(--warn-soft)] px-3 py-2.5 text-[12.5px] font-semibold text-[var(--warn)]">
-        ⚠ <strong>স্থায়ী তহবিল = স্থায়ী মূলধন (Permanent Capital)।</strong> এটি মাসিক মিল খরচ থেকে বাদ দেওয়া যাবে না —
-        রিপোর্টে “Permanent Fund” ও “দেনা-পাওনা” আলাদা দুটি স্তম্ভ হিসেবে থাকবে।
-      </div>
+      
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Card bodyClass="p-3">

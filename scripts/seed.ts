@@ -235,7 +235,7 @@ async function seedMonthRoster(
 
   let roster = await listMembers(officeId, month.id);
   if (roster.length === 0) {
-    for (const m of spec.memberList) {
+    for (const [i, m] of spec.memberList.entries()) {
       await db.insert(membersTable).values({
         id: cryptoId("mem"),
         officeId,
@@ -245,6 +245,7 @@ async function seedMonthRoster(
         isActive: true,
         phone: m.phone,
         note: "",
+        sortOrder: i + 1,
         joinedAt: new Date(`${year}-${String(monthNum).padStart(2, "0")}-01T09:00:00+06:00`),
       });
     }

@@ -1,0 +1,2 @@
+ALTER TABLE "bazar_expenses" ADD COLUMN IF NOT EXISTS "items_json" text DEFAULT '[]' NOT NULL;--> statement-breakpoint
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "sort_order" integer DEFAULT 0 NOT NULL;

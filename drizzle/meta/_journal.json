@@ -15,6 +15,13 @@
       "when": 1789348793841,
       "tag": "0001_drop_room",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789361746379,
+      "tag": "0002_member_order_bazar_items",
+      "breakpoints": true
     }
   ]
 }

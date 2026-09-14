@@ -233,6 +233,32 @@ async function main() {
   const bazarEdit = await req(mgr, "POST", "/api/mess", { action: "bazar.update", monthId, id: bazarRow.id, date: iso, buyerName: target.name, category: "Meat", items: "Beef", amount: 750, note: "edited" });
   check("bazar.update ok", bazarEdit.status === 200 && Number(bazarEdit.json?.data?.data?.amount) === 750, bazarEdit.text.slice(0, 140));
 
+  /* ── আইটেম পপআপ: লাইনগুলো সংরক্ষিত হয়, সারাংশ টেক্সট স্বয়ংক্রিয়, এডিট করা যায় ── */
+  const bazarItems = await req(mgr, "POST", "/api/mess", {
+    action: "bazar.create",
+    monthId,
+    date: iso,
+    memberId: target.id,
+    buyerName: target.name,
+    items: "",
+    amount: 105,
+    lines: [
+      { item: "আলু", qty: 2, price: 30 },
+      { item: "পেঁয়াজ", qty: 1.5, price: 30 },
+    ],
+  });
+  const itemsRow = bazarItems.json?.data?.data;
+  check("bazar lines stored (2 lines)", bazarItems.status === 200 && Array.isArray(itemsRow?.lines) && itemsRow.lines.length === 2, bazarItems.text.slice(0, 160));
+  check("bazar amount is user-set, not forced by lines", Number(itemsRow?.amount) === 105, `amount=${itemsRow?.amount}`);
+  check("items text auto-filled from lines", String(itemsRow?.items ?? "").includes("আলু"), itemsRow?.items);
+  check("line qty/price round-trip", Number(itemsRow?.lines?.[1]?.qty) === 1.5 && Number(itemsRow?.lines?.[1]?.price) === 30, JSON.stringify(itemsRow?.lines));
+  const itemsEdit = await req(mgr, "POST", "/api/mess", { action: "bazar.update", monthId, id: itemsRow.id, date: iso, buyerName: target.name, amount: 90, lines: [{ item: "আলু", qty: 3, price: 30 }] });
+  check("bazar lines editable (now 1 line)", itemsEdit.status === 200 && itemsEdit.json?.data?.data?.lines?.length === 1, itemsEdit.text.slice(0, 140));
+  const itemsBad = await req(mgr, "POST", "/api/mess", { action: "bazar.create", monthId, date: iso, buyerName: target.name, amount: 10, lines: "not-an-array" });
+  check("invalid lines payload is ignored safely", itemsBad.status === 200 && Array.isArray(itemsBad.json?.data?.data?.lines) && itemsBad.json.data.data.lines.length === 0, itemsBad.text.slice(0, 120));
+  await req(mgr, "POST", "/api/mess", { action: "bazar.delete", monthId, id: itemsRow.id });
+  await req(mgr, "POST", "/api/mess", { action: "bazar.delete", monthId, id: itemsBad.json?.data?.data?.id });
+
   const dep = await req(mgr, "POST", "/api/mess", { action: "deposit.create", monthId, date: iso, memberId: target.id, amount: 2000, note: "permanent capital", type: "permanent_fund" });
   check("deposit.create ok (permanent_fund)", dep.status === 200 && dep.json?.data?.data?.type === "permanent_fund", dep.text.slice(0, 140));
 
@@ -303,6 +329,22 @@ async function main() {
   check("member cannot create members → 403", memMember.status === 403, `status=${memMember.status}`);
   const memSync = await req(mem, "POST", "/api/mess", { action: "sheet.sync", monthId });
   check("member cannot trigger sheet sync → 403", memSync.status === 403, `status=${memSync.status}`);
+
+  /* ── সদস্যের কাস্টম ক্রম (members.reorder) ── */
+  const orderBefore = await req(mgr, "POST", "/api/mess", { action: "members.list", monthId });
+  const idsBefore = (orderBefore.json?.data?.data ?? []).map((m) => m.id);
+  const reversedIds = [...idsBefore].reverse();
+  const reorder = await req(mgr, "POST", "/api/mess", { action: "members.reorder", monthId, ids: reversedIds });
+  const idsAfter = (reorder.json?.data?.data?.members ?? []).map((m) => m.id);
+  check("manager can reorder members", reorder.status === 200 && reorder.json?.data?.data?.saved === idsBefore.length, reorder.text.slice(0, 160));
+  check("custom order is stored and returned", JSON.stringify(idsAfter) === JSON.stringify(reversedIds), `${idsAfter.join(",")} vs ${reversedIds.join(",")}`);
+  const reorderList = await req(mgr, "POST", "/api/mess", { action: "members.list", monthId });
+  check("members.list follows the custom order", JSON.stringify((reorderList.json?.data?.data ?? []).map((m) => m.id)) === JSON.stringify(reversedIds), reorderList.text.slice(0, 140));
+  const memReorder = await req(mem, "POST", "/api/mess", { action: "members.reorder", monthId, ids: reversedIds });
+  check("member cannot reorder → 403", memReorder.status === 403, `status=${memReorder.status}`);
+  const reorderEmpty = await req(mgr, "POST", "/api/mess", { action: "members.reorder", monthId, ids: [] });
+  check("empty reorder rejected", reorderEmpty.status === 400, `status=${reorderEmpty.status}`);
+  await req(mgr, "POST", "/api/mess", { action: "members.reorder", monthId, ids: idsBefore });
 
   /* ── 8. audit role ─────────────────────────────────── */
   console.log("\n8) Audit role (read-only)");

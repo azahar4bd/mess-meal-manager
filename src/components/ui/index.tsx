@@ -86,6 +86,7 @@ export function Modal({
   children,
   footer,
   wide,
+  z = "z-[90]",
 }: {
   open: boolean;
   title: string;
@@ -94,6 +95,8 @@ export function Modal({
   children: React.ReactNode;
   footer?: React.ReactNode;
   wide?: boolean;
+  /** অন্য মোডালের ভেতর থেকে খুললে উপরে দেখানোর জন্য বড় মান দিন */
+  z?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -112,7 +115,7 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+    <div className={`fixed inset-0 ${z} flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4`} role="dialog" aria-modal="true">
       <button type="button" className="absolute inset-0 h-full w-full cursor-default" aria-label="বন্ধ করুন" onClick={onClose} />
       <div
         className={`fade-in relative flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl sm:rounded-2xl ${

@@ -44,6 +44,7 @@ import {
   listExtras,
   listIncomes,
   listMembers,
+  reorderMembers,
   listMeals,
   listOffices,
   listSyncLogs,
@@ -93,6 +94,15 @@ export const maxDuration = 60;
 function deny(ctx: SessionContext, capability: Capability): never {
   void ctx;
   throw new AuthError("forbidden", `এই কাজটি করার অনুমতি আপনার নেই (${capability})`, 403);
+}
+
+/** বাজারের আইটেম পপআপ থেকে আসা লাইনগুলো যাচাই করে নেওয়া */
+function parseLines(value: unknown): { item: string; qty: number; price: number }[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 60).map((x) => {
+    const o = (x ?? {}) as Record<string, unknown>;
+    return { item: str(o.item).slice(0, 60), qty: Math.max(0, num(o.qty, 0)), price: Math.max(0, num(o.price, 0)) };
+  });
 }
 
 function need<T>(value: T | null | undefined, message: string): T {
@@ -365,6 +375,18 @@ const handlers: Record<string, ActionHandler> = {
     return { deleted, id };
   },
 
+  "members.reorder": async (ctx, body) => {
+    if (!can(ctx.user.role, "members.write")) deny(ctx, "members.write");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    assertWritable(ctx, month);
+    const ids = Array.isArray(body.ids) ? body.ids.map((x) => str(x)).filter(Boolean).slice(0, 300) : [];
+    if (!ids.length) throw new ServiceError("সাজানোর জন্য সদস্যের তালিকা পাওয়া যায়নি", 400, { ids: "খালি" });
+    const saved = await reorderMembers(officeId, month.id, ids);
+    await logAction(ctx, "members.reorder", "member", month.id, `সদস্যের ক্রম সাজানো হয়েছে (${saved} জন)`, month.id);
+    const rows = await listMembers(officeId, month.id);
+    return { saved, members: rows.map(memberDTO) };
+  },
+
   /* ── daily meals ─────────────────────────────────────── */
   "meals.list": async (ctx, body) => {
     if (!can(ctx.user.role, "meals.view")) deny(ctx, "meals.view");
@@ -448,6 +470,7 @@ const handlers: Record<string, ActionHandler> = {
         memberId: str(body.memberId) || null,
         category: normalizeCategory(str(body.category)),
         items: str(body.items).slice(0, 300),
+        lines: parseLines(body.lines),
         amount: num(body.amount, 0),
         note: str(body.note).slice(0, 300),
       },
@@ -468,6 +491,7 @@ const handlers: Record<string, ActionHandler> = {
         memberId: str(body.memberId) || null,
         category: normalizeCategory(str(body.category)),
         items: str(body.items).slice(0, 300),
+        lines: parseLines(body.lines),
         amount: num(body.amount, 0),
         note: str(body.note).slice(0, 300),
       }),

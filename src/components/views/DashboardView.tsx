@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { useApp } from "@/components/app-context";
 import { Badge, Card, EmptyState, Kpi, Loader } from "@/components/ui";
-import { formatMeal, formatMoney, round2 } from "@/lib/format";
+import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
 
 export function DashboardView() {
@@ -59,7 +59,7 @@ export function DashboardView() {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Kpi label="সক্রিয় সদস্য / Active Members" value={String(s.activeMembers)} sub={`মোট ${s.totalMembers} জন`} tone="brand" />
         <Kpi label="মোট মিল / Total Meals" value={formatMeal(s.totalMill)} sub={`${daysWithMeals}/${app.month.totalDays} দিনে এন্ট্রি`} />
-        <Kpi label="মিল রেট / Meal Rate" value={`৳ ${formatMoney(s.perMillRate)}`} sub="প্রতি মিল" tone="ok" />
+        <Kpi label="মিল রেট / Meal Rate" value={`৳ ${formatRate(s.perMillRate)}`} sub="প্রতি মিল" tone="ok" />
         <Kpi label="মোট বাজার / Total Bazar" value={`৳ ${formatMoney(s.totalBazarCost)}`} sub={`${data.bazarExpenses.length} এন্ট্রি`} />
         <Kpi label="অন্যান্য আয় / Other Income" value={`৳ ${formatMoney(s.totalOthersIncome)}`} sub={`${data.otherIncomes.length} এন্ট্রি`} tone="ok" />
         <Kpi label="নেট মিল খরচ / Net Meal Cost" value={`৳ ${formatMoney(s.netCost)}`} sub="বাজার − আয়" />

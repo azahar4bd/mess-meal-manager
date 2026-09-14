@@ -5,7 +5,7 @@ import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, ConfirmDialog, EmptyState, Kpi, Loader, Modal } from "@/components/ui";
 import { mess } from "@/lib/client";
-import { formatMeal, formatMoney, round2 } from "@/lib/format";
+import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { isoOfDay, monthLabelBn, toDisplayDate, toDisplayDateTime } from "@/lib/date";
 import { bazarByCategory, bazarByBuyer } from "@/lib/calc";
 import { CSV_VARIANTS } from "@/lib/report-csv";
@@ -191,7 +191,7 @@ export function ReportView() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             <Kpi label="সক্রিয় সদস্য" value={String(summary.activeMembers)} tone="brand" />
             <Kpi label="মোট মিল" value={formatMeal(summary.totalMill)} />
-            <Kpi label="মিল রেট" value={`৳ ${formatMoney(summary.perMillRate)}`} tone="ok" />
+            <Kpi label="মিল রেট" value={`৳ ${formatRate(summary.perMillRate)}`} tone="ok" />
             <Kpi label="মোট বাজার" value={`৳ ${formatMoney(summary.totalBazarCost)}`} />
             <Kpi label="অন্যান্য আয়" value={`৳ ${formatMoney(summary.totalOthersIncome)}`} />
             <Kpi label="নেট মিল খরচ" value={`৳ ${formatMoney(summary.netCost)}`} />
@@ -239,7 +239,7 @@ export function ReportView() {
                           </span>
                         </td>
                         <td className="num tabular-nums">{formatMeal(m.totalMill)}</td>
-                        <td className="num tabular-nums">{formatMoney(m.perMillRate)}</td>
+                        <td className="num tabular-nums">{formatRate(m.perMillRate)}</td>
                         <td className="num tabular-nums">{formatMoney(m.mealCost)}</td>
                         <td className="num tabular-nums">{formatMoney(m.individualExtra)}</td>
                         <td className="num tabular-nums">{formatMoney(m.sharedExtra)}</td>
@@ -258,7 +258,7 @@ export function ReportView() {
                     <tr>
                       <td>মোট</td>
                       <td className="num tabular-nums">{formatMeal(summary.totalMill)}</td>
-                      <td className="num tabular-nums">{formatMoney(summary.perMillRate)}</td>
+                      <td className="num tabular-nums">{formatRate(summary.perMillRate)}</td>
                       <td className="num tabular-nums">{formatMoney(round2(calcs.reduce((s, m) => s + m.mealCost, 0)))}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalIndividualExtra)}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalSharedExtra)}</td>
