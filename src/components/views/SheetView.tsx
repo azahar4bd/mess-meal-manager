@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { Badge, Card, EmptyState, Field, Loader, Modal, TextArea, TextInput } from "@/components/ui";
 import { mess } from "@/lib/client";
+import { GuideLine } from "@/components/GuideLine";
 import { toDisplayDateTime } from "@/lib/date";
 import { SHEET_TAB_ORDER } from "@/lib/sheet-structure";
 import type { SyncLogDTO } from "@/lib/types";
@@ -39,7 +40,6 @@ export function SheetView() {
   const [payloadOpen, setPayloadOpen] = useState(false);
   const [payload, setPayload] = useState<string>("");
   const [payloadLoading, setPayloadLoading] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
 
   const canSync = app.can("sheet.sync");
   const canEditSettings = app.can("settings.write") || app.role === "admin";
@@ -121,14 +121,9 @@ export function SheetView() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-[19px] font-extrabold leading-tight">গুগল শিট / Google Sheets Sync</h1>
-          <p className="muted text-[12.5px]">
-            PostgreSQL = মূল ডেটাবেস • Google Sheet = রিপোর্টিং/ব্যাকআপ কপি। সিংক ব্যর্থ হলেও ডেটাবেসের তথ্য নিরাপদ থাকবে।
-          </p>
+          <GuideLine section="sheet" text="PostgreSQL মূল ডেটাবেস • শিট শুধু রিপোর্টিং কপি" />
         </div>
         <div className="flex flex-wrap gap-1.5">
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setHelpOpen(true)}>
-            📖 সেটআপ গাইড
-          </button>
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => void showPayload()}>
             {`{ }`} Payload দেখুন
           </button>
@@ -182,11 +177,10 @@ export function SheetView() {
           <div className="grid gap-3">
             <Field
               label="Google Apps Script Web App URL (/exec)"
-              hint="Apps Script → Deploy → New deployment → Web app → Execute as: Me, Access: Anyone → URL কপি করুন"
             >
               <TextInput value={scriptUrl} onChange={(e) => setScriptUrl(e.target.value)} placeholder="https://script.google.com/macros/s/AKfycb.../exec" />
             </Field>
-            <Field label="Google Sheet URL (এই অফিসের স্প্রেডশিট)" hint="Naming: Mess Meal Manager - <Office Name>">
+            <Field label="Google Sheet URL (এই অফিসের স্প্রেডশিট)">
               <TextInput value={sheetUrl} onChange={(e) => setSheetUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/....../edit" />
             </Field>
             <div className="flex flex-wrap gap-2">
@@ -220,7 +214,7 @@ export function SheetView() {
       ) : (
         <Card title="সিংক সেটিংস" bodyClass="p-3">
           <p className="muted text-[12.5px]">
-            শিট URL ও Apps Script কনফিগারেশন শুধু ম্যানেজার/অ্যাডমিন পরিবর্তন করতে পারবেন। বর্তমান শিট:{" "}
+            বর্তমান শিট:{" "}
             {status?.sheetUrl ? (
               <a className="link" href={status.sheetUrl} target="_blank" rel="noreferrer">
                 খুলুন
@@ -294,7 +288,7 @@ export function SheetView() {
       <Modal
         open={payloadOpen}
         title="Sync Payload (JSON)"
-        subtitle="Apps Script টেস্ট করতে এই JSON কপি করে Code.gs-এর TEST_PAYLOAD এ পেস্ট করুন"
+        subtitle="Apps Script টেস্ট পেইলোড"
         onClose={() => setPayloadOpen(false)}
         wide
         footer={
@@ -315,39 +309,6 @@ export function SheetView() {
         )}
       </Modal>
 
-      {/* ── setup guide ────────────────────────────── */}
-      <Modal open={helpOpen} title="Google Apps Script সেটআপ গাইড" onClose={() => setHelpOpen(false)} wide>
-        <ol className="space-y-2 text-[13px]">
-          <li>
-            <strong>১.</strong> একটি নতুন Google Spreadsheet খুলুন এবং নাম দিন: <code>Mess Meal Manager - {app.office?.name ?? "<Office Name>"}</code>
-          </li>
-          <li>
-            <strong>২.</strong> Spreadsheet-এ <em>Extensions → Apps Script</em> খুলুন।
-          </li>
-          <li>
-            <strong>৩.</strong> এই প্রজেক্টের <code>google-apps-script/Code.gs</code> ফাইলের সম্পূর্ণ কোড কপি করে Apps Script এডিটরে পেস্ট করুন।
-          </li>
-          <li>
-            <strong>৪.</strong> <em>Deploy → New deployment → Web app</em> নির্বাচন করুন। Execute as: <strong>Me</strong>, Access:{" "}
-            <strong>Anyone</strong>।
-          </li>
-          <li>
-            <strong>৫.</strong> ডিপ্লয়মেন্টের পর যে <code>/exec</code> URL পাওয়া যাবে সেটি উপরের “Apps Script Web App URL” ঘরে বসান এবং
-            সংরক্ষণ করুন।
-          </li>
-          <li>
-            <strong>৬.</strong> <em>Connection Test (ping)</em> চেপে যাচাই করুন, তারপর <em>☁ Full Sheet Sync</em> চাপুন।
-          </li>
-          <li>
-            <strong>৭.</strong> সিংক হলে ৮টি ট্যাব তৈরি/রিরাইট হবে: {SHEET_TAB_ORDER.join(", ")}।
-          </li>
-        </ol>
-        <p className="muted mt-3 text-[12px]">
-          বিকল্প: সার্ভার-সাইড environment variable <code>GOOGLE_SCRIPT_WEB_APP_URL</code> সেট করলে সব অফিস একই এন্ডপয়েন্ট
-          ব্যবহার করবে। প্রতি অফিসের আলাদা URL দিতে চাইলে অ্যাডমিন প্যানেলের অফিস এডিট ফর্মে <code>scriptUrl</code> ঘর
-          ব্যবহার করুন।
-        </p>
-      </Modal>
     </div>
   );
 }

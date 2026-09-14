@@ -1,0 +1,382 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Card } from "@/components/ui";
+import type { SectionId } from "@/components/GuideLine";
+
+/* ══════════════════════════════════════════════════════════════════════
+ * গাইড ট্যাব — অ্যাপের সব বিস্তারিত নির্দেশনা এখানে এক জায়গায়।
+ * স্ক্রিনগুলোতে শুধু এক লাইনের <GuideLine/> থাকে, সেখান থেকে এখানে আসা যায়।
+ * ══════════════════════════════════════════════════════════════════════ */
+
+const SECTIONS: { id: SectionId; bn: string; icon: string }[] = [
+  { id: "shuru", bn: "শুরু করা", icon: "🚀" },
+  { id: "office", bn: "অফিস ও আলাদা ডেটা", icon: "🏢" },
+  { id: "dashboard", bn: "ড্যাশবোর্ড", icon: "🏠" },
+  { id: "members", bn: "সদস্য", icon: "👥" },
+  { id: "meals", bn: "মিল", icon: "🍚" },
+  { id: "bazar", bn: "বাজার", icon: "🧺" },
+  { id: "fund", bn: "ফান্ড / জমা", icon: "💰" },
+  { id: "income", bn: "অন্যান্য আয়", icon: "➕" },
+  { id: "extras", bn: "অতিরিক্ত খরচ", icon: "🧾" },
+  { id: "rules", bn: "হিসাবের নিয়ম", icon: "📐" },
+  { id: "report", bn: "রিপোর্ট", icon: "📊" },
+  { id: "month", bn: "মাস", icon: "📅" },
+  { id: "sheet", bn: "গুগল শিট সিঙ্ক", icon: "☁" },
+  { id: "admin", bn: "অ্যাডমিন প্যানেল", icon: "🛡" },
+  { id: "help", bn: "নিরাপত্তা ও সমস্যা", icon: "🩺" },
+];
+
+function Bullets({ items }: { items: React.ReactNode[] }) {
+  return (
+    <ul className="space-y-1.5 text-[13px] leading-relaxed">
+      {items.map((it, i) => (
+        <li key={i} className="flex gap-2">
+          <span aria-hidden className="mt-[1px] shrink-0 text-[var(--brand)]">•</span>
+          <span>{it}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Step({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-2.5 text-[13px] leading-relaxed">
+      <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--brand-soft)] text-[11px] font-black text-[var(--brand)]">
+        {n}
+      </span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function Code({ children }: { children: React.ReactNode }) {
+  return <code className="rounded bg-[var(--bg)] px-1.5 py-0.5 text-[12px] font-bold">{children}</code>;
+}
+
+export function GuideView() {
+  const [query, setQuery] = useState("");
+
+  /* অন্য স্ক্রিন থেকে #g-<section> হ্যাশ নিয়ে এলে সেই অংশে স্ক্রল করে দাও */
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const go = (id: SectionId) => {
+    window.location.hash = `g-${id}`;
+    document.getElementById(`g-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const q = query.trim().toLowerCase();
+  const shown = q ? SECTIONS.filter((s) => s.bn.toLowerCase().includes(q)) : SECTIONS;
+
+  return (
+    <div className="space-y-3">
+      {/* ── অংশ বেছে নেওয়া ── */}
+      <Card bodyClass="p-3">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <h1 className="text-[15px] font-extrabold">📘 গাইড</h1>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="অংশ খুঁজুন…"
+            className="input ml-auto h-8 w-full max-w-[220px] text-[12.5px]"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {shown.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => go(s.id)}
+              className="rounded-full border border-[var(--border)] px-2.5 py-1 text-[12px] font-semibold hover:border-[var(--brand)] hover:bg-[var(--brand-soft)]"
+            >
+              {s.icon} {s.bn}
+            </button>
+          ))}
+          {shown.length === 0 ? <span className="muted text-[12px]">কিছু পাওয়া যায়নি</span> : null}
+        </div>
+      </Card>
+
+      {/* ── ১. শুরু করা ── */}
+      <section id="g-shuru" className="scroll-mt-3">
+        <Card title="🚀 শুরু করা">
+          <Bullets
+            items={[
+              <>একটি অ্যাপ, অনেক অফিস/মেস — প্রতিটি অফিসের ডেটা সম্পূর্ণ আলাদা।</>,
+              <>লগইন: <Code>User ID / মোবাইল নম্বর</Code> + পাসওয়ার্ড।</>,
+              <>নতুন অফিস খুলতে চাইলে লগআউট করে <Code>/signup</Code> — অফিস + ম্যানেজার অ্যাকাউন্ট একসাথে তৈরি হবে, অফিস কোড স্বয়ংক্রিয়ভাবে বানানো হবে।</>,
+              <>সদস্যরা অফিস কোড দিয়ে <Code>/join</Code> থেকে যুক্ত হয়; ম্যানেজার অনুমোদন করলে পূর্ণ হিসাব দেখতে পায়।</>,
+              <>
+                <strong>ভূমিকা ও অনুমতি:</strong> অ্যাডমিন = সব অফিস + ইউজার + অডিট; ম্যানেজার = নিজের অফিসের সব লেখাপড়া ও সদস্য অনুমোদন;
+                সদস্য = শুধু নিজের রিপোর্ট; অডিট = পড়া + অডিট লগ।
+              </>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ২. অফিস ── */}
+      <section id="g-office" className="scroll-mt-3">
+        <Card title="🏢 অফিস ও আলাদা ডেটা">
+          <Bullets
+            items={[
+              <>প্রতিটি অফিস একটি আলাদা টেন্যান্ট — আলাদা ম্যানেজার, সদস্য, মাস, মিল, বাজার, তহবিল, আয় ও রিপোর্ট।</>,
+              <>আলাদা রাখা হয় ডেটাবেস ও API দুই স্তরেই (<Code>officeId</Code> ফিল্টার) — তাই এক অফিসের ডেটা অন্য অফিস থেকে দেখা বা বদলানো যায় না।</>,
+              <>একইভাবে প্রতিটি মাসও আলাদা: নতুন মাসে মিল ০ থেকে শুরু, আগের মাসের হিসাব অপরিবর্তিত।</>,
+              <>অ্যাডমিন উপরের সুইচার দিয়ে অফিস বদলে যে কোনো অফিসের ডেটা দেখতে পারেন।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৩. ড্যাশবোর্ড ── */}
+      <section id="g-dashboard" className="scroll-mt-3">
+        <Card title="🏠 ড্যাশবোর্ড">
+          <Bullets
+            items={[
+              <>এক নজরে মাসের প্রধান সংখ্যা: মোট মিল, মিল রেট, মোট বাজার, অন্যান্য আয়, স্থায়ী ফান্ড, দেনা-পাওনা।</>,
+              <>সদস্যভিত্তিক সংক্ষিপ্ত তালিকা — কে কত মিল খেলেন ও কত জমা দিলেন।</>,
+              <>সদস্য যোগ করার পর এখানে মিল সামারি দেখা যাবে; সদস্য না থাকলে খাতাগুলো খালি দেখাবে (এটা স্বাভাবিক)।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৪. সদস্য ── */}
+      <section id="g-members" className="scroll-mt-3">
+        <Card title="👥 সদস্য">
+          <Bullets
+            items={[
+              <>নতুন সদস্য যোগ করতে নাম (কমপক্ষে ২ অক্ষর) দরকার; মোবাইল, ভূমিকা, সক্রিয়/নিষ্ক্রিয় ও নোট ঐচ্ছিক।</>,
+              <><strong>unique নিয়ম:</strong> একই মাসে একই মোবাইল নম্বর দিয়ে দুইজন সদস্য থাকা যাবে না (<Code>monthId + phone</Code>)।</>,
+              <><Code>/join</Code> ফর্ম থেকে আসা অনুরোধ “অনুমোদন অপেক্ষমাণ” তালিকায় আসে — ম্যানেজার বা অ্যাডমিন অনুমোদন/বাতিল করতে পারেন।</>,
+              <>“আগের মাস থেকে কপি” করলে <strong>শুধু সদস্য তালিকা</strong> কপি হয় — মিল ০ থেকে শুরু, কোনো পুরনো মিল আসে না।</>,
+              <>নিষ্ক্রিয় সদস্যের পুরনো হিসাব থাকে, কিন্তু <strong>শেয়ার্ড অতিরিক্ত খরচের ভাগ শুধু সক্রিয় সদস্যদের</strong> মধ্যে হয়।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৫. মিল ── */}
+      <section id="g-meals" className="scroll-mt-3">
+        <Card title="🍚 মিল">
+          <Bullets
+            items={[
+              <>প্রতিদিন প্রতিটি সদস্যের মিল সংখ্যা বসান; দ্রুত কাজের জন্য স্টিপার (+/−) আছে।</>,
+              <><strong>ডুপ্লিকেট হয় না:</strong> একই দিনে বারবার সেভ করলে আগের মানই আপডেট হয় (unique: <Code>monthId + memberId + day</Code>)।</>,
+              <>মিল <Code>0</Code> দিলে ওই সারিটিই মুছে যায়।</>,
+              <>ঋণাত্মক মিল বা মাসের বাইরের তারিখ গ্রহণ করা হয় না।</>,
+              <>মোট মিলই মিল রেটের হর — তাই মিল ঠিকভাবে দেওয়া থাকলে হিসাব ঠিক থাকবে।</>,
+              <>টেবিলে সব দিন একসাথে দেখা যায়; মোবাইলে পাশে স্ক্রল করুন।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৬. বাজার ── */}
+      <section id="g-bazar" className="scroll-mt-3">
+        <Card title="🧺 বাজার">
+          <Bullets
+            items={[
+              <>তারিখ, ক্রেতা, ক্যাটাগরি, আইটেম, টাকা ও নোট দিয়ে বাজার খরচ যোগ করুন।</>,
+              <>মাসের বাইরের তারিখ বা ঋণাত্মক টাকা গ্রহণযোগ্য নয় — ভুল হলে সম্পাদনা/মুছে ফেলা যায়।</>,
+              <>মোট বাজার থেকেই মিল রেট হিসাব হয় (অন্যান্য আয় বাদ দিয়ে)।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৭. ফান্ড / জমা ── */}
+      <section id="g-fund" className="scroll-mt-3">
+        <Card title="💰 ফান্ড / জমা">
+          <Bullets
+            items={[
+              <>সদস্যের জমা, চাঁদা বা অগ্রিম টাকা এখানে যোগ করুন।</>,
+              <><strong>স্থায়ী তহবিল (Permanent Fund) সম্পূর্ণ আলাদা খাত</strong> — এটা মাসিক মিল খরচ থেকে কাটা হয় না, মাস শেষেও থেকে যায়।</>,
+              <>টাইপ বেছে নিন: সাধারণ জমা নাকি স্থায়ী তহবিল — হিসাব আলাদাভাবে যোগ হয়।</>,
+              <>দেনা-পাওনা হিসাবে সদস্যের মোট জমা ব্যবহার হয়।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৮. অন্যান্য আয় ── */}
+      <section id="g-income" className="scroll-mt-3">
+        <Card title="➕ অন্যান্য আয়">
+          <Bullets
+            items={[
+              <>গেস্ট মিল, ব্যাংক সুদ, পুরনো সামগ্রী বিক্রি — বাজার বা সদস্যের জমা নয় এমন যেকোনো আয় এখানে।</>,
+              <>অন্যান্য আয় যত বেশি, মিল রেট তত কমে (সূত্রে বিয়োগ হয়)।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ৯. অতিরিক্ত খরচ ── */}
+      <section id="g-extras" className="scroll-mt-3">
+        <Card title="🧾 অতিরিক্ত খরচ">
+          <Bullets
+            items={[
+              <>গ্যাস বিল, মেরামত, ইন্টারনেট ইত্যাদি বাজার-বহির্ভূত খরচ এখানে।</>,
+              <><strong>ইন্ডিভিজুয়াল:</strong> খরচটি শুধু নির্দিষ্ট সেই সদস্যের খাতায় যোগ হয়।</>,
+              <><strong>শেয়ার্ড:</strong> খরচটি সক্রিয় সদস্যদের মধ্যে <strong>সমান ভাগ</strong> হয়।</>,
+              <>অতিরিক্ত খরচ মিল রেটের হিসাবে ঢোকে না — সদস্যের সর্বমোট খরচের সাথে যোগ হয়।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ১০. হিসাবের নিয়ম ── */}
+      <section id="g-rules" className="scroll-mt-3">
+        <Card title="📐 হিসাবের নিয়ম (অপরিবর্তনীয়)">
+          <Bullets
+            items={[
+              <><strong>মিল রেট</strong> = (মোট বাজার − অন্যান্য আয়) ÷ মোট মিল</>,
+              <><strong>মিল খরচ</strong> = মিল রেট × সদস্যের মোট মিল</>,
+              <><strong>সর্বমোট খরচ</strong> = মিল খরচ + ইন্ডিভিজুয়াল অতিরিক্ত + শেয়ার্ড অতিরিক্ত</>,
+              <><strong>দেনা-পাওনা</strong> = সদস্যের মোট জমা − সর্বমোট খরচ (ধনাত্মক = পাওনা, ঋণাত্মক = দেনা)</>,
+              <>স্থায়ী ফান্ড আলাদা খাত — মাসিক মিল চার্জ থেকে কাটা হয় না।</>,
+              <>প্রতি অফিস ও প্রতি মাসের হিসাব আলাদা; আগের মাস দেখা যায় কিন্তু বন্ধ থাকলে লেখা যায় না।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ১১. রিপোর্ট ── */}
+      <section id="g-report" className="scroll-mt-3">
+        <Card title="📊 রিপোর্ট">
+          <Bullets
+            items={[
+              <>তারিখ ফিল্টার দিলে মিল, বাজার, আয়, জমা ও অতিরিক্ত খরচ — সবকিছু সেই সময়কাল অনুযায়ী হিসাব হয়।</>,
+              <>সামারি টেবিলে থাকে: মিল • মিল রেট • মিল খরচ • অতিরিক্ত • মোট খরচ • স্থায়ী ফান্ড • দেনা-পাওনা।</>,
+              <>CSV নামালে UTF-8 BOM যুক্ত হয়, তাই Excel-এ বাংলা ঠিকমতো দেখায়। প্রিন্ট/PDF-এর জন্য আলাদা প্রিন্ট-রেডি পেজ খোলে।</>,
+              <>সদস্য ভূমিকার ইউজার শুধু নিজের রিপোর্ট দেখতে পায় — কাঁচা খাতা (মিল/বাজার তালিকা) দেখতে পায় না।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ১২. মাস ── */}
+      <section id="g-month" className="scroll-mt-3">
+        <Card title="📅 মাস">
+          <Bullets
+            items={[
+              <>নতুন মাস খুললে তার নিজস্ব খাতা তৈরি হয় — MonthID হয় <Code>(office)-YYYY-MM</Code>।</>,
+              <>চাইলে আগের মাসের সদস্য তালিকা কপি করা যায়; মিল সবসময় ০ থেকে শুরু।</>,
+              <>“পূর্ববর্তী ব্যালেন্স carried forward” ঐচ্ছিক — নগদ/অপারেটিং ব্যালেন্স পরের মাসে নিতে চাইলে লিখুন। স্থায়ী ফান্ড আলাদা হিসাবেই থাকে।</>,
+              <>মাস বন্ধ করলে সেটি পড়া যায়, লেখা যায় না (ম্যানেজার/অ্যাডমিনের লেখার চেষ্টা 403 দেয়)।</>,
+              <>উপরের সুইচার থেকে যেকোনো মাস বেছে নিয়ে পুরনো হিসাব দেখা যায়।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ১৩. গুগল শিট সিঙ্ক ── */}
+      <section id="g-sheet" className="scroll-mt-3">
+        <Card title="☁ গুগল শিট সিঙ্ক" subtitle="PostgreSQL = মূল ডেটাবেস • Google Sheet = শুধু রিপোর্টিং/ব্যাকআপ কপি">
+          <div className="space-y-3 text-[13px] leading-relaxed">
+            <p className="muted">সিঙ্ক ব্যর্থ হলেও অ্যাপের কোনো ডেটা হারায় না — শুধু শিট হালনাগাদ হয় না।</p>
+
+            <div>
+              <div className="mb-1.5 text-[13px] font-extrabold">সেটআপ (একবারই, ~১০ মিনিট)</div>
+              <ol className="space-y-1.5">
+                <Step n={1}>একটি খালি Google Sheet খুলুন, নাম দিন <Code>Mess Meal Manager - &lt;অফিসের নাম&gt;</Code> — লিংকটি কপি করে রাখুন।</Step>
+                <Step n={2}>শিটের ভেতরে <Code>Extensions → Apps Script</Code> → ডিফল্ট কোড মুছে রিপোর <Code>google-apps-script/Code.gs</Code> (৫৯০ লাইন) পেস্ট করে <Code>Ctrl+S</Code>।</Step>
+                <Step n={3}>
+                  <Code>Deploy → New deployment → Web app</Code> → Execute as: <strong>Me</strong>, Who has access: <strong>Anyone</strong> →
+                  অনুমতি দিন (Review permissions → Advanced → Allow) → <strong>/exec</strong> দিয়ে শেষ URL কপি করুন।
+                </Step>
+                <Step n={4}>এই ট্যাবের “সিংক সেটিংস”-এ দুটি URL বসিয়ে <strong>💾 সেটিংস সংরক্ষণ</strong> → <strong>🔌 Connection Test (ping)</strong> → সবুজ “✓ সংযোগ সফল” দেখলে <strong>☁ Full Sheet Sync</strong>।</Step>
+                <Step n={5}>চাইলে <strong>Auto Sync</strong> চালু করুন — প্রতিটি সেভের পর শিট নিজে থেকে হালনাগাদ হবে।</Step>
+              </ol>
+            </div>
+
+            <div>
+              <div className="mb-1.5 text-[13px] font-extrabold">শিটে যে ৯টি ট্যাব তৈরি হয়</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] text-left">
+                      <th className="py-1 pr-2">ট্যাব</th>
+                      <th className="py-1">কী থাকে</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["00_অফিস_ইনফো", "অফিসের পরিচয় ও মাসের তথ্য (Key/Value)"],
+                      ["01_সদস্য_তালিকা", "MemberID, Name, Role, Phone, IsActive, OfficeID, MonthID"],
+                      ["02_দৈনিক_মিল_খাতা", "MonthID, Year, Month, Day, Date, MemberID, MemberName, Meals"],
+                      ["03_বাজার_খরচ", "EntryID, MonthID, Date, Day, MemberID, BuyerName, Category, Items, Amount, Note"],
+                      ["04_জমা_ও_তহবিল", "EntryID, MonthID, Date, Day, MemberID, MemberName, Amount, Note, Type"],
+                      ["05_অন্যান্য_আয়", "EntryID, MonthID, Date, Day, Title, Amount, Note"],
+                      ["06_হিসাব_সামারি", "মোট মিল, মিল রেট, বাজার, আয়, স্থায়ী ফান্ড, শেয়ার্ড অতিরিক্ত, ব্যালেন্স, SyncedAt"],
+                      ["07_দেনা_পাওনা", "সদস্যভিত্তিক মিল, খরচ, স্থায়ী ফান্ড, দেনা-পাওনা ও অবস্থা"],
+                      ["99_সিংক_লগ", "প্রতিটি সিঙ্কের সময়, সফল/ব্যর্থ, সারি সংখ্যা ও সময় লেগেছে কত"],
+                    ].map(([a, b]) => (
+                      <tr key={a} className="border-b border-[var(--border)]/60">
+                        <td className="py-1 pr-2 font-bold">{a}</td>
+                        <td className="muted py-1">{b}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-1.5 text-[13px] font-extrabold">যেখানে আটকে গেলে যা করবেন</div>
+              <Bullets
+                items={[
+                  <>ping ব্যর্থ/404 → URL কি <Code>/exec</Code> দিয়ে শেষ? <Code>/dev</Code> চলবে না।</>,
+                  <>উত্তরে লগইন পেজ/HTML → Access “Anyone” দেওয়া হয়নি; Manage deployments থেকে ঠিক করে নতুন ভার্শন ডিপ্লয় করুন।</>,
+                  <>401/403 → <Code>Code.gs</Code>-এ <Code>API_TOKEN</Code> সেট করলে অ্যাপের URL-এর শেষে <Code>?token=…</Code> যোগ করতে হয় (অ্যাপ আলাদা করে টোকেন পাঠায় না)।</>,
+                  <>কোড বদলালে → Manage deployments → ✎ → Version: <strong>New version</strong> → Deploy (না হলে পুরনো কোডই চলবে)।</>,
+                  <>ধীর/কোটা এরর → Auto Sync বন্ধ রেখে দিনে কয়েকবার ম্যানুয়ালি সিঙ্ক দিন।</>,
+                  <>শিট ট্যাবের “টেস্ট পেইলোড” কপি করে <Code>Code.gs</Code>-এর <Code>TEST_PAYLOAD</Code>-এ পেস্ট করলে স্ক্রিপ্ট অ্যাপ ছাড়াই টেস্ট করা যায়।</>,
+                  <>শিটে হাত দিয়ে লিখবেন না — সিঙ্ক শিটকে অ্যাপের ডেটা দিয়ে প্রতিস্থাপন করে।</>,
+                ]}
+              />
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      {/* ── ১৪. অ্যাডমিন প্যানেল ── */}
+      <section id="g-admin" className="scroll-mt-3">
+        <Card title="🛡 অ্যাডমিন প্যানেল" subtitle="শুধু প্ল্যাটফর্ম অ্যাডমিন ও ম্যানেজার (নিজের অফিসের জন্য)">
+          <Bullets
+            items={[
+              <><strong>নতুন অফিস:</strong> নাম দিলেই হবে; অফিস কোড খালি রাখলে স্বয়ংক্রিয় তৈরি হয়। একই ফর্মে ম্যানেজারের <Code>User ID</Code> ও পাসওয়ার্ড (৪+ অক্ষর) দিলে <strong>অফিস + ম্যানেজার লগইন একসাথে</strong> তৈরি হয় — আলাদা করে ইউজার ট্যাবে যেতে হয় না।</>,
+              <>ম্যানেজারের নম্বর আগে থেকে ব্যবহৃত হলে 409 এরর আসবে — তখন ভিন্ন নম্বর দিন (নিজের অ্যাডমিন নম্বর চলবে না)।</>,
+              <><strong>ইউজার:</strong> নতুন ইউজার তৈরি, ভূমিকা বদল, পাসওয়ার্ড রিসেট। রিসেট করলে ওই ইউজারের সব সক্রিয় সেশন বাতিল হয়ে যাবে।</>,
+              <><strong>অডিট লগ:</strong> কে কখন কী করল তার রেকর্ড (লগইন, অফিস/ইউজার তৈরি-মুছে ফেলা, গুরুত্বপূর্ণ পরিবর্তন)। শুধু অ্যাডমিন ও অডিট রোল দেখতে পায়।</>,
+              <><strong>অফিস মুছে ফেলা:</strong> নিশ্চিত করতে অফিসের নাম/কোড লিখতে হয় — ওই অফিসের সব ইউজার, মাস, মিল, বাজার, তহবিল ও রিপোর্ট <strong>স্থায়ীভাবে</strong> মুছে যাবে।</>,
+            ]}
+          />
+        </Card>
+      </section>
+
+      {/* ── ১৫. নিরাপত্তা ও সমস্যা ── */}
+      <section id="g-help" className="scroll-mt-3">
+        <Card title="🩺 নিরাপত্তা ও সমস্যা সমাধান">
+          <Bullets
+            items={[
+              <>পাসওয়ার্ড কখনো প্লেইন টেক্সটে সংরক্ষিত হয় না (bcrypt হ্যাশ); সেশন কুকি-ভিত্তিক ও সেশন টেবিলে রেকর্ড হয়।</>,
+              <>পাসওয়ার্ড কোথাও শেয়ার হয়ে গেলে (যেমন চ্যাটে) অ্যাপে লগইন করে বদলে নিন।</>,
+              <>“সার্ভার থেকে অপ্রত্যাশিত উত্তর (HTTP 404)” → পেজ হার্ড রিফ্রেশ দিন (<Code>Ctrl/Cmd + Shift + R</Code>) এবং সঠিক ঠিকানা ব্যবহার করুন।</>,
+              <>“অনেক বেশি অনুরোধ” → রেট লিমিট; কয়েক মিনিট পরে আবার চেষ্টা করুন।</>,
+              <>“বন্ধ মাসে লেখা যাবে না” → মাসটি বন্ধ করা; পুরনো হিসাব দেখা যাবে, বদলানো যাবে না।</>,
+              <>সমস্যা থেকে গেলে অ্যাডমিন প্যানেলের অডিট লগ দেখুন — কোন কাজটি কখন ব্যর্থ/সফল হয়েছে সেখানে থাকে।</>,
+            ]}
+          />
+        </Card>
+      </section>
+    </div>
+  );
+}

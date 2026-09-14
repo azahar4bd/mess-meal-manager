@@ -120,7 +120,6 @@ Creates, in one transaction: **office** (`office_<slug>`, auto `code` e.g. `GOBR
   "phone": "01744444444",            // optional (falls back to userId)
   "name": "Rahim Mia",               // required, 2–80
   "email": "",                       // optional
-  "room": "Room 3",                  // optional
   "password": "member123",
   "confirmPassword": "member123"
 }
@@ -189,7 +188,7 @@ Public (no auth). Never throws — a dead database is reported as `ok:false` wit
 | Action | Params | Capability |
 |---|---|---|
 | `members.list` | `monthId?` | `members.view` |
-| `member.create` | `name`, `phone?`, `room?`, `role?`, `note?`, `isActive?` | `members.write` |
+| `member.create` | `name`, `phone?`, `role?`, `note?`, `isActive?` | `members.write` |
 | `member.update` | `id`, + any of the above | `members.write` |
 | `member.delete` | `id` | `members.write` |
 
@@ -309,7 +308,7 @@ For `role: "member"` the response contains **only their own row** and `selfOnly:
   "month":  { "id": "office_gobra-2026-09", "name": "September 2026", "year": 2026, "month": 9 },
   "sheets": [
     { "name": "00_অফিস_ইনফো",     "headers": ["Key","Value"], "rows": [[…], …] },
-    { "name": "01_সদস্য_তালিকা",  "headers": ["MemberID","Name","Role","Phone","Room","IsActive","OfficeID","MonthID"], "rows": […] },
+    { "name": "01_সদস্য_তালিকা",  "headers": ["MemberID","Name","Role","Phone","IsActive","OfficeID","MonthID"], "rows": […] },
     { "name": "02_দৈনিক_মিল_খাতা","headers": ["MonthID","Year","Month","Day","Date","MemberID","MemberName","Meals"], "rows": […] },
     { "name": "03_বাজার_খরচ",     "headers": […], "rows": […] },
     { "name": "04_জমা_ও_তহবিল",   "headers": […], "rows": […] },

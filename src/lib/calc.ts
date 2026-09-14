@@ -146,7 +146,6 @@ export function calculateMonth(input: CalcInput): MonthSummary {
       name: m.name,
       role: m.role || "member",
       phone: m.phone || "",
-      room: m.room || "",
       isActive: m.isActive !== false,
       totalMill: totalMemberMeals,
       perMillRate,

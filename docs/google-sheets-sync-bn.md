@@ -112,7 +112,7 @@ https://script.google.com/macros/s/AKfycb…/exec?token=আপনার-গো�
 | ট্যাব | কী থাকে | কলাম |
 |---|---|---|
 | `00_অফিস_ইনফো` | অফিসের পরিচয় ও মাসের তথ্য | Key, Value |
-| `01_সদস্য_তালিকা` | সদস্য রোস্টার | MemberID, Name, Role, Phone, Room, IsActive, OfficeID, MonthID |
+| `01_সদস্য_তালিকা` | সদস্য রোস্টার | MemberID, Name, Role, Phone, IsActive, OfficeID, MonthID |
 | `02_দৈনিক_মিল_খাতা` | দিন-ভিত্তিক মিল | MonthID, Year, Month, Day, Date, MemberID, MemberName, Meals |
 | `03_বাজার_খরচ` | বাজারের এন্ট্রি | EntryID, MonthID, Date, Day, MemberID, BuyerName, Category, Items, Amount, Note |
 | `04_জমা_ও_তহবিল` | জমা, চাঁদা, স্থায়ী তহবিল | EntryID, MonthID, Date, Day, MemberID, MemberName, Amount, Note, Type |

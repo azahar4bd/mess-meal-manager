@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { AppProvider, useApp } from "@/components/app-context";
+import { GuideLine } from "@/components/GuideLine";
 import {
   Badge,
   ConfirmDialog,
@@ -17,6 +18,7 @@ import {
   ToastStack,
 } from "@/components/ui";
 import { AuthScreen } from "@/components/views/AuthScreen";
+import { GuideView } from "@/components/views/GuideView";
 import { DashboardView } from "@/components/views/DashboardView";
 import { MealsView } from "@/components/views/MealsView";
 import { BazarView } from "@/components/views/BazarView";
@@ -136,11 +138,8 @@ function NoOfficeNotice() {
   return (
     <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--brand-soft)] p-3">
       <div className="text-[13.5px] font-extrabold">এখনো কোনো অফিস / মেস তৈরি হয়নি</div>
-      <p className="muted mt-1 text-[12.5px] leading-relaxed">
-        নিচের <strong>অ্যাডমিন</strong> প্যানেলের <strong>অফিস</strong> ট্যাব থেকে প্রথম অফিস বানান। ফর্মে চাইলে
-        ম্যানেজারের User ID ও পাসওয়ার্ডও দিতে পারেন — তাহলে অফিসের সাথে ম্যানেজারের লগইন একই ধাপে তৈরি হয়ে
-        যাবে, আলাদা করে <strong>ইউজার</strong> ট্যাবে যেতে হবে না।
-      </p>
+      <p className="muted mt-1 text-[12.5px]">অ্যাডমিন প্যানেলের <strong>অফিস</strong> ট্যাব থেকে প্রথম অফিস বানান — চাইলে একই ফর্মে ম্যানেজারের লগইনও।</p>
+      <GuideLine section="admin" />
     </div>
   );
 }
@@ -154,7 +153,7 @@ function TabRouter() {
     return (
       <EmptyState
         title="কোনো অফিস নির্বাচিত নেই"
-        hint="অ্যাডমিন প্যানেলের “অফিস” ট্যাব থেকে অফিস তৈরি করুন, তারপর ওপরের সুইচার থেকে অফিস বেছে নিন।"
+        hint="অ্যাডমিন প্যানেল → অফিস ট্যাব"
       />
     );
   }
@@ -164,6 +163,8 @@ function TabRouter() {
   }
 
   switch (tab) {
+    case "guide":
+      return <GuideView />;
     case "dashboard":
       return app.can("dashboard.view") ? <DashboardView /> : <NoAccess />;
     case "meals":
@@ -372,7 +373,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
     <Modal
       open={open}
       title="নতুন মাস খুলুন / Open New Month"
-      subtitle="আগের মাসের সদস্য তালিকা কপি হবে, কিন্তু মিল ০ থেকে শুরু হবে (নতুন মাসের কোনো পুরনো মিল আসবে না)।"
+      subtitle="সদস্য তালিকা কপি হবে, মিল ০ থেকে শুরু।"
       onClose={onClose}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -406,12 +407,9 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
             <input type="checkbox" checked={copyMembers} onChange={(e) => setCopyMembers(e.target.checked)} className="h-4 w-4" />
             আগের মাসের সদস্য তালিকা কপি করুন
           </label>
-          <p className="muted mt-1 text-[11.5px]">
-            MonthID হবে: <code>{`(office)-${year}-${String(month).padStart(2, "0")}`}</code>
-          </p>
         </div>
 
-        <Field label="পূর্ববর্তী ব্যালেন্স carried forward (ঐচ্ছিক)" hint="নগদ/অপারেটিং ব্যালেন্স পরবর্তী মাসে carried forward করতে চাইলে লিখুন। স্থায়ী ফান্ড আলাদা হিসাব।">
+        <Field label="পূর্ববর্তী ব্যালেন্স carried forward (ঐচ্ছিক)" hint="নগদ ব্যালেন্স পরের মাসে নিতে চাইলে লিখুন">
           <NumberInput value={carry} min={0} step="0.01" onChange={(e) => setCarry(Number(e.target.value))} />
         </Field>
         <Field label="নোট (ঐচ্ছিক)">
@@ -528,10 +526,7 @@ function PendingApprovalScreen() {
           ⏳
         </div>
         <h1 className="mt-2 text-[18px] font-extrabold">অনুমোদনের অপেক্ষায়</h1>
-        <p className="muted mt-2 text-[13px]">
-          আপনার যোগদানের অনুরোধ <strong>{app.user?.name}</strong> হিসেবে জমা হয়েছে। অফিসের ম্যানেজার বা অ্যাডমিন অনুমোদন
-          করলে আপনি পূর্ণ মাসিক হিসাব দেখতে পাবেন।
-        </p>
+        <p className="muted mt-2 text-[13px]">অনুরোধ জমা হয়েছে — ম্যানেজার/অ্যাডমিন অনুমোদন করলে হিসাব দেখতে পাবেন।</p>
         <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-left text-[12.5px]">
           <div className="flex justify-between gap-2 py-0.5">
             <span className="muted">User ID</span>
@@ -583,9 +578,7 @@ function SelectOfficeScreen() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="card w-full max-w-lg p-5">
         <h1 className="text-[18px] font-extrabold">অফিস নির্বাচন করুন</h1>
-        <p className="muted mt-1 text-[12.5px]">
-          আপনি প্ল্যাটফর্ম অ্যাডমিন হিসেবে লগইন করেছেন। যে অফিসের ডেটা দেখতে/পরিচালনা করতে চান সেটি বেছে নিন।
-        </p>
+        <p className="muted mt-1 text-[12.5px]">অ্যাডমিন হিসেবে লগইন — যে অফিস দেখতে চান বেছে নিন।</p>
 
         <div className="mt-4 space-y-2">
           {loadingOffices ? <Loader label="Loading offices…" /> : null}

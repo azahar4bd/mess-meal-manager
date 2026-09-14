@@ -90,7 +90,6 @@ export interface MemberJoinInput {
   email: string;
   password: string;
   officeCode: string;
-  room?: string;
 }
 
 export async function joinOffice(input: MemberJoinInput) {

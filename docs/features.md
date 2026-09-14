@@ -140,7 +140,7 @@ UI: হেডারের মাস সিলেক্টরে সব মাস
 |---|---|
 | সদস্য যোগ/সম্পাদনা/ডিলিট | `views/MembersView.tsx` |
 | সক্রিয়/নিষ্ক্রিয় টগল | `member.update` → `isActive` |
-| রুম, ফোন, নোট, ইন-মেস রোল | `members` টেবিল |
+| ফোন, নোট, ইন-মেস রোল | `members` টেবিল |
 | মাস-ভিত্তিক রোস্টার | `UNIQUE(month_id, phone)` |
 | জয়েনার অনুমোদন প্যানেল | `views/MembersView.tsx` (`members.approve`) |
 | ব্যালেন্স ক্যারি / নোট | `mess_months.carry_forward_balance` |

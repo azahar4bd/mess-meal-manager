@@ -184,7 +184,6 @@ export const members = pgTable(
     isActive: boolean("is_active").notNull().default(true),
     phone: text("phone").notNull().default(""),
     password: text("password").notNull().default(""), // optional legacy/demo field, hashed
-    room: text("room").notNull().default(""),
     note: text("note").notNull().default(""),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

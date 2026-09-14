@@ -329,7 +329,6 @@ const handlers: Record<string, ActionHandler> = {
     const created = await createMember(officeId, month.id, {
       name,
       phone: str(body.phone).slice(0, 20),
-      room: str(body.room).slice(0, 40),
       role: str(body.role, "member") || "member",
       isActive: body.isActive === undefined ? true : Boolean(body.isActive),
       note: str(body.note).slice(0, 200),
@@ -347,7 +346,6 @@ const handlers: Record<string, ActionHandler> = {
     const patch: Record<string, unknown> = {};
     if (body.name !== undefined) patch.name = str(body.name).slice(0, 80);
     if (body.phone !== undefined) patch.phone = str(body.phone).slice(0, 20);
-    if (body.room !== undefined) patch.room = str(body.room).slice(0, 40);
     if (body.role !== undefined) patch.role = str(body.role).slice(0, 20);
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.note !== undefined) patch.note = str(body.note).slice(0, 200);

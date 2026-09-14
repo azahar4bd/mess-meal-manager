@@ -83,7 +83,6 @@ export function buildSyncPayload(
       m.name,
       m.role,
       m.phone,
-      m.room,
       m.isActive ? "TRUE" : "FALSE",
       office.id,
       data.id,

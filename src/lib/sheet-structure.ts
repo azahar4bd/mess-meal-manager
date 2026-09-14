@@ -66,7 +66,7 @@ export const SHEET_ALIAS: Record<string, string> = {
 
 export const COLUMNS = {
   officeInfo: ["Key", "Value"],
-  members: ["MemberID", "Name", "Role", "Phone", "Room", "IsActive", "OfficeID", "MonthID"],
+  members: ["MemberID", "Name", "Role", "Phone", "IsActive", "OfficeID", "MonthID"],
   meals: ["MonthID", "Year", "Month", "Day", "Date", "MemberID", "MemberName", "Meals"],
   bazar: [
     "EntryID",

@@ -109,7 +109,6 @@ export interface MemberDTO {
   role: string;
   isActive: boolean;
   phone: string;
-  room: string;
   note: string;
   createdAt: string;
 }
@@ -178,7 +177,6 @@ export interface MemberCalculation {
   name: string;
   role: string;
   phone: string;
-  room: string;
   isActive: boolean;
   totalMill: number;
   perMillRate: number;

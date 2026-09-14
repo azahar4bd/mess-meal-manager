@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { useApp } from "@/components/app-context";
+import { GuideLine } from "@/components/GuideLine";
 import { EntryPanel, type ColumnDef, type FieldDef, type FormState } from "@/components/ui/entry-panel";
 import { Badge, Card, ConfirmDialog, EmptyState, Loader, Modal, StatusPill } from "@/components/ui";
 import { mess, ApiError } from "@/lib/client";
@@ -67,7 +68,6 @@ export function MembersView() {
   const fields: FieldDef[] = [
     { key: "name", label: "সদস্যের নাম / Name", type: "text", required: true, placeholder: "Azahar", half: true },
     { key: "phone", label: "মোবাইল / Phone", type: "text", placeholder: "01722222222", half: true },
-    { key: "room", label: "রুম / Room", type: "text", placeholder: "Room 2", half: true },
     {
       key: "role",
       label: "ভূমিকা / Role",
@@ -88,12 +88,11 @@ export function MembersView() {
     { key: "note", label: "নোট / Note", type: "textarea" },
   ];
 
-  const initialValues = (): FormState => ({ name: "", phone: "", room: "", role: "member", isActive: "true", note: "" });
+  const initialValues = (): FormState => ({ name: "", phone: "", role: "member", isActive: "true", note: "" });
 
   const toForm = (row: MemberDTO): FormState => ({
     name: row.name,
     phone: row.phone ?? "",
-    room: row.room ?? "",
     role: row.role || "member",
     isActive: row.isActive ? "true" : "false",
     note: row.note ?? "",
@@ -107,7 +106,6 @@ export function MembersView() {
     const payload = {
       name: values.name.trim(),
       phone: values.phone.trim(),
-      room: values.room.trim(),
       role: values.role || "member",
       isActive: values.isActive !== "false",
       note: values.note,
@@ -177,7 +175,6 @@ export function MembersView() {
         </span>
       ),
     },
-    { key: "room", header: "রুম / Room", align: "center", render: (r) => r.room || "—" },
     {
       key: "role",
       header: "ভূমিকা / Role",
@@ -222,7 +219,6 @@ export function MembersView() {
       {app.can("user.manage") || app.can("members.approve") ? (
         <Card
           title="যোগদানের অনুমোদন / Member Approval"
-          subtitle="Member Join ফর্ম থেকে আসা অনুরোধগুলো এখানে অনুমোদন করুন"
           bodyClass="p-3"
         >
           {!showPending ? (
@@ -269,11 +265,11 @@ export function MembersView() {
         onSubmit={onSubmit}
         onDelete={canWrite ? onDelete : undefined}
         emptyTitle="কোনো সদস্য পাওয়া যায়নি"
-        emptyHint="নতুন সদস্য যোগ করুন অথবা আগের মাস থেকে সদস্য তালিকা কপি করুন।"
+        emptyHint="নতুন সদস্য যোগ করুন"
         emptyIcon="👥"
         addLabel="+ নতুন সদস্য"
         formTitle="সদস্য"
-        search={(r) => `${r.name} ${r.phone} ${r.room} ${r.role}`}
+        search={(r) => `${r.name} ${r.phone} ${r.role}`}
         toolbar={
           canWrite && app.months.length > 1 ? (
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCopyOpen(true)}>
@@ -298,7 +294,7 @@ export function MembersView() {
       <Modal
         open={copyOpen}
         title="আগের মাস থেকে সদস্য কপি করুন"
-        subtitle="শুধু সদস্য তালিকা কপি হবে — মিল ০ থেকে শুরু হবে।"
+        subtitle="শুধু তালিকা কপি হবে, মিল ০ থেকে শুরু"
         onClose={() => setCopyOpen(false)}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -340,9 +336,7 @@ export function MembersView() {
         onConfirm={() => void decide()}
       />
 
-      <p className="muted text-[11px]">
-        নোট: unique নিয়ম — একই মাসে একই মোবাইল নম্বর দিয়ে দুইজন সদস্য থাকা যাবে না (monthId + phone)।
-      </p>
+      <GuideLine section="members" text="unique নিয়ম, জয়েন অনুমোদন ও কপি" />
     </div>
   );
 }

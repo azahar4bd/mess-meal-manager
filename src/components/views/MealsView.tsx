@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
+import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, EmptyState, Loader, MealStepper, SegmentedButtons } from "@/components/ui";
 import { formatMeal, formatMoney, round2, toNumber } from "@/lib/format";
 import { isoOfDay, isValidIso, toDisplayDate, toIsoDate, weekdayBn, todayIso } from "@/lib/date";
@@ -230,7 +231,6 @@ export function MealsView() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px] font-bold">{member.name}</span>
                   <span className="muted block truncate text-[11px]">
-                    {member.room ? `রুম ${member.room} • ` : ""}
                     মাসে মোট {formatMeal(memberTotals.get(member.id) ?? 0)} মিল
                     {member.isActive ? "" : " • নিষ্ক্রিয়"}
                   </span>
@@ -258,15 +258,11 @@ export function MealsView() {
               </button>
             ) : null}
           </div>
-          <p className="muted mt-2 text-[11px]">
-            একই দিনে বারবার সেভ করলে নতুন ডুপ্লিকেট রেকর্ড তৈরি হবে না (unique: monthId + memberId + day)। ০ দিলে সেই
-            এন্ট্রি মুছে যাবে।
-          </p>
+          <GuideLine section="meals" text="ডুপ্লিকেট হয় না, ০ দিলে মুছে যায়" />
         </Card>
       ) : (
         <Card
           title="মাস গ্রিড / Month Grid"
-          subtitle="সব দিন একসাথে — মোবাইলে পাশে স্ক্রল করুন"
           action={
             canWrite ? (
               <button type="button" className="btn btn-primary btn-sm" disabled={!gridChanged || gridSaving} onClick={() => void saveGrid()}>

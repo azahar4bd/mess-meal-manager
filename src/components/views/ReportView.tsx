@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
+import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, ConfirmDialog, EmptyState, Kpi, Loader, Modal } from "@/components/ui";
 import { mess } from "@/lib/client";
 import { formatMeal, formatMoney, round2 } from "@/lib/format";
@@ -179,10 +180,7 @@ export function ReportView() {
             </button>
           </div>
         </div>
-        <p className="muted mt-2 text-[11px]">
-          তারিখ ফিল্টার দিলে মিল, বাজার, আয়, জমা ও অতিরিক্ত খরচ — সবকিছু সেই সময়কাল অনুযায়ী হিসাব হবে। MonthID:{" "}
-          <code>{month.id}</code>
-        </p>
+        <GuideLine section="report" text="তারিখ ফিল্টার ও হিসাবের নিয়ম" />
       </Card>
 
       {loading ? (
@@ -206,7 +204,6 @@ export function ReportView() {
           {/* ── member report table (spec §40) ──────── */}
           <Card
             title="সদস্য হিসাব / Member Report"
-            subtitle="মিল • মিল রেট • মিল খরচ • অতিরিক্ত • মোট খরচ • স্থায়ী ফান্ড • দেনা-পাওনা"
             bodyClass="p-0"
           >
             {calcs.length === 0 ? (
@@ -237,7 +234,6 @@ export function ReportView() {
                           <span className="block font-bold">{m.name}</span>
                           <span className="muted block text-[11px]">
                             {m.role}
-                            {m.room ? ` • রুম ${m.room}` : ""}
                             {m.phone ? ` • ${m.phone}` : ""}
                             {m.isActive ? "" : " • নিষ্ক্রিয়"}
                           </span>
@@ -335,10 +331,7 @@ export function ReportView() {
                   <div className="muted text-[10.5px]">জন</div>
                 </div>
               </div>
-              <p className="muted mt-2 text-[11.5px]">
-                দেনা-পাওনা = সদস্যের জমা − মোট খরচ (মিল খরচ + ইন্ডিভিজুয়াল + শেয়ার্ড অতিরিক্ত)। স্থায়ী ফান্ড আলাদা স্তম্ভে
-                দেখানো হয়েছে, মিল বিল থেকে বাদ দেওয়া হয়নি।
-              </p>
+              
             </Card>
           </div>
 
@@ -363,7 +356,6 @@ export function ReportView() {
               <span className="muted text-[11px]">.csv</span>
             </a>
           ))}
-          <p className="muted text-[11px]">CSV ফাইলে UTF-8 BOM আছে, তাই Excel-এ বাংলা ঠিকমতো দেখাবে।</p>
         </div>
       </Modal>
 

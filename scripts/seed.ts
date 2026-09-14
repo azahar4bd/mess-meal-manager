@@ -73,7 +73,7 @@ interface OfficeSeed {
   code: string;
   manager: { userId: string; name: string; phone: string; email: string; password: string };
   audit?: { userId: string; name: string; phone: string; password: string };
-  memberList: { name: string; phone: string; room: string; fund: number }[];
+  memberList: { name: string; phone: string; fund: number }[];
   pendingMember?: { userId: string; name: string; phone: string; password: string };
   randomSeed: number;
 }
@@ -94,12 +94,12 @@ const OFFICES: OfficeSeed[] = [
     audit: { userId: "01733333333", name: "Audit Rahman", phone: "01733333333", password: "audit123" },
     pendingMember: { userId: "01799999999", name: "New Joiner Shakil", phone: "01799999999", password: "member123" },
     memberList: [
-      { name: "Azahar Hossain", phone: "01711111111", room: "Room 1", fund: 3000 },
-      { name: "Rahim Uddin", phone: "01722222222", room: "Room 2", fund: 2000 },
-      { name: "Karim Mia", phone: "01744444444", room: "Room 2", fund: 2500 },
-      { name: "Selim Ahmed", phone: "01755555555", room: "Room 3", fund: 1500 },
-      { name: "Jashim Khan", phone: "01766666666", room: "Room 3", fund: 2000 },
-      { name: "Belal Howlader", phone: "01777777777", room: "Room 4", fund: 1000 },
+      { name: "Azahar Hossain", phone: "01711111111", fund: 3000 },
+      { name: "Rahim Uddin", phone: "01722222222", fund: 2000 },
+      { name: "Karim Mia", phone: "01744444444", fund: 2500 },
+      { name: "Selim Ahmed", phone: "01755555555", fund: 1500 },
+      { name: "Jashim Khan", phone: "01766666666", fund: 2000 },
+      { name: "Belal Howlader", phone: "01777777777", fund: 1000 },
     ],
     randomSeed: 20260911,
   },
@@ -116,10 +116,10 @@ const OFFICES: OfficeSeed[] = [
       password: "manager123",
     },
     memberList: [
-      { name: "Mahmudul Hasan", phone: "01811111111", room: "A-1", fund: 5000 },
-      { name: "Nurul Islam", phone: "01822222222", room: "A-2", fund: 3000 },
-      { name: "Sohel Rana", phone: "01833333333", room: "A-2", fund: 3000 },
-      { name: "Imran Kabir", phone: "01844444444", room: "B-1", fund: 2500 },
+      { name: "Mahmudul Hasan", phone: "01811111111", fund: 5000 },
+      { name: "Nurul Islam", phone: "01822222222", fund: 3000 },
+      { name: "Sohel Rana", phone: "01833333333", fund: 3000 },
+      { name: "Imran Kabir", phone: "01844444444", fund: 2500 },
     ],
     randomSeed: 77123,
   },
@@ -136,9 +136,9 @@ const OFFICES: OfficeSeed[] = [
       password: "manager123",
     },
     memberList: [
-      { name: "Farhana Akter", phone: "01911111111", room: "101", fund: 4000 },
-      { name: "Tanvir Alam", phone: "01922222222", room: "102", fund: 2000 },
-      { name: "Ripon Das", phone: "01933333333", room: "102", fund: 2000 },
+      { name: "Farhana Akter", phone: "01911111111", fund: 4000 },
+      { name: "Tanvir Alam", phone: "01922222222", fund: 2000 },
+      { name: "Ripon Das", phone: "01933333333", fund: 2000 },
     ],
     randomSeed: 5150,
   },
@@ -244,7 +244,6 @@ async function seedMonthRoster(
         role: m.phone === spec.manager.phone ? "manager" : "member",
         isActive: true,
         phone: m.phone,
-        room: m.room,
         note: "",
         joinedAt: new Date(`${year}-${String(monthNum).padStart(2, "0")}-01T09:00:00+06:00`),
       });
@@ -399,7 +398,7 @@ async function seedMonthRoster(
         monthId: month.id,
         date: isoOfDay(year, monthNum, Math.min(14, month.totalDays)),
         day: Math.min(14, month.totalDays),
-        title: "Room repair",
+        title: "মেস মেরামত",
         amount: "300",
         type: "individual",
         memberId: individualTarget?.id ?? null,

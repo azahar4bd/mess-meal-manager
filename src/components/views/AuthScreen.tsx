@@ -208,9 +208,7 @@ export function AuthScreen({
               )}
             </div>
 
-            <p className="muted mt-3 text-center text-[11px]">
-              © {new Date().getFullYear()} Mess Meal Manager • এক অ্যাপ → অনেক অফিস → প্রতি অফিসে আলাদা মাসিক হিসাব
-            </p>
+            <p className="muted mt-3 text-center text-[11px]">© {new Date().getFullYear()} Mess Meal Manager</p>
           </div>
         </main>
       </div>
@@ -268,7 +266,6 @@ function LoginForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn,
     <form onSubmit={submit} className="space-y-3">
       <div>
         <h2 className="text-[17px] font-extrabold">লগইন করুন</h2>
-        <p className="muted text-[12px]">User ID / মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে প্রবেশ করুন।</p>
       </div>
 
       <Field label="User ID / মোবাইল নম্বর" required error={errors.login}>
@@ -322,7 +319,7 @@ function LoginForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn,
             🔎 Audit (Barishal)
           </button>
         </div>
-        <p className="muted mt-1.5 text-[10.5px]">প্রোডাকশনে এই পাসওয়ার্ডগুলো অবশ্যই পরিবর্তন করতে হবে।</p>
+        <p className="muted mt-1.5 text-[10.5px]">ডেমো পাসওয়ার্ড — প্রোডাকশনে বদলে নিন।</p>
       </div>
     </form>
   );
@@ -396,13 +393,8 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
     <form onSubmit={submit} className="space-y-3">
       <div>
         <h2 className="text-[17px] font-extrabold">নতুন অফিস / মেস তৈরি করুন</h2>
-        <p className="muted text-[12px]">
-          একটি অফিস + তার ম্যানেজার অ্যাকাউন্ট তৈরি হবে। অফিস কোড স্বয়ংক্রিয়ভাবে তৈরি হবে।
-        </p>
-        <p className="muted mt-1 text-[11.5px]">
-          নোট: এখানে দেওয়া মোবাইল নম্বর আগে থেকে ব্যবহৃত হলে (যেমন আপনার অ্যাডমিন লগইন) নতুন অফিস তৈরি হবে না —
-          তখন অ্যাডমিন প্যানেল ব্যবহার করুন বা ভিন্ন নম্বর দিন। সাইনআপ সফল হলে আপনি ওই অফিসের <strong>ম্যানেজার</strong> হিসেবে লগইন হয়ে যাবেন।
-        </p>
+        <p className="muted text-[12px]">অফিস + ম্যানেজার অ্যাকাউন্ট তৈরি হবে; কোড স্বয়ংক্রিয়।</p>
+        <p className="muted mt-1 text-[11.5px]">নম্বর আগে ব্যবহৃত হলে অফিস তৈরি হবে না — ভিন্ন নম্বর দিন।</p>
       </div>
 
       <Field label="অফিসের নাম / Office Name" required error={errors.officeName}>
@@ -439,9 +431,7 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
       <button type="submit" className="btn btn-primary w-full" disabled={busy}>
         {busy ? "তৈরি হচ্ছে…" : "Create Office"}
       </button>
-      <p className="muted text-center text-[11px]">
-        অফিস তৈরি হলে আপনি স্বয়ংক্রিয়ভাবে ম্যানেজার হিসেবে লগইন হয়ে যাবেন।
-      </p>
+      <p className="muted text-center text-[11px]">অফিস তৈরি হলে আপনি ম্যানেজার হিসেবে লগইন হবেন।</p>
     </form>
   );
 }
@@ -459,7 +449,6 @@ function JoinForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn, 
     password: "",
     confirmPassword: "",
     officeCode: "",
-    room: "",
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
 
@@ -489,7 +478,7 @@ function JoinForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn, 
     <form onSubmit={submit} className="space-y-3">
       <div>
         <h2 className="text-[17px] font-extrabold">সদস্য হিসেবে যোগ দিন</h2>
-        <p className="muted text-[12px]">আপনার অফিসের Office Code দিয়ে যুক্ত হন। ম্যানেজার অনুমোদনের পর পূর্ণ হিসাব দেখতে পাবেন।</p>
+        <p className="muted text-[12px]">অফিস কোড দিয়ে যুক্ত হন; অনুমোদনের পর হিসাব দেখতে পাবেন।</p>
       </div>
 
       <Field label="অফিস কোড / Office Code" required error={errors.officeCode} hint="যেমন: GOBRA01">
@@ -507,9 +496,6 @@ function JoinForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn, 
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="মোবাইল / User ID" required error={errors.phone}>
           <TextInput value={f.phone} onChange={set("phone")} placeholder="01722222222" inputMode="tel" />
-        </Field>
-        <Field label="রুম নম্বর">
-          <TextInput value={f.room} onChange={set("room")} placeholder="Room 2" />
         </Field>
       </div>
       <Field label="ইমেইল (ঐচ্ছিক)" error={errors.email}>

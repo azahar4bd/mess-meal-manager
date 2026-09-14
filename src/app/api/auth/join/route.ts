@@ -30,7 +30,6 @@ export const POST = api({ auth: false, limit: "join", auditAction: "auth.join" }
   const password = requirePassword(body.password, "password", errors, 4);
   requireMatch(body.password, body.confirmPassword, "confirmPassword", errors);
   const officeCode = requireString(body.officeCode, "officeCode", errors, { min: 3, max: 30 }).toUpperCase();
-  const room = str(body.room).slice(0, 40);
 
   if (hasErrors(errors)) return fail("ফর্মে কিছু তথ্য সঠিক নয়", 400, "validation", errors);
 
@@ -42,7 +41,6 @@ export const POST = api({ auth: false, limit: "join", auditAction: "auth.join" }
       email,
       password,
       officeCode,
-      room,
     });
 
     await createSession(user);

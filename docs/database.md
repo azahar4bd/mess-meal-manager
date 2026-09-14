@@ -142,7 +142,6 @@ Logout / password reset / user delete all remove the rows → instant invalidati
 | `is_active` | bool = true | only active members share the **shared extra** |
 | `phone` | text `''` | |
 | `password` | text `''` | optional member-level password (bcrypt when used) |
-| `room` | text `''` | |
 | `note` | text `''` | |
 | `joined_at`, `created_at`, `updated_at` | timestamptz | |
 

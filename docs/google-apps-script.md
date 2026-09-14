@@ -59,7 +59,7 @@ Apps Script এডিটরে উপরে ফাংশন ড্রপডা�
 | # | ট্যাব | কী থাকে |
 |---|-------|----------|
 | 1 | `00_অফিস_ইনফো` | অফিসের নাম, কোড, ম্যানেজার, শিট মেটাডেটা (Key/Value) |
-| 2 | `01_সদস্য_তালিকা` | MemberID, Name, Role, Phone, Room, IsActive, OfficeID, MonthID |
+| 2 | `01_সদস্য_তালিকা` | MemberID, Name, Role, Phone, IsActive, OfficeID, MonthID |
 | 3 | `02_দৈনিক_মিল_খাতা` | MonthID, Year, Month, Day, Date, MemberID, MemberName, Meals |
 | 4 | `03_বাজার_খরচ` | EntryID, MonthID, Date, Day, MemberID, Buyer, Category, Items, Amount, Note |
 | 5 | `04_জমা_ও_তহবিল` | EntryID, MonthID, Date, Day, MemberID, Name, Amount, Type, Note |

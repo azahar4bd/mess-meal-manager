@@ -94,7 +94,6 @@ export function memberDTO(m: Member): MemberDTO {
     role: m.role,
     isActive: m.isActive,
     phone: m.phone,
-    room: m.room,
     note: m.note,
     createdAt: m.createdAt.toISOString(),
   };
@@ -380,7 +379,6 @@ export async function openMonth(
             role: m.role,
             isActive: m.isActive,
             phone: m.phone,
-            room: m.room,
             note: m.note,
             password: "",
             joinedAt: new Date(),
@@ -427,7 +425,7 @@ export async function getMember(officeId: string, memberId: string): Promise<Mem
 export async function createMember(
   officeId: string,
   monthId: string,
-  input: { name: string; phone?: string; room?: string; role?: string; isActive?: boolean; note?: string },
+  input: { name: string; phone?: string; role?: string; isActive?: boolean; note?: string },
 ): Promise<Member> {
   const phone = (input.phone ?? "").trim();
   if (phone) {
@@ -446,7 +444,6 @@ export async function createMember(
       monthId,
       name: input.name,
       phone,
-      room: input.room ?? "",
       role: input.role ?? "member",
       isActive: input.isActive ?? true,
       note: input.note ?? "",
@@ -459,7 +456,7 @@ export async function createMember(
 export async function updateMember(
   officeId: string,
   memberId: string,
-  patch: Partial<Pick<Member, "name" | "phone" | "room" | "role" | "isActive" | "note">>,
+  patch: Partial<Pick<Member, "name" | "phone" | "role" | "isActive" | "note">>,
 ): Promise<Member | null> {
   const rows = await db
     .update(membersTable)
@@ -495,7 +492,6 @@ export async function copyRoster(officeId: string, fromMonthId: string, toMonthI
       role: m.role,
       isActive: m.isActive,
       phone: m.phone,
-      room: m.room,
       note: m.note,
       password: "",
       joinedAt: new Date(),
@@ -533,7 +529,6 @@ export async function syncUserToRosters(user: User): Promise<number> {
       role: user.role === "audit" ? "audit" : "member",
       isActive: true,
       phone,
-      room: "",
       note: "joined via app",
       joinedAt: new Date(),
     });

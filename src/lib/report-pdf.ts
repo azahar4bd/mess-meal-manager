@@ -50,7 +50,6 @@ export function buildPrintHtml(input: PrintReportInput): string {
       <tr>
         <td class="c">${i + 1}</td>
         <td>${esc(m.name)}</td>
-        <td class="c">${esc(m.room || "—")}</td>
         <td class="r">${formatMeal(m.totalMill)}</td>
         <td class="r">${formatMoney(m.perMillRate)}</td>
         <td class="r">${formatMoney(m.mealCost)}</td>
@@ -195,7 +194,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
     <table>
       <thead>
         <tr>
-          <th class="c">#</th><th>সদস্য</th><th class="c">রুম</th><th class="r">মোট মিল</th>
+          <th class="c">#</th><th>সদস্য</th><th class="r">মোট মিল</th>
           <th class="r">মিল রেট</th><th class="r">মিল খরচ</th><th class="r">ইন্ডি. অতিরিক্ত</th>
           <th class="r">শেয়ার্ড অতিরিক্ত</th><th class="r">সর্বমোট খরচ</th><th class="r">স্থায়ী ফান্ড</th>
           <th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th>

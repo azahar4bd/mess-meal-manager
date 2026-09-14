@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
+import { GuideLine } from "@/components/GuideLine";
 import {
   Badge,
   Card,
@@ -65,7 +66,7 @@ export function AdminView() {
   const [tab, setTab] = useState<AdminTab>("overview");
 
   if (!app.can("user.manage") && !app.can("office.manage")) {
-    return <EmptyState icon="🛡" title="অ্যাডমিন প্যানেলে প্রবেশাধিকার নেই" hint="শুধু প্ল্যাটফর্ম অ্যাডমিন ও ম্যানেজার এই প্যানেল ব্যবহার করতে পারবেন।" />;
+    return <EmptyState icon="🛡" title="অ্যাডমিন প্যানেলে প্রবেশাধিকার নেই" hint="অ্যাডমিন/ম্যানেজার অনুমতি দরকার" />;
   }
 
   return (
@@ -307,9 +308,7 @@ function OfficesPanel() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="muted text-[12.5px]">
-          প্রতিটি অফিস সম্পূর্ণ আলাদা টেন্যান্ট — আলাদা ম্যানেজার, সদস্য, মাস, মিল, বাজার, তহবিল ও রিপোর্ট।
-        </p>
+        <GuideLine section="office" text="প্রতিটি অফিস আলাদা টেন্যান্ট" />
         {canManage ? (
           <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
             + নতুন অফিস
@@ -462,12 +461,12 @@ function OfficesPanel() {
             <>
               <Field
                 label="ম্যানেজারের User ID / মোবাইল (ঐচ্ছিক)"
-                hint="দিলে অফিসের সাথে ম্যানেজারের লগইনও এখনই তৈরি হয়ে যাবে"
+                hint="দিলে ম্যানেজার লগইনও তৈরি হবে"
                 className="sm:col-span-2"
               >
                 <TextInput value={form.managerUserId} onChange={set("managerUserId")} placeholder="01711111111" inputMode="tel" />
               </Field>
-              <Field label="ম্যানেজারের পাসওয়ার্ড (ঐচ্ছিক)" hint="কমপক্ষে ৪ অক্ষর — bcrypt দিয়ে হ্যাশ হবে" className="sm:col-span-2">
+              <Field label="ম্যানেজারের পাসওয়ার্ড (ঐচ্ছিক)" hint="৪+ অক্ষর" className="sm:col-span-2">
                 <TextInput value={form.managerPassword} onChange={set("managerPassword")} type="text" placeholder="••••••••" />
               </Field>
             </>
@@ -487,7 +486,7 @@ function OfficesPanel() {
       <Modal
         open={!!deleting}
         title="অফিস মুছে ফেলবেন?"
-        subtitle="এই অফিসের সব ইউজার, মাস, মিল, বাজার, তহবিল ও রিপোর্ট স্থায়ীভাবে মুছে যাবে।"
+        subtitle="সব ডেটা স্থায়ীভাবে মুছে যাবে।"
         onClose={() => setDeleting(null)}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -849,7 +848,7 @@ function UsersPanel() {
             <TextInput value={form.branch} onChange={set("branch")} />
           </Field>
           {!editing ? (
-            <Field label="পাসওয়ার্ড" required hint="কমপক্ষে ৪ অক্ষর — bcrypt দিয়ে হ্যাশ হবে">
+            <Field label="পাসওয়ার্ড" required hint="৪+ অক্ষর">
               <TextInput value={form.password} onChange={set("password")} type="text" />
             </Field>
           ) : null}
@@ -859,7 +858,7 @@ function UsersPanel() {
       <Modal
         open={!!pwUser}
         title={`পাসওয়ার্ড রিসেট — ${pwUser?.name ?? ""}`}
-        subtitle="রিসেট করলে এই ইউজারের সব সক্রিয় সেশন বাতিল হয়ে যাবে।"
+        subtitle="সব সক্রিয় সেশন বাতিল হবে।"
         onClose={() => setPwUser(null)}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -924,7 +923,7 @@ function AuditPanel() {
   }, [rows, query]);
 
   if (!app.can("audit.view")) {
-    return <EmptyState icon="🔒" title="অডিট ট্রেইল দেখার অনুমতি নেই" hint="শুধু অ্যাডমিন ও অডিট রোল অডিট লগ দেখতে পারবেন।" />;
+    return <EmptyState icon="🔒" title="অডিট ট্রেইল দেখার অনুমতি নেই" hint="অ্যাডমিন/অডিট রোলের জন্য" />;
   }
 
   return (

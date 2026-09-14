@@ -140,6 +140,7 @@ async function main() {
   const mgrMe = await req(mgr, "GET", "/api/auth/me");
   check("manager sees only own office in list", (mgrMe.json?.data?.offices?.length ?? 0) === 0, `count=${mgrMe.json?.data?.offices?.length}`);
   check("manager menu has no admin tab", !(mgrMe.json?.data?.menu ?? []).some((m) => m.tab === "admin"));
+  check("manager menu has the guide tab", (mgrMe.json?.data?.menu ?? []).some((m) => m.tab === "guide"));
 
   const mgrBoot = await req(mgr, "POST", "/api/mess", { action: "bootstrap" });
   const boot = mgrBoot.json?.data?.data;
@@ -286,7 +287,7 @@ async function main() {
   check("member login ok", memLogin.status === 200 && memLogin.json?.ok === true, memLogin.text.slice(0, 160));
   check("member home = report", memLogin.json?.data?.home === "report");
   const memMenu = (await req(mem, "GET", "/api/auth/me")).json?.data?.menu ?? [];
-  check("member menu = Reports only (spec §70)", JSON.stringify(memMenu.map((m) => m.tab)) === JSON.stringify(["report"]), JSON.stringify(memMenu.map((m) => m.tab)));
+  check("member menu = Reports + Guide (spec §70, গাইড ট্যাব সবার জন্য)", JSON.stringify(memMenu.map((m) => m.tab)) === JSON.stringify(["report", "guide"]), JSON.stringify(memMenu.map((m) => m.tab)));
   const memMeals = await req(mem, "POST", "/api/mess", { action: "meals.list", monthId });
   check("member cannot read the raw meal ledger → 403", memMeals.status === 403, `status=${memMeals.status}`);
   const memMonthData = await req(mem, "POST", "/api/mess", { action: "month.data", monthId });
@@ -435,7 +436,6 @@ async function main() {
     password: "join1234",
     confirmPassword: "join1234",
     officeCode: newOffice.code,
-    room: "R1",
   });
   check("member join ok with office code", join.status === 200 && join.json?.ok === true, join.text.slice(0, 200));
   check("joined user status = pending", join.json?.data?.user?.status === "pending");

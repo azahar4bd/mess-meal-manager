@@ -105,7 +105,7 @@ export function DashboardView() {
           }
         >
           {topMembers.length === 0 ? (
-            <EmptyState icon="👥" title="কোনো সদস্য পাওয়া যায়নি" hint="সদস্য যোগ করলে এখানে মিল সামারি দেখা যাবে।" />
+            <EmptyState icon="👥" title="কোনো সদস্য পাওয়া যায়নি" hint="সদস্য যোগ করুন" />
           ) : (
             <div className="space-y-1.5">
               {topMembers.map((m, i) => (
@@ -116,7 +116,6 @@ export function DashboardView() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13.5px] font-bold">{m.name}</span>
                     <span className="muted block text-[11px]">
-                      {m.room ? `রুম ${m.room} • ` : ""}
                       মিল খরচ ৳ {formatMoney(m.totalCost)}
                     </span>
                   </span>

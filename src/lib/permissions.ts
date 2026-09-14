@@ -28,6 +28,7 @@ export type Capability =
   | "office.manage"
   | "user.manage"
   | "audit.view"
+  | "guide.view"
   | "settings.write";
 
 const MATRIX: Record<Role, Record<Capability, boolean>> = {
@@ -55,6 +56,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "office.manage": true,
     "user.manage": true,
     "audit.view": true,
+    "guide.view": true,
     "settings.write": true,
   },
 
@@ -83,6 +85,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "office.manage": false,
     "user.manage": false,
     "audit.view": false,
+    "guide.view": true,
     "settings.write": true,
   },
 
@@ -110,6 +113,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "office.manage": false,
     "user.manage": false,
     "audit.view": false,
+    "guide.view": true,
     "settings.write": false,
   },
 
@@ -137,6 +141,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "office.manage": false,
     "user.manage": false,
     "audit.view": true,
+    "guide.view": true,
     "settings.write": false,
   },
 };
@@ -203,6 +208,7 @@ export const MENU: MenuItem[] = [
   { tab: "report", bn: "হিসাব / রিপোর্ট", en: "Reports", icon: "📊", capability: "report.view" },
   { tab: "sheet", bn: "গুগল শিট", en: "Google Sheet", icon: "☁", capability: "sheet.view" },
   { tab: "admin", bn: "অ্যাডমিন প্যানেল", en: "Admin", icon: "🛡", capability: "user.manage" },
+  { tab: "guide", bn: "গাইড", en: "Guide", icon: "📘", capability: "guide.view" },
 ];
 
 export function menuForRole(role: Role): MenuItem[] {
