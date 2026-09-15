@@ -338,33 +338,33 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data report-table" style={{ minWidth: hasJer ? 1180 : 940 }}>
+                <table className="data report-table" style={{ minWidth: hasJer ? 980 : 760 }}>
                   <thead>
                     <tr>
                       <th>সদস্য</th>
-                      <th className="num vth">মোট মিল</th>
-                      <th className="num vth">মিল রেট</th>
-                      <th className="num vth">মিল খরচ</th>
-                      <th className="num vth">ইন্ডি. অতিরিক্ত</th>
-                      <th className="num vth">শেয়ার্ড অতিরিক্ত</th>
-                      <th className="num vth">মোট খরচ (−)</th>
-                      <th className="num vth">জমা / সমন্বয়</th>
-                      <th className="num vth">নিজ টাকায় বাজার</th>
+                      <th className="num vth">মোট<br/>মিল</th>
+                      <th className="num vth">মিল<br/>রেট</th>
+                      <th className="num vth">মিল<br/>খরচ</th>
+                      <th className="num vth">ইন্ডি.<br/>অতিরিক্ত</th>
+                      <th className="num vth">শেয়ার্ড<br/>অতিরিক্ত</th>
+                      <th className="num vth">মোট<br/>খরচ (−)</th>
+                      <th className="num vth">জমা/<br/>সমন্বয়</th>
+                      <th className="num vth">নিজ টাকায়<br/>বাজার</th>
                       {hasJer ? (
                         <>
-                          <th className="num vth">প্রারম্ভিক জের</th>
-                          <th className="num vth">জের সমন্বয়</th>
-                          <th className="num vth">বাকি জের</th>
+                          <th className="num vth">প্রারম্ভিক<br/>জের</th>
+                          <th className="num vth">জের<br/>সমন্বয়</th>
+                          <th className="num vth">বাকি<br/>জের</th>
                         </>
                       ) : null}
                       <th className="num vth" title="জমা বসানোর আগের হিসাব">
-                        দেনা(-)/পাওনা(+)
+                        দেনা(−)/<br/>পাওনা(+)
                       </th>
-                      <th className="num vth">দেনা-পাওনার জমা (৳)</th>
+                      <th className="num vth">দেনা-পাওনার<br/>জমা (৳)</th>
                       <th className="num vth" title="হিসাব − জমা = অবশিষ্ট; এটাই পরের মাসে জের হিসেবে যায়">
-                        অবশিষ্ট দেনা-পাওনা
+                        অবশিষ্ট<br/>দেনা-পাওনা
                       </th>
-                      <th className="num vth">স্থায়ী ফান্ড</th>
+                      <th className="num vth">স্থায়ী<br/>ফান্ড</th>
                       <th className="vth text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>

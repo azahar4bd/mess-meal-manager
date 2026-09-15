@@ -199,16 +199,16 @@ body {
     border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   }
 
-  /* ── রিপোর্ট সদস্য টেবিল — কম্প্যাক্ট; সংকীর্ণ স্ক্রিনে হেডার উপর-নিচ ── */
+  /* ── রিপোর্ট সদস্য টেবিল — কম্প্যাক্ট; সংকীর্ণ কলামে হেডার দুই লাইনে সোজা ── */
   table.report-table {
     font-size: 12.5px;
   }
   table.report-table th {
-    line-height: 1.2;
+    line-height: 1.15;
     white-space: normal;
-    vertical-align: bottom;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    vertical-align: middle;
+    padding-top: 5px;
+    padding-bottom: 5px;
   }
   table.report-table td {
     padding-top: 4px;
@@ -218,9 +218,20 @@ body {
   table.report-table td.num {
     text-align: right;
   }
+  /* সংখ্যা-কলামের হেডার: সোজা লেখা, শব্দ ভেঙে দুই লাইন, মাঝখানে */
+  table.report-table th.vth {
+    text-align: center;
+    vertical-align: middle;
+    min-width: 44px;
+    max-width: 74px;
+    padding-left: 2px;
+    padding-right: 2px;
+    font-size: 11px;
+    line-height: 1.12;
+  }
   @media (max-width: 767px) {
     table.data th {
-      padding: 6px 4px;
+      padding: 5px 4px;
       font-size: 10.5px;
     }
     table.data td {
@@ -231,13 +242,10 @@ body {
       min-width: 0 !important;
     }
     table.report-table th.vth {
-      writing-mode: vertical-rl;
-      text-orientation: mixed;
-      min-width: 26px;
-      max-width: 34px;
-      padding: 6px 2px;
-      letter-spacing: 0.2px;
-      line-height: 1.35;
+      min-width: 34px;
+      max-width: 58px;
+      font-size: 10px;
+      line-height: 1.1;
     }
     table.report-table td.num {
       padding-left: 3px;
@@ -308,7 +316,7 @@ body {
   }
 }
 
-/* ── স্ক্রলিং নোটিশ বোর্ড (বাম → ডান) ── */
+/* ── স্ক্রলিং নোটিশ বোর্ড (ডান → বাম) ── */
 .notice-ticker {
   display: flex;
   align-items: center;
@@ -335,7 +343,7 @@ body {
   gap: 3rem;
   white-space: nowrap;
   padding: 0.35rem 0;
-  animation: ticker-ltr 28s linear infinite;
+  animation: ticker-rtl 28s linear infinite;
   will-change: transform;
 }
 .notice-ticker__item {
@@ -351,12 +359,12 @@ body {
 .notice-ticker:hover .notice-ticker__track {
   animation-play-state: paused;
 }
-@keyframes ticker-ltr {
+@keyframes ticker-rtl {
   from {
-    transform: translateX(-50%);
+    transform: translateX(0%);
   }
   to {
-    transform: translateX(0%);
+    transform: translateX(-50%);
   }
 }
 @media (prefers-reduced-motion: reduce) {
