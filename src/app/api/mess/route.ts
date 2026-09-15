@@ -91,6 +91,16 @@ import {
   setOfficeStatus,
   setUserStatus,
 } from "@/lib/service";
+import {
+  insertMessage as insertSupportMessage,
+  listMine as listSupportMine,
+  listThreads as listSupportThreads,
+  markRepliesRead,
+  openThread as openSupportThread,
+  unreadForAdmin,
+  unreadForUser,
+  ensureSupportTable,
+} from "@/lib/support";
 import type { MemberCalculation, MessData, MonthSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -806,6 +816,72 @@ const handlers: Record<string, ActionHandler> = {
     if (ctx.user.role === "admin" && str(body.scope) === "all") return listAllAuditLogs(150);
     const office = await loadOfficePayload(ctx);
     return listAuditLogs(office.id, 150);
+  },
+
+  /* ── support chat (যেকোনো লগইন-করা ব্যবহারকারী → অ্যাডমিন) ── */
+  "support.unread": async (ctx) => {
+    await ensureSupportTable();
+    if (ctx.user.role === "admin") return unreadForAdmin();
+    return { count: await unreadForUser(ctx.user.userId) };
+  },
+
+  "support.send": async (ctx, body) => {
+    await ensureSupportTable();
+    const text = str(body.message ?? body.body).trim().slice(0, 2000);
+    if (text.length < 2) throw new AuthError("bad-request", "বার্তা লিখুন (অন্তত ২ অক্ষর)", 400);
+    const msg = await insertSupportMessage({
+      user: ctx.user,
+      officeId: ctx.activeOfficeId ?? "",
+      officeName: ctx.office?.name ?? "",
+      sender: "user",
+      body: text,
+    });
+    await logAction(ctx, "support.send", "support", msg.id, `অ্যাডমিনকে বার্তা: ${text.slice(0, 80)}`);
+    return msg;
+  },
+
+  "support.mine": async (ctx) => {
+    await ensureSupportTable();
+    const msgs = await listSupportMine(ctx.user.userId);
+    await markRepliesRead(ctx.user.userId);
+    return msgs;
+  },
+
+  "support.threads": async (ctx) => {
+    await ensureSupportTable();
+    if (ctx.user.role !== "admin") deny(ctx, "office.manage");
+    return listSupportThreads();
+  },
+
+  "support.thread": async (ctx, body) => {
+    await ensureSupportTable();
+    if (ctx.user.role !== "admin") deny(ctx, "office.manage");
+    const userId = str(body.userId);
+    if (!userId) throw new AuthError("bad-request", "থ্রেড নির্বাচন করুন", 400);
+    return openSupportThread(userId);
+  },
+
+  "support.reply": async (ctx, body) => {
+    await ensureSupportTable();
+    if (ctx.user.role !== "admin") deny(ctx, "office.manage");
+    const userId = str(body.userId);
+    const text = str(body.message ?? body.body).trim().slice(0, 2000);
+    if (!userId) throw new AuthError("bad-request", "থ্রেড নির্বাচন করুন", 400);
+    if (text.length < 2) throw new AuthError("bad-request", "উত্তর লিখুন", 400);
+    const prior = await listSupportMine(userId);
+    const first = prior[0];
+    const msg = await insertSupportMessage({
+      user: ctx.user,
+      officeId: first?.officeId ?? "",
+      officeName: first?.officeName ?? "",
+      sender: "admin",
+      body: text,
+      targetUserId: userId,
+      targetName: first?.userName ?? "",
+      targetRole: first?.role ?? "",
+    });
+    await logAction(ctx, "support.reply", "support", msg.id, `${first?.userName ?? userId}-কে উত্তর: ${text.slice(0, 80)}`);
+    return msg;
   },
 
   /* ── platform admin ──────────────────────────────────── */

@@ -357,7 +357,7 @@ export function SegmentedButtons<T extends string>({
   size = "md",
 }: {
   value: T;
-  options: { value: T; label: string }[];
+  options: { value: T; label: React.ReactNode }[];
   onChange: (v: T) => void;
   size?: "sm" | "md";
 }) {

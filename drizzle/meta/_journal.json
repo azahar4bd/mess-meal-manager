@@ -36,6 +36,13 @@
       "when": 1789458721128,
       "tag": "0004_member_opening_due",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789620000000,
+      "tag": "0005_support_chat",
+      "breakpoints": true
     }
   ]
 }

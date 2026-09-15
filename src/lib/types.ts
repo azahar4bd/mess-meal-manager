@@ -304,6 +304,34 @@ export interface ApiError {
 
 export type ApiResponse<T> = { ok: true; data: T } | ApiError;
 
+/* ── সাপোর্ট চ্যাট ─────────────────────────────────────────── */
+export interface SupportMessageDTO {
+  id: string;
+  at: string;
+  userId: string;
+  userName: string;
+  role: string;
+  officeId: string;
+  officeName: string;
+  /** "user" = ব্যবহারকারী → অ্যাডমিন; "admin" = অ্যাডমিন → ব্যবহারকারী */
+  sender: "user" | "admin";
+  body: string;
+  read: boolean;
+}
+
+export interface SupportThread {
+  userId: string;
+  userName: string;
+  role: string;
+  officeId: string;
+  officeName: string;
+  lastAt: string;
+  lastBody: string;
+  lastSender: "user" | "admin";
+  unread: number;
+  total: number;
+}
+
 export const TABS = [
   "dashboard",
   "meals",

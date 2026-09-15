@@ -263,7 +263,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (month && body.monthId === undefined) body.monthId = month.id;
       try {
         const result = await mess<T>(action, body);
-        const isWrite = !action.endsWith(".list") && !action.endsWith(".data") && !action.startsWith("sheet.") && action !== "bootstrap";
+        const isWrite =
+          !action.endsWith(".list") &&
+          !action.endsWith(".data") &&
+          !action.startsWith("sheet.") &&
+          !(action.startsWith("support.") && action !== "support.send" && action !== "support.reply") &&
+          action !== "bootstrap";
         if (isWrite) {
           // ডেটা রিফ্রেশ + সার্ভার-সাইড স্বয়ংক্রিয় গুগল শিট সিংক (after()-হুক);
           // ক্লায়েন্ট থেকে আলাদা সিংক কল করা হয় না (ডুপ্লিকেট/পারমিশন এরর এড়াতে)।

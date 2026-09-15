@@ -20,11 +20,12 @@ import {
 } from "@/components/ui";
 import { mess } from "@/lib/client";
 import { UiContentEditor } from "@/components/UiContent";
+import { AdminMessages } from "@/components/views/AdminMessages";
 import { toDisplayDateTime } from "@/lib/date";
 import { ROLE_LABEL } from "@/lib/permissions";
 import type { AuditLogDTO, OfficeDTO, Role } from "@/lib/types";
 
-type AdminTab = "overview" | "offices" | "users" | "audit";
+type AdminTab = "overview" | "messages" | "offices" | "users" | "audit";
 
 interface OfficeRow extends OfficeDTO {
   monthCount: number;
@@ -65,6 +66,23 @@ interface AdminSummary {
 export function AdminView() {
   const app = useApp();
   const [tab, setTab] = useState<AdminTab>("overview");
+  const [chatUnread, setChatUnread] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    mess<{ messages?: number; count?: number }>("support.unread")
+      .then((r) => alive && setChatUnread(r.messages ?? r.count ?? 0))
+      .catch(() => undefined);
+    const t = setInterval(() => {
+      mess<{ messages?: number; count?: number }>("support.unread")
+        .then((r) => alive && setChatUnread(r.messages ?? r.count ?? 0))
+        .catch(() => undefined);
+    }, 45000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
 
   if (!app.can("user.manage") && !app.can("office.manage")) {
     return <EmptyState icon="🛡" title="অ্যাডমিন প্যানেলে প্রবেশাধিকার নেই" hint="অ্যাডমিন/ম্যানেজার অনুমতি দরকার" />;
@@ -79,6 +97,19 @@ export function AdminView() {
         onChange={setTab}
         options={[
           { value: "overview", label: "ওভারভিউ" },
+          {
+            value: "messages",
+            label: (
+              <>
+                💬 বার্তা
+                {chatUnread > 0 ? (
+                  <span className="ml-1 inline-grid h-4 min-w-[16px] place-items-center rounded-full bg-[var(--danger)] px-1 text-[10px] font-extrabold text-white">
+                    {chatUnread > 9 ? "9+" : chatUnread}
+                  </span>
+                ) : null}
+              </>
+            ),
+          },
           { value: "offices", label: "অফিস ম্যানেজমেন্ট" },
           { value: "users", label: "ইউজার ম্যানেজমেন্ট" },
           { value: "audit", label: "অডিট ট্রেইল" },
@@ -86,6 +117,7 @@ export function AdminView() {
       />
 
       {tab === "overview" ? <OverviewPanel /> : null}
+      {tab === "messages" ? <AdminMessages onUnreadChange={setChatUnread} /> : null}
       {tab === "offices" ? <OfficesPanel /> : null}
       {tab === "users" ? <UsersPanel /> : null}
       {tab === "audit" ? <AuditPanel /> : null}

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AppProvider, useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { AppNoticeTicker, GlobalEditButton, useUiContent } from "@/components/UiContent";
+import { SupportChatButton } from "@/components/SupportChat";
 import {
   Badge,
   ConfirmDialog,
@@ -132,6 +133,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <FooterBar />
       <MobileTabBar />
       <GlobalEditButton />
+      <SupportChatButton />
       <ToastStack toasts={app.toasts} onClose={app.closeToast} />
     </div>
   );

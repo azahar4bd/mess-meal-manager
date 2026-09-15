@@ -423,6 +423,32 @@ export const auditLogs = pgTable(
 );
 
 /* ────────────────────────────────────────────────────────────
+ *  SUPPORT CHAT — ম্যানেজার/সদস্য/অফিস থেকে প্ল্যাটফর্ম অ্যাডমিনকে বার্তা
+ *  sender: "user" (ব্যবহারকারী → অ্যাডমিন) | "admin" (অ্যাডমিন → ব্যবহারকারী)
+ * ──────────────────────────────────────────────────────────── */
+
+export const supportMessages = pgTable(
+  "support_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => cryptoId("msg")),
+    at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    /** প্রেরকের স্থিতিশীল পরিচয় (ইউজারের userId = মোবাইল/লগইন) */
+    userId: text("user_id").notNull().default(""),
+    userName: text("user_name").notNull().default(""),
+    role: text("role").notNull().default(""),
+    officeId: text("office_id").notNull().default(""),
+    officeName: text("office_name").notNull().default(""),
+    sender: text("sender").notNull().default("user"),
+    body: text("body").notNull().default(""),
+    /** admin-বার্তা ব্যবহারকারী পড়লে / ইনবাউন্ড অ্যাডমিন পড়লে true */
+    read: boolean("read").notNull().default(false),
+  },
+  (t) => [index("support_user_idx").on(t.userId, t.at), index("support_read_idx").on(t.read, t.sender)],
+);
+
+/* ────────────────────────────────────────────────────────────
  *  KEY / VALUE SETTINGS (platform + per office)
  * ──────────────────────────────────────────────────────────── */
 
@@ -464,6 +490,7 @@ export type OtherIncome = typeof otherIncomes.$inferSelect;
 export type ExtraExpense = typeof extraExpenses.$inferSelect;
 export type SyncLog = typeof syncLogs.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type SupportMessage = typeof supportMessages.$inferSelect;
 
 export type Role = "admin" | "manager" | "member" | "audit";
 export type UserStatus = "pending" | "approved" | "rejected" | "inactive" | "active";
