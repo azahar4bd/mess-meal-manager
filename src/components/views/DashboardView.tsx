@@ -5,7 +5,7 @@ import { useApp } from "@/components/app-context";
 import { UiContentEditor, useUiContent } from "@/components/UiContent";
 import { Badge, Card, EmptyState, Kpi, Loader } from "@/components/ui";
 import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
-import { toDisplayDate, toDisplayDateTime, monthLabelBn, todayIso } from "@/lib/date";
+import { toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
 
 export function DashboardView() {
   const app = useApp();
@@ -27,63 +27,6 @@ export function DashboardView() {
   const due = round2(s.memberCalculations.filter((m) => m.statusEn === "Due").reduce((a, m) => a + Math.abs(m.denaPoana), 0));
   const receive = round2(s.memberCalculations.filter((m) => m.statusEn === "Receive").reduce((a, m) => a + m.denaPoana, 0));
   const daysWithMeals = new Set(data.dailyMeals.map((m) => m.day)).size;
-
-  /* ── বর্তমান কাজের অবস্থা — ড্যাশবোর্ড ইন্ডিকেটর ── */
-  const today = todayIso();
-  const inThisMonth = today.startsWith(`${app.month.year}-${String(app.month.month).padStart(2, "0")}`);
-  const todayDay = inThisMonth ? Number(today.slice(-2)) : null;
-  const todayMeals = todayDay ? data.dailyMeals.some((m) => m.day === todayDay) : null;
-  const todayBazar = todayDay ? data.bazarExpenses.some((b) => b.day === todayDay) : null;
-  const sync = app.office ? { scriptConfigured: Boolean(app.office.scriptUrl), lastSyncedAt: app.office.lastSyncedAt } : null;
-  const tasks: { label: string; hint: string; done: boolean | null; tab?: string }[] = [
-    {
-      label: todayMeals === null ? "আজকের মিল এন্ট্রি (এই মাসে নয়)" : "আজকের মিল এন্ট্রি",
-      hint: todayMeals === null ? "—" : todayMeals ? "হয়ে গেছে" : "বাকি আছে",
-      done: todayMeals,
-      tab: "meals",
-    },
-    {
-      label: todayBazar === null ? "আজকের বাজার এন্ট্রি (এই মাসে নয়)" : "আজকের বাজার এন্ট্রি",
-      hint: todayBazar === null ? "—" : todayBazar ? "হয়ে গেছে" : "দেওয়া হয়নি",
-      done: todayBazar,
-      tab: "bazar",
-    },
-    {
-      label: "মাসের মিল কভারেজ",
-      hint: `${daysWithMeals}/${app.month.totalDays} দিন`,
-      done: daysWithMeals >= app.month.totalDays,
-      tab: "meals",
-    },
-    {
-      label: "বাজার এন্ট্রি",
-      hint: `${data.bazarExpenses.length}টি • মোট ৳ ${Math.round(s.totalBazarCost)}`,
-      done: data.bazarExpenses.length > 0,
-      tab: "bazar",
-    },
-    {
-      label: "স্থায়ী তহবিল / জমা",
-      hint: `${data.deposits.length}টি এন্ট্রি`,
-      done: data.deposits.length > 0,
-      tab: "fund",
-    },
-    {
-      label: "Google Sheet সিঙ্ক",
-      hint: sync?.scriptConfigured
-        ? sync.lastSyncedAt
-          ? `শেষ সিঙ্ক ${toDisplayDateTime(sync.lastSyncedAt)}`
-          : "কনফিগার করা, এখনো সিঙ্ক হয়নি"
-        : "কনফিগার করা নেই",
-      done: sync?.scriptConfigured ? Boolean(sync.lastSyncedAt) : null,
-      tab: "sheet",
-    },
-    {
-      label: "মাসের অবস্থা",
-      hint: app.month.isClosed ? "বন্ধ — শুধু দেখা যাবে" : "খোলা — এন্ট্রি দেওয়া যাবে",
-      done: app.month.isClosed ? null : true,
-      tab: "month",
-    },
-  ];
-  const pending = tasks.filter((t) => t.done === false).length;
 
   return (
     <div className="space-y-3">
@@ -128,37 +71,6 @@ export function DashboardView() {
           ) : null}
         </div>
       </div>
-
-      {/* ── বর্তমান অবস্থান / কাজের ইন্ডিকেটর ─────────────────── */}
-      <Card bodyClass="p-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-extrabold">🧭 আপনি এখন যে কাজে আছেন</span>
-          <Badge tone="brand">{app.month.monthName}</Badge>
-          <Badge tone={app.month.isClosed ? "danger" : "ok"}>{app.month.isClosed ? "মাস বন্ধ 🔒" : "মাস খোলা"}</Badge>
-          <Badge tone={pending ? "warn" : "muted"}>{pending ? `${pending}টি কাজ বাকি` : "সব কাজ শেষ ✓"}</Badge>
-          <span className="muted text-[11.5px]">
-            {app.office?.name} • {app.role === "admin" ? "প্ল্যাটফর্ম অ্যাডমিন" : app.role === "manager" ? "ম্যানেজার" : app.role === "audit" ? "অডিট" : "সদস্য"}
-          </span>
-        </div>
-        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-          {tasks.map((t) => (
-            <button
-              key={t.label}
-              type="button"
-              onClick={() => t.tab && app.setTab(t.tab)}
-              className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2 text-left text-[12.5px] transition hover:border-[var(--brand)] hover:bg-[var(--brand-soft)]"
-            >
-              <span aria-hidden className="text-[13px]">
-                {t.done === true ? "✅" : t.done === false ? "⬜" : "ℹ️"}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-bold">{t.label}</span>
-                <span className="muted block truncate text-[11px]">{t.hint}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-      </Card>
 
       {app.can("settings.write") ? <UiContentEditor open={editorOpen} onClose={() => setEditorOpen(false)} scope="office" /> : null}
 
