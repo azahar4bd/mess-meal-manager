@@ -164,6 +164,8 @@ export function fullReportCsv(ctx: CsvContext): string {
         ["Total Members (active)", summary.activeMembers],
         ["Total Meals", summary.totalMill],
         ["Total Bazar", summary.totalBazarCost],
+        ["Fund Paid Bazar", summary.fundPaidBazar ?? summary.totalBazarCost - (summary.totalSelfPaidBazar ?? 0)],
+        ["Self Paid Bazar", summary.totalSelfPaidBazar],
         ["Other Income", summary.totalOthersIncome],
         ["Net Meal Cost", summary.netCost],
         ["Meal Rate", summary.perMillRate],

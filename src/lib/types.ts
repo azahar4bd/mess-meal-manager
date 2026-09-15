@@ -219,6 +219,8 @@ export interface MonthSummary {
   totalFund: number;
   /** সদস্যরা নিজের পকেট থেকে যে বাজার করেছে (তাদের পাওনা) */
   totalSelfPaidBazar: number;
+  /** ফান্ড থেকে করা বাজার (লাস্ট ব্যালেন্স থেকে বাদ যায়) */
+  fundPaidBazar: number;
   totalSharedExtra: number;
   totalIndividualExtra: number;
   totalDepositsThisMonth: number;

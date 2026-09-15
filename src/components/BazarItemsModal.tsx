@@ -9,6 +9,7 @@ import type { BazarLine } from "@/lib/types";
 /* ══════════════════════════════════════════════════════════
  *  বাজারের আইটেম পপআপ
  *  • আইটেম লিখলে বাংলাদেশি বাজার তালিকা থেকে বাংলা সাজেশন
+ *    + আগের বাজার থেকে কাস্টম আইটেমও মনে থাকে
  *  • কোয়ান্টিটি / দাম / মোট — যেকোনো দুটি দিলে তৃতীয়টি অটো
  *  • টেবিলে জমা হয়, এডিট/ডিলিট করা যায়, সেভ না করা পর্যন্ত থাকে
  *  • সেভ চাপলে মোট টাকা বাজার এন্ট্রির পরিমাণ ঘরে বসে যায়
@@ -21,6 +22,7 @@ export interface BazarItemsModalProps {
   onClose: () => void;
   onApply: (lines: BazarLine[], total: number) => void;
   disabled?: boolean;
+  historyItems?: string[];
 }
 
 export function linesTotal(lines: BazarLine[]): number {
@@ -37,7 +39,7 @@ export function linesToText(lines: BazarLine[]): string {
 
 type FieldKey = "qty" | "price" | "total";
 
-export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disabled }: BazarItemsModalProps) {
+export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disabled, historyItems = [] }: BazarItemsModalProps) {
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
@@ -56,7 +58,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setError("");
   }, [open]);
 
-  const suggestions = useMemo(() => (focusItem && item.trim() ? suggestBazarItems(item, 8) : []), [item, focusItem]);
+  const suggestions = useMemo(() => (focusItem && item.trim() ? suggestBazarItems(item, 8, historyItems) : []), [item, focusItem, historyItems]);
   const grandTotal = useMemo(() => linesTotal(lines), [lines]);
 
   const clearInputs = () => {
@@ -68,7 +70,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setError("");
   };
 
-  /** যেকোনো দুটি ঘর পূরণ হলে তৃতীয়টি নিজে থেকে হিসাব হয়ে যায় */
+  /** যেকোনো দুটি ঘর পূরণ হলে তৃতীয়টি নিজে থেকে হিসাব হয়ে যায় — ২০০/০.২ বাগ ফিক্স */
   const onField = (changed: FieldKey, raw: string) => {
     const clean = raw.replace(/[^\d.]/g, "");
     let q = qty;
@@ -81,18 +83,39 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     const qn = toNumber(q);
     const pn = toNumber(p);
     const tn = toNumber(t);
-    const filled = { q: q.trim() !== "", p: p.trim() !== "", t: t.trim() !== "" };
+
+    const qtyFilled = q.trim() !== "";
+    const priceFilled = p.trim() !== "";
+    const totalFilled = t.trim() !== "";
 
     if (changed === "qty") {
-      if (filled.p) t = String(round2(qn * pn));
-      else if (filled.t && qn > 0) p = String(round2(tn / qn));
+      if (priceFilled && qtyFilled) {
+        // qty + price => total
+        t = String(round2(qn * pn));
+      } else if (totalFilled && qtyFilled && qn !== 0) {
+        // qty + total => price
+        p = String(round2(tn / qn));
+      }
     } else if (changed === "price") {
-      if (filled.q) t = String(round2(qn * pn));
-      else if (filled.t && pn > 0) q = String(round2(tn / pn));
-    } else if (qn > 0) {
-      p = String(round2(tn / qn));
-    } else if (pn > 0) {
-      q = String(round2(tn / pn));
+      if (qtyFilled && toNumber(q) !== 0) {
+        // qty + price => total
+        t = String(round2(qn * pn));
+      } else if (totalFilled && pn !== 0) {
+        // price + total => qty = total / price  (e.g. 40 / 20 = 2)
+        q = String(round2(tn / pn));
+      }
+    } else {
+      // changed === "total"
+      if (qtyFilled && !priceFilled && qn !== 0) {
+        // qty + total => price
+        p = String(round2(tn / qn));
+      } else if (priceFilled && !qtyFilled && pn !== 0) {
+        // price + total => qty
+        q = String(round2(tn / pn));
+      } else if (qtyFilled && priceFilled) {
+        // all three filled - keep qty, recompute price from total/qty (more intuitive)
+        if (qn !== 0) p = String(round2(tn / qn));
+      }
     }
 
     setQty(q);
