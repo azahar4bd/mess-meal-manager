@@ -88,13 +88,13 @@ export function DashboardView() {
         <Kpi
           label="লাস্ট ব্যালেন্স / Last Balance"
           value={`৳ ${formatMoney(s.lastBalance)}`}
-          sub="ফান্ড − (বাজার + অতিরিক্ত − আয়)"
+          sub={(s.totalRemainingJer ?? 0) > 0 ? `ফান্ড − খরচ − বাকি জের ৳${formatMoney(s.totalRemainingJer ?? 0)}` : "ফান্ড − (বাজার + অতিরিক্ত − আয়)"}
           tone={s.lastBalance >= 0 ? "ok" : "danger"}
         />
       </div>
 
       {/* ── dena paona snapshot ─────────────────────── */}
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className={`grid gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
         <Card className="border-l-4 border-l-[var(--danger)]" bodyClass="p-3">
           <div className="kpi-k">মোট দিবে (Due)</div>
           <div className="kpi-v text-[var(--danger)]">৳ {formatMoney(due)}</div>
@@ -110,6 +110,15 @@ export function DashboardView() {
           <div className="kpi-v">{s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন</div>
           <div className="muted text-[11px]">জমা = খরচ</div>
         </Card>
+        {(s.totalRemainingJer ?? 0) > 0 ? (
+          <Card className="border-l-4 border-l-[var(--warn)]" bodyClass="p-3">
+            <div className="kpi-k">বাকি জের (আগের মাসের)</div>
+            <div className="kpi-v text-[var(--warn)]">৳ {formatMoney(s.totalRemainingJer ?? 0)}</div>
+            <div className="muted text-[11px]">
+              {s.memberCalculations.filter((m) => (m.remainingJer ?? 0) > 0).length} জন সদস্য • বাজার থেকে সমন্বয় হবে
+            </div>
+          </Card>
+        ) : null}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
@@ -230,6 +239,7 @@ export function DashboardView() {
             <li>• স্থায়ী ফান্ড = স্থায়ী মূলধন, মিল খরচ থেকে বাদ যায় না</li>
             <li>• Shared Extra = মোট ÷ সক্রিয় সদস্য সংখ্যা</li>
             <li>• Individual Extra শুধু নির্দিষ্ট সদস্যের হিসাবে</li>
+            <li>• আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার থেকে সমন্বয় হয়</li>
             <li>• প্রতি মাস আলাদা হিসাব — পুরনো মাস দেখা যাবে, মুছে যাবে না</li>
           </ul>
         </Card>

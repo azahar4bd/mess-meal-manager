@@ -6,7 +6,7 @@ import { GuideLine } from "@/components/GuideLine";
 import { EntryPanel, type ColumnDef, type FieldDef, type FormState } from "@/components/ui/entry-panel";
 import { Badge, Card, ConfirmDialog, EmptyState, Loader, Modal, StatusPill } from "@/components/ui";
 import { mess, ApiError } from "@/lib/client";
-import { formatMeal, formatMoney0 } from "@/lib/format";
+import { formatMeal, formatMoney0, toNumber } from "@/lib/format";
 import { toDisplayDateTime as fmtDt } from "@/lib/date";
 import type { MemberDTO } from "@/lib/types";
 
@@ -127,10 +127,18 @@ export function MembersView() {
         { value: "false", label: "নিষ্ক্রিয় / Inactive" },
       ],
     },
+    {
+      key: "openingDue",
+      label: "জের / Previous Due (৳)",
+      type: "money",
+      half: true,
+      placeholder: "0",
+      hint: "আগের মাসের বাকি — নিজের টাকার বাজার থেকে সমন্বয় হবে",
+    },
     { key: "note", label: "নোট / Note", type: "textarea" },
   ];
 
-  const initialValues = (): FormState => ({ name: "", phone: "", role: "member", isActive: "true", note: "" });
+  const initialValues = (): FormState => ({ name: "", phone: "", role: "member", isActive: "true", note: "", openingDue: "" });
 
   const toForm = (row: MemberDTO): FormState => ({
     name: row.name,
@@ -138,6 +146,7 @@ export function MembersView() {
     role: row.role || "member",
     isActive: row.isActive ? "true" : "false",
     note: row.note ?? "",
+    openingDue: (row.openingDue ?? 0) > 0 ? String(row.openingDue) : "",
   });
 
   const onSubmit = async (values: FormState, editingId: string | null): Promise<boolean> => {
@@ -151,6 +160,7 @@ export function MembersView() {
       role: values.role || "member",
       isActive: values.isActive !== "false",
       note: values.note,
+      openingDue: Math.max(0, toNumber(values.openingDue)),
     };
     const res = await app.call<MemberDTO>(editingId ? "member.update" : "member.create", editingId ? { id: editingId, ...payload } : payload);
     if (!res) return false;
@@ -201,6 +211,29 @@ export function MembersView() {
     if (res) app.toast(`${res.copied} জন সদস্য কপি হয়েছে ✓`, "success");
   };
 
+  const hasJer = rows.some((r) => toNumber(r.openingDue) > 0);
+
+  const jerColumn: ColumnDef<MemberDTO> = {
+    key: "jer",
+    header: "জের / Due",
+    align: "right",
+    render: (r) => {
+      const c = calcById.get(r.id);
+      const opening = toNumber(r.openingDue);
+      const rest = c?.remainingJer ?? 0;
+      if (!(opening > 0) && !(rest > 0)) return <span className="muted">—</span>;
+      return (
+        <span
+          className="tabular-nums"
+          title={`প্রারম্ভিক ৳${formatMoney0(opening)} • সমন্বয় ৳${formatMoney0((c?.jerAdjusted ?? 0) + (c?.jerCashPaid ?? 0))}`}
+        >
+          <span className="font-bold text-[var(--warn)]">৳ {formatMoney0(rest)}</span>
+          <span className="muted block text-[10.5px]">মোট ৳{formatMoney0(opening)}</span>
+        </span>
+      );
+    },
+  };
+
   const columns: ColumnDef<MemberDTO>[] = [
     {
       key: "name",
@@ -244,6 +277,7 @@ export function MembersView() {
       hideOnMobile: true,
       render: (r) => <span className="tabular-nums text-[var(--brand)]">৳ {formatMoney0(calcById.get(r.id)?.permanentFund ?? 0)}</span>,
     },
+    ...(hasJer ? [jerColumn] : []),
     {
       key: "dena",
       header: "দেনা-পাওনা",

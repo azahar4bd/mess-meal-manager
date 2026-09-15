@@ -111,6 +111,8 @@ export interface MemberDTO {
   phone: string;
   note: string;
   sortOrder: number;
+  /** আগের মাস থেকে ক্যারি হওয়া বাকি (জের) — নতুন মাসের শুরুতে ≥ 0 */
+  openingDue: number;
   createdAt: string;
 }
 
@@ -197,8 +199,18 @@ export interface MemberCalculation {
   totalCost: number;
   /** মাসের জমা/সমন্বয় — স্থায়ী ফান্ড বাদে */
   totalDeposit: number;
-  /** নিজের টাকা থেকে করা বাজার (পাওনা হিসেবে যোগ হয়) */
+  /** নিজের টাকা থেকে করা মোট বাজার (জের সমন্বয় + পাওনা — দুটো মিলে) */
   selfPaidBazar: number;
+  /** আগের মাসের বাকি (জের) — এই মাসের শুরুতে */
+  openingDue: number;
+  /** জেরের যে অংশ নিজের টাকার বাজার থেকে সমন্বয় হয়েছে */
+  jerAdjusted: number;
+  /** জেরের যে অংশ নগদ (jer_payment) পরিশোধ হয়েছে */
+  jerCashPaid: number;
+  /** এখনো বাকি জের — লাস্ট ব্যালেন্স থেকে বাদ যায় */
+  remainingJer: number;
+  /** জের সমন্বয়ের পর বাড়তি নিজের-টাকার বাজার — এটাই পাওনা হিসেবে যোগ হয় */
+  selfPaidCredit: number;
   /** শুধু permanent_fund ধরনের জমা — দেনা-পাওনার সঙ্গে মেলে না */
   permanentFund: number;
   denaPoana: number;
@@ -219,6 +231,14 @@ export interface MonthSummary {
   totalFund: number;
   /** সদস্যরা নিজের পকেট থেকে যে বাজার করেছে (তাদের পাওনা) */
   totalSelfPaidBazar: number;
+  /** আগের মাস থেকে ক্যারি হওয়া মোট জের (মাসের শুরুতে) */
+  totalOpeningDue: number;
+  /** বাজার থেকে সমন্বয় হওয়া মোট জের */
+  totalJerAdjusted: number;
+  /** নগদে পরিশোধ হওয়া মোট জের */
+  totalJerCashPaid: number;
+  /** এখনো বাকি মোট জের — লাস্ট ব্যালেন্স থেকে বাদ যায় */
+  totalRemainingJer: number;
   /** ফান্ড থেকে করা বাজার (লাস্ট ব্যালেন্স থেকে বাদ যায়) */
   fundPaidBazar: number;
   totalSharedExtra: number;

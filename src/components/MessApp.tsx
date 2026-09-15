@@ -375,6 +375,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [copyMembers, setCopyMembers] = useState(true);
   const [carryBalances, setCarryBalances] = useState(false);
+  const [carryDues, setCarryDues] = useState(true);
   const [carry, setCarry] = useState(0);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -393,7 +394,13 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
 
   const submit = async () => {
     setBusy(true);
-    const created = await app.openNewMonth(year, month, { copyMembers, carryForwardBalance: carry, note, carryMemberBalances: carryBalances });
+    const created = await app.openNewMonth(year, month, {
+      copyMembers,
+      carryForwardBalance: carry,
+      note,
+      carryMemberBalances: carryBalances && !carryDues,
+      carryDues: carryDues && copyMembers,
+    });
     setBusy(false);
     if (created) onClose();
   };
@@ -439,15 +446,30 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
           <label className={`flex items-start gap-2 font-semibold ${copyMembers ? "" : "opacity-55"}`}>
             <input
               type="checkbox"
-              checked={carryBalances && copyMembers}
+              checked={carryDues && copyMembers}
               disabled={!copyMembers}
+              onChange={(e) => setCarryDues(e.target.checked)}
+              className="mt-0.5 h-4 w-4"
+            />
+            <span>
+              আগের মাসের বাকি (জের) নতুন মাসে ক্যারি করুন ✓ প্রস্তাবিত
+              <span className="muted block text-[11.5px] font-medium">
+                বাকি জের হিসেবে বসবে — নতুন মাসে নিজের টাকার বাজার থেকে সমন্বয় হবে, পাওনা সমন্বয়-জমা হবে
+              </span>
+            </span>
+          </label>
+          <label className={`flex items-start gap-2 font-semibold ${copyMembers && !carryDues ? "" : "opacity-55"}`}>
+            <input
+              type="checkbox"
+              checked={carryBalances && copyMembers && !carryDues}
+              disabled={!copyMembers || carryDues}
               onChange={(e) => setCarryBalances(e.target.checked)}
               className="mt-0.5 h-4 w-4"
             />
             <span>
-              আগের মাসের দেনা-পাওনা নতুন মাসে ক্যারি করুন
+              আগের মাসের দেনা-পাওনা সমন্বয়-জমা হিসেবে ক্যারি করুন (পুরনো নিয়ম)
               <span className="muted block text-[11.5px] font-medium">
-                টিক না দিলে নতুন মাস শূন্য থেকে শুরু — বাকি শুধু পুরনো মাসের রিপোর্টে থাকবে
+                জের-ক্যারি বন্ধ থাকলে বাকি + পাওনা দুটোই সমন্বয়-জমা হয় • টিক না দিলে নতুন মাস শূন্য থেকে শুরু
               </span>
             </span>
           </label>

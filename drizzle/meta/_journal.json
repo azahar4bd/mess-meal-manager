@@ -29,6 +29,13 @@
       "when": 1789403582754,
       "tag": "0003_bazar_paid_by",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789458721128,
+      "tag": "0004_member_opening_due",
+      "breakpoints": true
     }
   ]
 }

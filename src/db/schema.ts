@@ -186,6 +186,8 @@ export const members = pgTable(
     password: text("password").notNull().default(""), // optional legacy/demo field, hashed
     note: text("note").notNull().default(""),
     sortOrder: integer("sort_order").notNull().default(0),
+    /** আগের মাসের বাকি (জের) — নতুন মাসে নিজের টাকার বাজার/জের-পরিশোধ থেকে সমন্বয় হয় */
+    openingDue: numeric("opening_due", { precision: 14, scale: 2 }).notNull().default("0"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

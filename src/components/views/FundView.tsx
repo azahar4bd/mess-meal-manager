@@ -46,6 +46,8 @@ export function FundView() {
       half: true,
       options: [
         { value: "member_deposit", label: "সদস্যের জমা / মাসিক পরিশোধ" },
+        { value: "closing_payment", label: "মাস-শেষ পরিশোধ / Closing Payment" },
+        { value: "jer_payment", label: "জের পরিশোধ / Due Payment" },
         { value: "adjustment", label: "সমন্বয় / adjustment" },
         { value: "permanent_fund", label: "স্থায়ী তহবিল / permanent_fund" },
         { value: "refund", label: "ফেরত / refund" },
@@ -116,16 +118,30 @@ export function FundView() {
       header: "ধরন / Type",
       align: "center",
       render: (r) => (
-        <Badge tone={r.type === "permanent_fund" ? "brand" : r.type === "refund" ? "warn" : "muted"}>
+        <Badge
+          tone={
+            r.type === "permanent_fund"
+              ? "brand"
+              : r.type === "refund" || r.type === "jer_payment"
+                ? "warn"
+                : r.type === "closing_payment"
+                  ? "ok"
+                  : "muted"
+          }
+        >
           {r.type === "permanent_fund"
             ? "স্থায়ী তহবিল"
             : r.type === "member_deposit"
               ? "সদস্যের জমা"
-              : r.type === "adjustment"
-                ? "সমন্বয়"
-                : r.type === "refund"
-                  ? "ফেরত"
-                  : r.type}
+              : r.type === "closing_payment"
+                ? "মাস-শেষ পরিশোধ"
+                : r.type === "jer_payment"
+                  ? "জের পরিশোধ"
+                  : r.type === "adjustment"
+                    ? "সমন্বয়"
+                    : r.type === "refund"
+                      ? "ফেরত"
+                      : r.type}
         </Badge>
       ),
     },
@@ -159,7 +175,9 @@ export function FundView() {
         </Card>
       </div>
       <p className="muted -mt-1 px-1 text-[11.5px]">
-        স্থায়ী তহবিল সম্পূর্ণ আলাদা খাত — দেনা-পাওনায় মেশে না। দেনা-পাওনায় ধরা হয় “সদস্যের জমা”, “সমন্বয়” ও নিজের টাকা থেকে করা বাজার।
+        স্থায়ী তহবিল সম্পূর্ণ আলাদা খাত — দেনা-পাওনায় মেশে না। দেনা-পাওনায় ধরা হয় “সদস্যের জমা”, “মাস-শেষ
+        পরিশোধ”, “সমন্বয়” ও নিজের টাকা থেকে করা বাজার (জের সমন্বয়ের পর বাড়তি অংশ)। “জের পরিশোধ” আগের মাসের
+        বাকি মেটায় — চলতি দেনা-পাওনায় ধরা হয় না।
       </p>
 
       <EntryPanel<DepositDTO>

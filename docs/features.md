@@ -66,6 +66,9 @@ bcrypt cost 10 · HTTP-only cookie · `sessions` টেবিল · ৭ দি�
 | পুরনো মাস ভিউ (read-only) | মাস সিলেক্টর (`MessApp.tsx`) + `assertWritable()` |
 | রোস্টার কপি (এক মাস থেকে আরেক মাসে) | `month.copyRoster` → `copyRoster()` |
 | ক্যারি-ফরোয়ার্ড ব্যালেন্স | `mess_months.carry_forward_balance` (`openMonth({carryForwardBalance})`) |
+| মাস-শেষ পরিশোধ (Paid Entry) | রিপোর্ট পেজের Settlement কার্ড → `deposit.create` (`type=closing_payment`) |
+| বাকি-জের ক্যারি + বাজার সমন্বয় (Rule 9) | `members.opening_due` + `openMonth({carryDues})` — নিজের টাকার বাজার আগে জের মেটায়, বাকি জের লাস্ট ব্যালেন্স থেকে বাদ |
+| জেরের নগদ পরিশোধ | `deposit.create` (`type=jer_payment`) — জের কমায়, দেনা-পাওনায় ধরে না |
 | মাস-বহির্ভূত তারিখ রিজেক্ট | `mess-data.assertDateInMonth()` |
 | `total_days` লিপ-ইয়ার সেফ | `lib/date.ts` `daysInMonth()` |
 

@@ -144,6 +144,7 @@ Logout / password reset / user delete all remove the rows → instant invalidati
 | `password` | text `''` | optional member-level password (bcrypt when used) |
 | `note` | text `''` | |
 | `sort_order` | integer `0` | ব্যবহারকারীর নিজের পছন্দমতো ক্রম (`members.reorder`) — সদস্য পেজ ও মিল এন্ট্রি/মাস গ্রিডে একই ক্রম |
+| `opening_due` | numeric(14,2) `0` | আগের মাসের বাকি (জের) — নতুন মাসে নিজের টাকার বাজার/`jer_payment` থেকে সমন্বয় হয় (Rule 9) |
 | `joined_at`, `created_at`, `updated_at` | timestamptz | |
 
 `UNIQUE members_month_phone_uq(month_id, phone)` · `INDEX members_office_idx`, `members_month_idx`
@@ -193,7 +194,7 @@ Logout / password reset / user delete all remove the rows → instant invalidati
 | `member_id` | text NULL | |
 | `member_name` | text `''` | kept so deleted members' history stays readable |
 | `amount` | numeric(14,2) = 0 | |
-| `type` | text = `permanent_fund` | `permanent_fund` (স্থায়ী তহবিল) / `monthly` |
+| `type` | text = `permanent_fund` | `permanent_fund` (স্থায়ী তহবিল) / `member_deposit` / `closing_payment` (মাস-শেষ পরিশোধ) / `adjustment` / `jer_payment` (জেরের নগদ — দেনা-পাওনায় ধরে না) / `refund` |
 | `note`, `created_by` | text `''` | |
 | `created_at`, `updated_at` | timestamptz | |
 

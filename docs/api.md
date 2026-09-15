@@ -179,7 +179,7 @@ Public (no auth). Never throws — a dead database is reported as `ok:false` wit
 
 | Action | Params | Capability | Notes |
 |---|---|---|---|
-| `month.open` | `year?`, `month?`, `copyMembers?=true`, `carryForwardBalance?=0`, `note?` | `month.write` | new `monthId`, **0 meals**, roster optionally copied |
+| `month.open` | `year?`, `month?`, `copyMembers?=true`, `carryForwardBalance?=0`, `note?`, `carryDues?=false`, `carryMemberBalances?=false` | `month.write` | new `monthId`, **0 meals**, roster optionally copied; `carryDues` carries dues as জের (`members.opening_due`) + receives as adjustment deposits |
 | `month.close` | `monthId`, `closed?=true` | `month.write` | closed months become read-only for non-admins |
 | `month.copyRoster` | `monthId`, `fromMonthId` | `members.write` | copies members from another month **of the same office** |
 
@@ -236,6 +236,8 @@ Rules enforced server-side: `meals` must be a finite number, `0 ≤ meals ≤ 10
 | `deposit.delete` | `id` | `fund.write` |
 
 `type: "permanent_fund"` is the permanent fund — reported in its **own column** and never subtracted from a member's monthly cost.
+Other types: `member_deposit` (monthly payment), `closing_payment` (month-end settlement from the report page — counts as payment),
+`adjustment` (carry-forward/manual correction — counts as payment), `jer_payment` (cash against carried জের — reduces `remainingJer`, **not** counted in dena-paona), `refund`.
 
 ### Other income
 

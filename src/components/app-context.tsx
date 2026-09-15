@@ -67,7 +67,13 @@ export interface AppContextValue {
   openNewMonth: (
     year: number,
     month: number,
-    opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean },
+    opts?: {
+      copyMembers?: boolean;
+      carryForwardBalance?: number;
+      note?: string;
+      carryMemberBalances?: boolean;
+      carryDues?: boolean;
+    },
   ) => Promise<MonthDTO | null>;
   switchOffice: (officeId: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -302,19 +308,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (
       year: number,
       m: number,
-      opts?: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean },
+      opts?: {
+        copyMembers?: boolean;
+        carryForwardBalance?: number;
+        note?: string;
+        carryMemberBalances?: boolean;
+        carryDues?: boolean;
+      },
     ) => {
-      const created = await call<{ month: MonthDTO; copiedMembers: number; carriedBalances: number }>("month.open", {
-        year,
-        month: m,
-        copyMembers: opts?.copyMembers ?? true,
-        carryForwardBalance: opts?.carryForwardBalance ?? 0,
-        note: opts?.note ?? "",
-        carryMemberBalances: opts?.carryMemberBalances ?? false,
-      });
+      const created = await call<{ month: MonthDTO; copiedMembers: number; carriedBalances: number; carriedDues: number }>(
+        "month.open",
+        {
+          year,
+          month: m,
+          copyMembers: opts?.copyMembers ?? true,
+          carryForwardBalance: opts?.carryForwardBalance ?? 0,
+          note: opts?.note ?? "",
+          carryMemberBalances: opts?.carryMemberBalances ?? false,
+          carryDues: opts?.carryDues ?? false,
+        },
+      );
       if (!created) return null;
       toast(
-        `নতুন মাস খোলা হয়েছে: ${created.month.monthName}${created.copiedMembers ? ` (${created.copiedMembers} জন সদস্য কপি)` : ""}${created.carriedBalances ? ` • ${created.carriedBalances} জনের বাকি ক্যারি হয়েছে` : ""}`,
+        `নতুন মাস খোলা হয়েছে: ${created.month.monthName}${created.copiedMembers ? ` (${created.copiedMembers} জন সদস্য কপি)` : ""}${created.carriedDues ? ` • ${created.carriedDues} জনের জের ক্যারি হয়েছে` : ""}${created.carriedBalances ? ` • ${created.carriedBalances} জনের বাকি ক্যারি হয়েছে` : ""}`,
         "success",
       );
       const monthsList = await mess<MonthDTO[]>("months.list").catch(() => null);

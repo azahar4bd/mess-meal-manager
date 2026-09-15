@@ -133,7 +133,27 @@ export function BazarView() {
     app.toast(`মোট ৳ ${formatMoney0(total)} পরিমাণের ঘরে বসেছে ✓`, "success");
   };
 
+  const calcByMemberId = useMemo(() => {
+    const map = new Map<string, { name: string; remainingJer: number }>();
+    for (const c of app.summary?.memberCalculations ?? []) {
+      map.set(c.memberId, { name: c.name, remainingJer: c.remainingJer ?? 0 });
+    }
+    return map;
+  }, [app.summary]);
+  const memberById = useMemo(() => new Map((data?.members ?? []).map((m) => [m.id, m])), [data?.members]);
+
   const fieldExtra: Record<string, (ctx: FieldExtraCtx) => React.ReactNode> = {
+    paidByMemberId: (ctx) => {
+      const sel = String(ctx.values?.paidByMemberId ?? "");
+      if (!sel || sel.startsWith(CUSTOM)) return null;
+      const jer = calcByMemberId.get(sel)?.remainingJer ?? 0;
+      if (!(jer > 0)) return null;
+      return (
+        <div className="-mt-1 mb-1 rounded-lg border border-[var(--warn)] bg-[var(--warn-soft)]/40 px-2 py-1 text-[11.5px] font-semibold text-[var(--warn)]">
+          ⚠ এই সদস্যের ৳ {formatMoney0(jer)} জের আছে — বাজার থেকে সমন্বয় হবে, লাস্ট ব্যালেন্স বাড়বে ✓
+        </div>
+      );
+    },
     amount: (ctx) => {
       setFieldRef.current = ctx.setValue;
       const t = linesTotal(lines);
@@ -168,6 +188,9 @@ export function BazarView() {
         <span className="flex items-center gap-1.5">
           <span className="font-semibold">{r.buyerName || "—"}</span>
           {r.paidByMemberId ? <span className="pill pill-warn">নিজের টাকা</span> : null}
+          {r.paidByMemberId && (memberById.get(r.paidByMemberId)?.openingDue ?? 0) > 0 ? (
+            <span className="pill pill-ok">জের সমন্বয়</span>
+          ) : null}
         </span>
       ),
     },
