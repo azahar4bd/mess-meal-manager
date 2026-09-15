@@ -39,7 +39,7 @@ export interface Notice {
 
 /** Hero থিম প্রিসেট — brand প্যানেলের ব্যাকগ্রাউন্ড */
 export const HERO_THEMES: { id: string; label: string; background: string }[] = [
-  { id: "green", label: "সবুজ (ডিফল্ট)", background: "" },
+  { id: "green", label: "সবুজ (ডিফল্ট)", background: "linear-gradient(135deg,#0d9488 0%,#0e9469 55%,#059669 100%)" },
   { id: "blue", label: "নীল", background: "linear-gradient(135deg,#1e3a8a 0%,#0284c7 100%)" },
   { id: "purple", label: "বেগুনি", background: "linear-gradient(135deg,#5b21b6 0%,#c026d3 100%)" },
   { id: "sunset", label: "সানসেট", background: "linear-gradient(135deg,#9a3412 0%,#be123c 100%)" },

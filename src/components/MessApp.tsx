@@ -160,9 +160,7 @@ function FooterBar() {
 function NoOfficeNotice() {
   return (
     <div className="mb-3 rounded-xl border border-[var(--border)] bg-[var(--brand-soft)] p-3">
-      <div className="text-[13.5px] font-extrabold">এখনো কোনো অফিস / মেস তৈরি হয়নি</div>
-      <p className="muted mt-1 text-[12.5px]">অ্যাডমিন প্যানেলের <strong>অফিস</strong> ট্যাব থেকে প্রথম অফিস বানান — চাইলে একই ফর্মে ম্যানেজারের লগইনও।</p>
-      <GuideLine section="admin" />
+      <div className="text-[13px] font-bold">এখনো কোনো অফিস তৈরি হয়নি — অ্যাডমিন প্যানেলের “অফিস” ট্যাব থেকে তৈরি করুন।</div>
     </div>
   );
 }
@@ -244,7 +242,12 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
         </button>
 
         <button type="button" onClick={() => app.setTab(app.can("dashboard.view") ? "dashboard" : "report")} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--brand)] text-[16px] font-black text-white">{brandInitial}</span>
+          <span
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-[16px] font-black text-white shadow-sm"
+            style={{ background: "linear-gradient(135deg,#0d9488 0%,var(--brand) 55%,#059669 100%)" }}
+          >
+            {brandInitial}
+          </span>
           <span className="min-w-0">
             <span className="block truncate text-[14.5px] font-extrabold leading-tight">{brandTitle}</span>
             <span className="muted block truncate text-[11px] leading-tight">
@@ -377,15 +380,12 @@ function CurrentPageBar() {
   const label = app.lang === "bn" ? current.bn : current.en;
   return (
     <div className="border-b border-[var(--border)] bg-[var(--card)] no-print">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-3 py-1.5 sm:px-4">
-        <span className="muted shrink-0 text-[12px] font-semibold">📍 আপনি এখন আছেন:</span>
-        <span className="flex min-w-0 items-center gap-1.5 text-[14px] font-extrabold text-[var(--brand)]">
-          <span aria-hidden className="shrink-0">
-            {current.icon}
-          </span>
-          <span className="truncate">{label}</span>
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-1.5 px-3 py-1.5 sm:px-4">
+        <span aria-hidden className="shrink-0 text-[14px]">
+          {current.icon}
         </span>
-        {app.month ? <span className="muted ml-auto shrink-0 text-[11.5px]">• {app.month.monthName}</span> : null}
+        <span className="truncate text-[13.5px] font-extrabold text-[var(--brand)]">{label}</span>
+        {app.month ? <span className="muted ml-auto shrink-0 text-[11.5px] font-semibold">{app.month.monthName}</span> : null}
       </div>
     </div>
   );
@@ -421,8 +421,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
   return (
     <Modal
       open={open}
-      title="নতুন মাস খুলুন / Open New Month"
-      subtitle="মিল ০ থেকে শুরু হবে।"
+      title="নতুন মাস খুলুন"
       onClose={onClose}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -451,16 +450,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
           </Field>
         </div>
 
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-[12.5px] leading-relaxed">
-          <div className="font-semibold">✅ স্বয়ংক্রিয়ভাবে চলে আসবে — কোনো কপি অপশন লাগবে না:</div>
-          <ul className="muted mt-1 list-disc pl-5">
-            <li>চলতি মাসের সকল সক্রিয় সদস্য নতুন মাসে যুক্ত হবে</li>
-            <li>প্রত্যেকের অবশিষ্ট দেনা-পাওনা (জের) নতুন মাসের হিসাবে বসবে</li>
-            <li>সদস্য যোগ/বাদ পরবর্তীতে সদস্য তালিকা থেকে করা যাবে</li>
-          </ul>
-        </div>
-
-        <Field label="পূর্ববর্তী নগদ ব্যালেন্স (ঐচ্ছিক)" hint="নগদ ব্যালেন্স পরের মাসে নিতে চাইলে লিখুন">
+        <Field label="পূর্ববর্তী নগদ ব্যালেন্স (ঐচ্ছিক)">
           <NumberInput value={carry} min={0} step="0.01" onChange={(e) => setCarry(Number(e.target.value))} />
         </Field>
       </div>
@@ -541,24 +531,29 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
 /** Bottom quick-nav on small screens (mobile UX, spec §105) */
 function MobileTabBar() {
   const app = useApp();
-  const items = app.menu.slice(0, 5);
+  // প্রতিদিনের কাজের ট্যাব + রিপোর্ট আগে রাখা হয়; বাকিগুলো ☰ মেনুতে
+  const PRIORITY = ["dashboard", "meals", "bazar", "fund", "report"];
+  const items = PRIORITY.map((t) => app.menu.find((m) => m.tab === t)).filter((m): m is NonNullable<typeof m> => Boolean(m)).slice(0, 5);
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 grid border-t border-[var(--border)] bg-[var(--card)]/98 backdrop-blur sm:hidden no-print" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0,1fr))` }}>
-      {items.map((m) => (
-        <button
-          key={m.tab}
-          type="button"
-          onClick={() => app.setTab(m.tab)}
-          className={`flex flex-col items-center gap-0.5 px-1 py-2 text-[10px] font-semibold ${
-            app.tab === m.tab ? "text-[var(--brand)]" : "text-[var(--muted)]"
-          }`}
-        >
-          <span className="text-[16px]" aria-hidden>
-            {m.icon}
-          </span>
-          <span className="max-w-full truncate">{app.lang === "bn" ? m.bn.split(" ")[0] : m.en}</span>
-        </button>
-      ))}
+    <nav className="fixed inset-x-0 bottom-0 z-40 grid border-t border-[var(--border)] bg-[var(--card)]/98 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden no-print" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0,1fr))` }}>
+      {items.map((m) => {
+        const active = app.tab === m.tab;
+        return (
+          <button
+            key={m.tab}
+            type="button"
+            onClick={() => app.setTab(m.tab)}
+            className={`flex flex-col items-center gap-0.5 px-1 py-1.5 text-[10px] font-semibold transition ${
+              active ? "text-[var(--brand)]" : "text-[var(--muted)]"
+            }`}
+          >
+            <span className={`grid h-7 w-10 place-items-center rounded-full text-[16px] ${active ? "bg-[var(--brand-soft)]" : ""}`} aria-hidden>
+              {m.icon}
+            </span>
+            <span className="max-w-full truncate">{app.lang === "bn" ? m.bn.split(" ")[0] : m.en}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 }

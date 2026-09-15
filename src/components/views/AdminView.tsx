@@ -72,10 +72,7 @@ export function AdminView() {
 
   return (
     <div className="space-y-3">
-      <div>
-        <h1 className="text-[19px] font-extrabold leading-tight">অ্যাডমিন প্যানেল / Admin Panel</h1>
-        <p className="muted text-[12.5px]">অফিস, ইউজার, রোল ও অডিট ট্রেইল ব্যবস্থাপনা</p>
-      </div>
+      <h1 className="text-[17px] font-extrabold leading-tight">অ্যাডমিন প্যানেল</h1>
 
       <SegmentedButtons<AdminTab>
         value={tab}
@@ -173,15 +170,9 @@ function OverviewPanel() {
           )}
         </Card>
 
-        <Card title="অ্যাপের টেক্সট ও নোটিশ / App Content" bodyClass="p-3">
-          <p className="muted mb-2.5 text-[12.5px]">
-            লগইন পেজের হিরো (টাইটেল/স্টাইল), হেডার, ফুটার ও উপরের স্ক্রলিং নোটিশ — সব অফিসের জন্য কমন টেক্সট এখান থেকে বদলানো যায়।
-          </p>
+        <Card title="অ্যাপ কন্টেন্ট" bodyClass="p-3">
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setContentOpen(true)}>✎ এডিট করুন</button>
-            <span className="muted self-center text-[11.5px]">
-              যেকোনো পেজে নিচে-ডানের ভাসমান <strong>✏️ এডিট</strong> বাটন থেকেও একই এডিটর খোলে; অফিসে ঢুকে সেখান থেকে ওই অফিসের টেক্সট বদলানো যায়।
-            </span>
           </div>
         </Card>
       </div>

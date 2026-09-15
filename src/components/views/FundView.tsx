@@ -174,14 +174,9 @@ export function FundView() {
           </div>
         </Card>
       </div>
-      <p className="muted -mt-1 px-1 text-[11.5px]">
-        স্থায়ী তহবিল সম্পূর্ণ আলাদা খাত — দেনা-পাওনায় মেশে না। দেনা-পাওনায় ধরা হয় “সদস্যের জমা”, “মাস-শেষ
-        পরিশোধ”, “সমন্বয়” ও নিজের টাকা থেকে করা বাজার (জের সমন্বয়ের পর বাড়তি অংশ)। “জের পরিশোধ” আগের মাসের
-        বাকি মেটায় — চলতি দেনা-পাওনায় ধরা হয় না।
-      </p>
 
       <EntryPanel<DepositDTO>
-        title="জমা ও তহবিল / Member Fund & Deposits"
+        title="জমা ও তহবিল"
         subtitle={`${month?.monthName ?? ""} • সদস্যের জমা ও স্থায়ী তহবিল (আলাদা খাত)`}
         fields={fields}
         rows={rows}
@@ -202,7 +197,7 @@ export function FundView() {
       />
 
       {rows.length > 0 ? (
-        <Card title="সদস্য অনুযায়ী তহবিল / Fund per Member" bodyClass="p-3">
+        <Card title="সদস্য অনুযায়ী তহবিল" bodyClass="p-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {(data?.members ?? []).map((m) => {
               const amount = perMemberFund.get(m.id) ?? perMemberFund.get(`name:${m.name.toLowerCase()}`) ?? 0;

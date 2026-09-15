@@ -125,7 +125,7 @@ function ClosingPaymentCell({
         min={0}
         step="0.01"
         inputMode="decimal"
-        className="input h-8 w-24 text-right tabular-nums"
+        className="input h-7 w-[72px] px-1.5 text-right tabular-nums sm:w-20"
         value={raw}
         disabled={busy}
         placeholder="0"
@@ -135,7 +135,7 @@ function ClosingPaymentCell({
       {dirty ? (
         <button
           type="button"
-          className="btn btn-primary btn-sm h-8 px-2"
+          className="btn btn-primary btn-sm h-7 min-h-0 px-2"
           disabled={busy}
           onClick={() => void save()}
           title="জমা সংরক্ষণ করুন"
@@ -246,14 +246,10 @@ export function ReportView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[19px] font-extrabold leading-tight">মাসিক হিসাব রিপোর্ট / Monthly Report</h1>
-          <p className="muted text-[12.5px]">
-            {app.office?.name} • {month.monthName} ({monthLabelBn(month.year, month.month)}) •{" "}
-            {toDisplayDate(fromDate || isoOfDay(month.year, month.month, 1))} — {toDisplayDate(toDate || isoOfDay(month.year, month.month, month.totalDays))}
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[17px] font-extrabold leading-tight">
+          মাসিক রিপোর্ট <span className="muted font-bold">• {month.monthName}</span>
+        </h1>
         <div className="flex flex-wrap gap-1.5">
           <button type="button" className="btn btn-primary btn-sm" onClick={downloadPdf}>
             ⬇ Download PDF
@@ -270,25 +266,24 @@ export function ReportView() {
         </div>
       ) : null}
 
-      {/* ── filters (spec §94) ─────────────────────── */}
-      <Card title="রিপোর্ট ফিল্টার / Date Filter" bodyClass="p-3">
+      <Card title="তারিখ ফিল্টার" bodyClass="p-2.5 sm:p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="block min-w-[150px] flex-1">
-            <span className="label">From Date</span>
+          <label className="block min-w-[140px] flex-1">
+            <span className="label">শুরু</span>
             <input
               type="date"
-              className="input h-10"
+              className="input h-9"
               value={fromDate}
               min={isoOfDay(month.year, month.month, 1)}
               max={isoOfDay(month.year, month.month, month.totalDays)}
               onChange={(e) => setFromDate(e.target.value)}
             />
           </label>
-          <label className="block min-w-[150px] flex-1">
-            <span className="label">To Date</span>
+          <label className="block min-w-[140px] flex-1">
+            <span className="label">শেষ</span>
             <input
               type="date"
-              className="input h-10"
+              className="input h-9"
               value={toDate}
               min={isoOfDay(month.year, month.month, 1)}
               max={isoOfDay(month.year, month.month, month.totalDays)}
@@ -297,7 +292,7 @@ export function ReportView() {
           </label>
           <div className="flex gap-2">
             <button type="button" className="btn btn-primary" onClick={() => void load()}>
-              রিপোর্ট দেখুন
+              দেখুন
             </button>
             <button
               type="button"
@@ -312,7 +307,6 @@ export function ReportView() {
             </button>
           </div>
         </div>
-        <GuideLine section="report" text="তারিখ ফিল্টার ও হিসাবের নিয়ম" />
       </Card>
 
       {loading ? (
@@ -327,15 +321,15 @@ export function ReportView() {
             <Kpi label="মোট বাজার" value={`৳ ${formatMoney(summary.totalBazarCost)}`} />
             <Kpi label="অন্যান্য আয়" value={`৳ ${formatMoney(summary.totalOthersIncome)}`} />
             <Kpi label="নেট মিল খরচ" value={`৳ ${formatMoney(summary.netCost)}`} />
-            <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(summary.totalFund)}`} tone="warn" sub="মিল খরচ থেকে বাদ যায় না" />
+            <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(summary.totalFund)}`} tone="warn" />
             <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(summary.totalSharedExtra)}`} />
-            <Kpi label="ইন্ডিভিজুয়াল অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
+            <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
             <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
           </div>
 
           {/* ── member report table (spec §40) ──────── */}
           <Card
-            title="সদস্য হিসাব / Member Report"
+            title="সদস্য হিসাব"
             bodyClass="p-0"
           >
             {calcs.length === 0 ? (
@@ -344,47 +338,47 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data" style={{ minWidth: hasJer ? 1780 : 1480 }}>
+                <table className="data report-table" style={{ minWidth: hasJer ? 1180 : 940 }}>
                   <thead>
                     <tr>
-                      <th>সদস্য / Member</th>
-                      <th className="num">মোট মিল</th>
-                      <th className="num">মিল রেট</th>
-                      <th className="num">মিল খরচ</th>
-                      <th className="num">ইন্ডি. অতিরিক্ত</th>
-                      <th className="num">শেয়ার্ড অতিরিক্ত</th>
-                      <th className="num">মোট খরচ (−)</th>
-                      <th className="num">জমা / সমন্বয়</th>
-                      <th className="num">নিজের টাকা থেকে বাজার</th>
+                      <th>সদস্য</th>
+                      <th className="num vth">মোট মিল</th>
+                      <th className="num vth">মিল রেট</th>
+                      <th className="num vth">মিল খরচ</th>
+                      <th className="num vth">ইন্ডি. অতিরিক্ত</th>
+                      <th className="num vth">শেয়ার্ড অতিরিক্ত</th>
+                      <th className="num vth">মোট খরচ (−)</th>
+                      <th className="num vth">জমা / সমন্বয়</th>
+                      <th className="num vth">নিজ টাকায় বাজার</th>
                       {hasJer ? (
                         <>
-                          <th className="num">জের (প্রারম্ভিক)</th>
-                          <th className="num">জের সমন্বয়</th>
-                          <th className="num">বাকি জের</th>
+                          <th className="num vth">প্রারম্ভিক জের</th>
+                          <th className="num vth">জের সমন্বয়</th>
+                          <th className="num vth">বাকি জের</th>
                         </>
                       ) : null}
-                      <th className="num" title="জমা বসানোর আগের গণিত: মোট জমা/সমন্বয় − মোট খরচ">
-                        দেনা(-)/পাওনা(+) হিসাব
+                      <th className="num vth" title="জমা বসানোর আগের হিসাব">
+                        দেনা(-)/পাওনা(+)
                       </th>
-                      <th className="num">দেনা-পাওনার জমা (৳)</th>
-                      <th className="num" title="হিসাব − জমা = অবশিষ্ট; এটাই পরের মাসে জের হিসেবে যাবে">
+                      <th className="num vth">দেনা-পাওনার জমা (৳)</th>
+                      <th className="num vth" title="হিসাব − জমা = অবশিষ্ট; এটাই পরের মাসে জের হিসেবে যায়">
                         অবশিষ্ট দেনা-পাওনা
                       </th>
-                      <th className="num">স্থায়ী ফান্ড</th>
-                      <th className="text-center">স্ট্যাটাস</th>
+                      <th className="num vth">স্থায়ী ফান্ড</th>
+                      <th className="vth text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>
                   <tbody>
                     {calcs.map((m) => {
                       const closing = closingMap[m.memberId];
                       const closingPaid = round2(closing?.paid ?? 0);
-                      // জমা বসানোর আগের হিসাব; হিসাব − জমা = অবশিষ্ট (denaPoana)
+                      // হিসাব − জমা = অবশিষ্ট (denaPoana)
                       const dueBefore = round2(m.denaPoana - closingPaid);
                       return (
                       <tr key={m.memberId}>
                         <td>
                           <span className="block font-bold">{m.name}</span>
-                          <span className="muted block text-[11px]">
+                          <span className="cell-sub muted block text-[10.5px]">
                             {m.role}
                             {m.phone ? ` • ${m.phone}` : ""}
                             {m.isActive ? "" : " • নিষ্ক্রিয়"}
@@ -402,7 +396,7 @@ export function ReportView() {
                             <>
                               +৳{formatMoney(m.selfPaidBazar)}
                               {(m.selfPaidCredit ?? m.selfPaidBazar) < m.selfPaidBazar - 0.005 ? (
-                                <span className="muted block text-[10.5px]">
+                                <span className="cell-sub muted block text-[10px]">
                                   ক্রেডিট ৳{formatMoney(m.selfPaidCredit ?? 0)}
                                 </span>
                               ) : null}
@@ -416,10 +410,7 @@ export function ReportView() {
                             <td className="num tabular-nums">
                               {(m.openingDue ?? 0) > 0 ? `৳${formatMoney(m.openingDue ?? 0)}` : "—"}
                             </td>
-                            <td
-                              className="num tabular-nums text-[var(--ok)]"
-                              title={`বাজার থেকে ৳${formatMoney(m.jerAdjusted ?? 0)} + নগদে ৳${formatMoney(m.jerCashPaid ?? 0)}`}
-                            >
+                            <td className="num tabular-nums text-[var(--ok)]" title={`বাজার থেকে ৳${formatMoney(m.jerAdjusted ?? 0)} + নগদে ৳${formatMoney(m.jerCashPaid ?? 0)}`}>
                               {(m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0) > 0
                                 ? `৳${formatMoney((m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0))}`
                                 : "—"}
@@ -448,7 +439,7 @@ export function ReportView() {
                         <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(m.permanentFund)}</td>
                         <td className="text-center">
                           <Badge tone={m.statusEn === "Due" ? "danger" : m.statusEn === "Receive" ? "ok" : "muted"}>
-                            {m.status} / {m.statusEn}
+                            {m.statusEn}
                           </Badge>
                         </td>
                       </tr>
@@ -475,13 +466,13 @@ export function ReportView() {
                           <td className="num tabular-nums">৳{formatMoney(summary.totalRemainingJer ?? 0)}</td>
                         </>
                       ) : null}
-                      <td className="num tabular-nums" style={{ fontSize: 11 }}>
+                      <td className="num tabular-nums">
                         দিবে ৳{formatMoney(totalBeforeDue)}
                         <br />
                         পাবে ৳{formatMoney(totalBeforeReceive)}
                       </td>
                       <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(totalClosing)}</td>
-                      <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)", fontSize: 11 }}>
+                      <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)" }}>
                         দিবে ৳{formatMoney(totalDue)}
                         <br />
                         পাবে ৳{formatMoney(totalReceive)}
@@ -491,18 +482,13 @@ export function ReportView() {
                     </tr>
                   </tfoot>
                 </table>
-                <p className="muted border-t border-[var(--border)] px-3 py-2 text-[11.5px]">
-                  <b>অবশিষ্ট দেনা-পাওনা = হিসাব (জমা/সমন্বয় + নিজের টাকার বাজার{hasJer ? " + জের সমন্বয়" : ""} − মোট খরচ) − দেনা-পাওনার জমা।</b>{" "}
-                  লাল ঋণাত্মক = সদস্য দিবে, সবুজ ধনাত্মক = সদস্য পাবে; <b>এই অবশিষ্ট টাকাই পরবর্তী মাসে জের হিসেবে স্বয়ংক্রিয় চলে যায়।</b>{" "}
-                  স্থায়ী ফান্ড আলাদা খাত, এই হিসাবে মেশে না।
-                </p>
               </div>
             )}
           </Card>
 
           {/* ── bazar + income summary ──────────────── */}
           <div className="grid gap-3 lg:grid-cols-2">
-            <Card title="বাজার সামারি / Bazar Summary" bodyClass="p-3">
+            <Card title="বাজার সামারি" bodyClass="p-3">
               {Object.keys(categories).length === 0 ? (
                 <EmptyState icon="🧺" title="এই মাসে কোনো বাজার এন্ট্রি নেই" />
               ) : (
@@ -540,7 +526,7 @@ export function ReportView() {
               )}
             </Card>
 
-            <Card title="দেনা-পাওনা সারাংশ / Dena-Paona" bodyClass="p-3">
+            <Card title="দেনা-পাওনা সারাংশ" bodyClass="p-3">
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger-soft)]/50 p-2">
                   <div className="text-[11px] font-bold text-[var(--danger)]">দিবে / Due</div>
@@ -562,17 +548,13 @@ export function ReportView() {
             </Card>
           </div>
 
-          <p className="muted text-[11px]">
-            রিপোর্ট তৈরির সময়: {report?.generatedAt ? toDisplayDateTime(report.generatedAt) : "—"} • হিসাবের সূত্র অপরিবর্তনীয়
-            (spec §121)।
-          </p>
         </>
       )}
 
       {/* ── CSV modal ─────────────────────────────── */}
       <Modal
         open={csvOpen}
-        title="CSV ডাউনলোড / Download CSV"
+        title="CSV ডাউনলোড"
         subtitle="যে অংশটি এক্সপোর্ট করতে চান বেছে নিন"
         onClose={() => setCsvOpen(false)}
       >

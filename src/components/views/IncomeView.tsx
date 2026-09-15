@@ -86,7 +86,7 @@ export function IncomeView() {
       </div>
 
       <EntryPanel<IncomeDTO>
-        title="অন্যান্য আয় / Other Income"
+        title="অন্যান্য আয়"
         subtitle={`${month?.monthName ?? ""} • মোট আয় ৳ ${formatMoney(summary?.totalOthersIncome ?? 0)}`}
         fields={fields}
         rows={rows}

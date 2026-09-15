@@ -165,7 +165,12 @@ export function AuthScreen({
           <div className="w-full max-w-md">
             <div className="mb-4 flex items-center justify-between gap-2 lg:hidden">
               <div className="flex items-center gap-2">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--brand)] text-[17px] font-black text-white">{brandInitial}</span>
+                <span
+                  className="grid h-10 w-10 place-items-center rounded-xl text-[17px] font-black text-white"
+                  style={{ background: "linear-gradient(135deg,#0d9488 0%,var(--brand) 55%,#059669 100%)" }}
+                >
+                  {brandInitial}
+                </span>
                 <div>
                   <div className="text-[15px] font-extrabold leading-tight">{texts.appName}</div>
                   <div className="muted text-[11px]">{texts.heroBadge}</div>
@@ -211,13 +216,8 @@ export function AuthScreen({
 
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-[11.5px]">
               {health ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Badge tone={health.ok ? "ok" : "danger"}>{health.ok ? "● Database online" : "● Database offline"}</Badge>
-                  <span className="muted">{health.message}</span>
-                </span>
-              ) : (
-                <span className="muted">সিস্টেম স্ট্যাটাস চেক হচ্ছে…</span>
-              )}
+                <Badge tone={health.ok ? "ok" : "danger"}>{health.ok ? "● অনলাইন" : "● অফলাইন"}</Badge>
+              ) : null}
             </div>
 
             <p className="muted mt-3 text-center text-[11px]">© {new Date().getFullYear()} {texts.appName}</p>
@@ -269,11 +269,6 @@ function LoginForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn,
     }
   };
 
-  const fill = (u: string, p: string) => {
-    setLogin(u);
-    setPassword(p);
-  };
-
   return (
     <form onSubmit={submit} className="space-y-3">
       <div>
@@ -312,27 +307,8 @@ function LoginForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn,
       </Field>
 
       <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-        {busy ? "লগইন হচ্ছে…" : "Login"}
+        {busy ? "লগইন হচ্ছে…" : "লগইন করুন"}
       </button>
-
-      <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg)] p-2.5">
-        <div className="mb-1.5 text-[11.5px] font-bold muted">ডেমো অ্যাকাউন্ট (ক্লিক করে পূরণ করুন)</div>
-        <div className="grid gap-1.5 sm:grid-cols-2">
-          <button type="button" className="btn btn-ghost btn-sm justify-start" onClick={() => fill("01700000000", "admin")}>
-            🛡 Platform Admin
-          </button>
-          <button type="button" className="btn btn-ghost btn-sm justify-start" onClick={() => fill("01711111111", "manager123")}>
-            👔 Gobra Manager
-          </button>
-          <button type="button" className="btn btn-ghost btn-sm justify-start" onClick={() => fill("01722222222", "member123")}>
-            👤 Member (Azahar)
-          </button>
-          <button type="button" className="btn btn-ghost btn-sm justify-start" onClick={() => fill("01733333333", "audit123")}>
-            🔎 Audit (Barishal)
-          </button>
-        </div>
-        <p className="muted mt-1.5 text-[10.5px]">ডেমো পাসওয়ার্ড — প্রোডাকশনে বদলে নিন।</p>
-      </div>
     </form>
   );
 }
@@ -403,13 +379,9 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div>
-        <h2 className="text-[17px] font-extrabold">নতুন অফিস / মেস তৈরি করুন</h2>
-        <p className="muted text-[12px]">অফিস + ম্যানেজার অ্যাকাউন্ট তৈরি হবে; কোড স্বয়ংক্রিয়।</p>
-        <p className="muted mt-1 text-[11.5px]">নম্বর আগে ব্যবহৃত হলে অফিস তৈরি হবে না — ভিন্ন নম্বর দিন।</p>
-      </div>
+      <h2 className="text-[17px] font-extrabold">নতুন অফিস তৈরি করুন</h2>
 
-      <Field label="অফিসের নাম / Office Name" required error={errors.officeName}>
+      <Field label="অফিসের নাম" required error={errors.officeName}>
         <TextInput value={f.officeName} onChange={set("officeName")} placeholder="Gobra Mess" />
       </Field>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -441,9 +413,8 @@ function SignupForm({ busy, setBusy, errors, setErrors, setFormError, onSignedIn
       </div>
 
       <button type="submit" className="btn btn-primary w-full" disabled={busy}>
-        {busy ? "তৈরি হচ্ছে…" : "Create Office"}
+        {busy ? "তৈরি হচ্ছে…" : "অফিস তৈরি করুন"}
       </button>
-      <p className="muted text-center text-[11px]">অফিস তৈরি হলে আপনি ম্যানেজার হিসেবে লগইন হবেন।</p>
     </form>
   );
 }

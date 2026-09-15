@@ -118,11 +118,8 @@ export function SheetView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[19px] font-extrabold leading-tight">গুগল শিট / Google Sheets Sync</h1>
-          <GuideLine section="sheet" text="PostgreSQL মূল ডেটাবেস • শিট শুধু রিপোর্টিং কপি" />
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[17px] font-extrabold leading-tight">গুগল শিট</h1>
         <div className="flex flex-wrap gap-1.5">
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => void showPayload()}>
             {`{ }`} Payload দেখুন
@@ -159,9 +156,6 @@ export function SheetView() {
             <Badge tone={status?.autoSync ? "ok" : "warn"}>
               {status?.autoSync ? "স্বয়ংক্রিয় চালু" : "সার্ভারে বন্ধ"}
             </Badge>
-            <div className="muted mt-1 text-[10.5px] leading-tight">
-              প্রতিটি হিসাব এন্ট্রি সংরক্ষণের পর শিট নিজে থেকেই হালনাগাদ হয় — কোনো সুইচ লাগে না।
-            </div>
           </div>
         </Card>
       </div>
@@ -207,17 +201,17 @@ export function SheetView() {
           </div>
         </Card>
       ) : (
-        <Card title="সিংক সেটিংস" bodyClass="p-3">
-          <p className="muted text-[12.5px]">
-            বর্তমান শিট:{" "}
-            {status?.sheetUrl ? (
-              <a className="link" href={status.sheetUrl} target="_blank" rel="noreferrer">
-                খুলুন
+        <Card
+          title="সিংক সেটিংস"
+          action={
+            status?.sheetUrl ? (
+              <a className="btn btn-ghost btn-sm" href={status.sheetUrl} target="_blank" rel="noreferrer">
+                শিট খুলুন ↗
               </a>
-            ) : (
-              "সংযুক্ত নেই"
-            )}
-          </p>
+            ) : undefined
+          }
+          bodyClass="p-3"
+        >
         </Card>
       )}
 

@@ -218,7 +218,7 @@ export function BazarView() {
   return (
     <>
       <EntryPanel<BazarDTO>
-        title="বাজার খরচ / Bazar Expense"
+        title="বাজার খরচ"
         subtitle={`${month?.monthName ?? ""} • মোট বাজার ৳ ${formatMoney0(app.summary?.totalBazarCost ?? 0)} • নেট মিল খরচ ৳ ${formatMoney0(app.summary?.netCost ?? 0)}`}
         fields={fields}
         rows={rows}

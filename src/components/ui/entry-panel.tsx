@@ -86,7 +86,6 @@ export interface EntryPanelProps<T extends { id: string }> {
 export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) {
   const {
     title,
-    subtitle,
     fields,
     rows,
     columns,
@@ -288,11 +287,8 @@ export function EntryPanel<T extends { id: string }>(props: EntryPanelProps<T>) 
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[19px] font-extrabold leading-tight">{title}</h1>
-          {subtitle ? <p className="muted text-[12.5px]">{subtitle}</p> : null}
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[17px] font-extrabold leading-tight">{title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {toolbar}
           {canWrite ? (

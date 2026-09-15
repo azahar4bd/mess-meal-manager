@@ -139,14 +139,8 @@ export function MealsView() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-[19px] font-extrabold leading-tight">দৈনিক মিল / Daily Meals</h1>
-          <p className="muted text-[12.5px]">
-            {month.monthName} • {month.totalDays} দিন • মোট মিল {formatMeal(summary?.totalMill ?? 0)} • মিল রেট ৳{" "}
-            {formatRate(summary?.perMillRate ?? 0)}
-          </p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-[17px] font-extrabold leading-tight">দৈনিক মিল</h1>
         <SegmentedButtons
           value={mode}
           onChange={(v) => {
@@ -262,7 +256,7 @@ export function MealsView() {
         </Card>
       ) : (
         <Card
-          title="মাস গ্রিড / Month Grid"
+          title="মাস গ্রিড"
           subtitle="উপরের সারিতে তারিখ, বাম পাশের কলমে সদস্যের নাম"
           action={
             canWrite ? (

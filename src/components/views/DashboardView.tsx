@@ -32,14 +32,9 @@ export function DashboardView() {
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <h1 className="truncate text-[19px] font-extrabold leading-tight">{texts.dashboardTitle || "ড্যাশবোর্ড / Dashboard"}</h1>
+            <h1 className="truncate text-[17px] font-extrabold leading-tight">{texts.dashboardTitle || "ড্যাশবোর্ড"}</h1>
           </div>
-          <p className="muted text-[12.5px]">
-            {app.office?.name}
-            {app.office?.branch ? ` • ${app.office.branch}` : ""} • {app.month.monthName} ({monthLabelBn(app.month.year, app.month.month)})
-            {app.month.isClosed ? " • 🔒 বন্ধ" : ""}
-          </p>
-          {texts.dashboardSubtitle ? <p className="mt-0.5 text-[12.5px] font-semibold text-[var(--brand)]">{texts.dashboardSubtitle}</p> : null}
+          {texts.dashboardSubtitle ? <p className="mt-0.5 text-[12px] font-semibold text-[var(--brand)]">{texts.dashboardSubtitle}</p> : null}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {app.can("meals.write") ? (
@@ -64,47 +59,36 @@ export function DashboardView() {
 
       {/* ── KPI grid (spec §39, §85) ─────────────────── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi label="সক্রিয় সদস্য / Active Members" value={String(s.activeMembers)} sub={`মোট ${s.totalMembers} জন`} tone="brand" />
-        <Kpi label="মোট মিল / Total Meals" value={formatMeal(s.totalMill)} sub={`${daysWithMeals}/${app.month.totalDays} দিনে এন্ট্রি`} />
-        <Kpi label="মিল রেট / Meal Rate" value={`৳ ${formatRate(s.perMillRate)}`} sub="প্রতি মিল" tone="ok" />
-        <Kpi label="মোট বাজার / Total Bazar" value={`৳ ${formatMoney(s.totalBazarCost)}`} sub={`${data.bazarExpenses.length} এন্ট্রি`} />
-        <Kpi label="অন্যান্য আয় / Other Income" value={`৳ ${formatMoney(s.totalOthersIncome)}`} sub={`${data.otherIncomes.length} এন্ট্রি`} tone="ok" />
-        <Kpi label="নেট মিল খরচ / Net Meal Cost" value={`৳ ${formatMoney(s.netCost)}`} sub="বাজার − আয়" />
-        <Kpi label="স্থায়ী তহবিল / Permanent Fund" value={`৳ ${formatMoney(s.totalFund)}`} sub="মিল খরচ থেকে বাদ যায় না" tone="warn" />
-        <Kpi label="শেয়ার্ড অতিরিক্ত / Shared Extra" value={`৳ ${formatMoney(s.totalSharedExtra)}`} sub={`জনপ্রতি ৳ ${formatMoney(s.activeMembers ? s.totalSharedExtra / s.activeMembers : 0)}`} />
-        <Kpi label="ইন্ডিভিজুয়াল অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} sub={`${data.extraExpenses.filter((e) => e.type === "individual").length} এন্ট্রি`} />
-        <Kpi
-          label="লাস্ট ব্যালেন্স / Last Balance"
-          value={`৳ ${formatMoney(s.lastBalance)}`}
-          sub={(s.totalRemainingJer ?? 0) > 0 ? `ফান্ড − খরচ − বাকি জের ৳${formatMoney(s.totalRemainingJer ?? 0)}` : "ফান্ড − (বাজার + অতিরিক্ত − আয়)"}
-          tone={s.lastBalance >= 0 ? "ok" : "danger"}
-        />
+        <Kpi label="সক্রিয় সদস্য" value={String(s.activeMembers)} tone="brand" />
+        <Kpi label="মোট মিল" value={formatMeal(s.totalMill)} />
+        <Kpi label="মিল রেট" value={`৳ ${formatRate(s.perMillRate)}`} tone="ok" />
+        <Kpi label="মোট বাজার" value={`৳ ${formatMoney(s.totalBazarCost)}`} />
+        <Kpi label="অন্যান্য আয়" value={`৳ ${formatMoney(s.totalOthersIncome)}`} tone="ok" />
+        <Kpi label="নেট মিল খরচ" value={`৳ ${formatMoney(s.netCost)}`} />
+        <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(s.totalFund)}`} tone="warn" />
+        <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(s.totalSharedExtra)}`} />
+        <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} />
+        <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(s.lastBalance)}`} tone={s.lastBalance >= 0 ? "ok" : "danger"} />
       </div>
 
       {/* ── dena paona snapshot ─────────────────────── */}
       <div className={`grid gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
-        <Card className="border-l-4 border-l-[var(--danger)]" bodyClass="p-3">
-          <div className="kpi-k">মোট দিবে (Due)</div>
+        <Card className="border-l-4 border-l-[var(--danger)]" bodyClass="p-2.5 sm:p-3">
+          <div className="kpi-k">মোট দিবে</div>
           <div className="kpi-v text-[var(--danger)]">৳ {formatMoney(due)}</div>
-          <div className="muted text-[11px]">{s.memberCalculations.filter((m) => m.statusEn === "Due").length} জন সদস্য</div>
         </Card>
-        <Card className="border-l-4 border-l-[var(--ok)]" bodyClass="p-3">
-          <div className="kpi-k">মোট পাবে (Receive)</div>
+        <Card className="border-l-4 border-l-[var(--ok)]" bodyClass="p-2.5 sm:p-3">
+          <div className="kpi-k">মোট পাবে</div>
           <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(receive)}</div>
-          <div className="muted text-[11px]">{s.memberCalculations.filter((m) => m.statusEn === "Receive").length} জন সদস্য</div>
         </Card>
-        <Card className="border-l-4 border-l-[var(--brand)]" bodyClass="p-3">
-          <div className="kpi-k">সমান (Settled)</div>
+        <Card className="border-l-4 border-l-[var(--brand)]" bodyClass="p-2.5 sm:p-3">
+          <div className="kpi-k">সমান</div>
           <div className="kpi-v">{s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন</div>
-          <div className="muted text-[11px]">জমা = খরচ</div>
         </Card>
         {(s.totalRemainingJer ?? 0) > 0 ? (
-          <Card className="border-l-4 border-l-[var(--warn)]" bodyClass="p-3">
-            <div className="kpi-k">বাকি জের (আগের মাসের)</div>
+          <Card className="border-l-4 border-l-[var(--warn)]" bodyClass="p-2.5 sm:p-3">
+            <div className="kpi-k">বাকি জের</div>
             <div className="kpi-v text-[var(--warn)]">৳ {formatMoney(s.totalRemainingJer ?? 0)}</div>
-            <div className="muted text-[11px]">
-              {s.memberCalculations.filter((m) => (m.remainingJer ?? 0) > 0).length} জন সদস্য • বাজার থেকে সমন্বয় হবে
-            </div>
           </Card>
         ) : null}
       </div>
@@ -112,7 +96,7 @@ export function DashboardView() {
       <div className="grid gap-3 lg:grid-cols-2">
         {/* ── top members ─────────────────────────── */}
         <Card
-          title="সর্বোচ্চ মিল / Top Meals"
+          title="সর্বোচ্চ মিল"
           subtitle="এই মাসের হিসাব"
           action={
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("report")}>
@@ -148,7 +132,7 @@ export function DashboardView() {
 
         {/* ── recent bazar ────────────────────────── */}
         <Card
-          title="সাম্প্রতিক বাজার / Recent Bazar"
+          title="সাম্প্রতিক বাজার"
           action={
             app.can("bazar.view") ? (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("bazar")}>

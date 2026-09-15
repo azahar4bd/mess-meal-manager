@@ -126,22 +126,14 @@ export function ExtrasView() {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Kpi label="মোট শেয়ার্ড / Shared Extra" value={`৳ ${formatMoney(summary?.totalSharedExtra ?? 0)}`} tone="brand" />
-        <Kpi label="জনপ্রতি শেয়ার্ড" value={`৳ ${formatMoney(sharedPerMember)}`} sub={`${activeCount} জন সক্রিয় সদস্য`} />
-        <Kpi label="মোট ইন্ডিভিজুয়াল" value={`৳ ${formatMoney(summary?.totalIndividualExtra ?? 0)}`} tone="warn" />
-        <Kpi label="মোট অতিরিক্ত খরচ" value={`৳ ${formatMoney(round2((summary?.totalSharedExtra ?? 0) + (summary?.totalIndividualExtra ?? 0)))}`} />
+        <Kpi label="মোট শেয়ার্ড" value={`৳ ${formatMoney(summary?.totalSharedExtra ?? 0)}`} tone="brand" />
+        <Kpi label="জনপ্রতি শেয়ার্ড" value={`৳ ${formatMoney(sharedPerMember)}`} />
+        <Kpi label="মোট ইন্ডি." value={`৳ ${formatMoney(summary?.totalIndividualExtra ?? 0)}`} tone="warn" />
+        <Kpi label="মোট অতিরিক্ত" value={`৳ ${formatMoney(round2((summary?.totalSharedExtra ?? 0) + (summary?.totalIndividualExtra ?? 0)))}`} />
       </div>
 
-      <Card bodyClass="p-3">
-        <p className="text-[12.5px]">
-          <strong>Shared:</strong> মোট ৳ {formatMoney(summary?.totalSharedExtra ?? 0)} ÷ {activeCount} জন সক্রিয় সদস্য ={" "}
-          <strong>৳ {formatMoney(sharedPerMember)}</strong> জনপ্রতি। &nbsp;
-          <strong>Individual:</strong> সরাসরি নির্দিষ্ট সদস্যের মোট খরচের সঙ্গে যোগ হবে।
-        </p>
-      </Card>
-
       <EntryPanel<ExtraDTO>
-        title="অতিরিক্ত খরচ / Extra Expenses"
+        title="অতিরিক্ত খরচ"
         subtitle={`${month?.monthName ?? ""} • shared ও individual দুই ধরনের খরচ`}
         fields={fields}
         rows={rows}

@@ -81,7 +81,6 @@ export function useToasts() {
 export function Modal({
   open,
   title,
-  subtitle,
   onClose,
   children,
   footer,
@@ -122,16 +121,15 @@ export function Modal({
           wide ? "sm:max-w-3xl" : "sm:max-w-lg"
         }`}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
           <div>
-            <h3 className="text-[15px] font-bold">{title}</h3>
-            {subtitle ? <p className="muted mt-0.5 text-[12px]">{subtitle}</p> : null}
+            <h3 className="text-[15px] font-bold leading-tight">{title}</h3>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-[18px] leading-none muted hover:bg-[var(--brand-soft)]" aria-label="বন্ধ করুন">
             ×
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        <div className="modal-scroll flex-1 overflow-y-auto px-4 py-3">{children}</div>
         {footer ? <div className="border-t border-[var(--border)] px-4 py-3">{footer}</div> : null}
       </div>
     </div>
@@ -253,7 +251,6 @@ export function ErrorState({ message, onReload }: { message: string; onReload?: 
 
 export function Field({
   label,
-  hint,
   error,
   required,
   children,
@@ -273,7 +270,6 @@ export function Field({
         {required ? <span className="text-[var(--danger)]"> *</span> : null}
       </span>
       {children}
-      {hint && !error ? <span className="muted mt-1 block text-[11.5px]">{hint}</span> : null}
       {error ? <span className="mt-1 block text-[11.5px] font-semibold text-[var(--danger)]">{error}</span> : null}
     </label>
   );
@@ -308,15 +304,12 @@ export function FormRow({ children, cols = 2 }: { children: React.ReactNode; col
  *  Layout helpers
  * ══════════════════════════════════════════════════════════ */
 
-export function Card({ title, subtitle, action, children, className = "", bodyClass = "p-3 sm:p-4" }: { title?: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode; className?: string; bodyClass?: string }) {
+export function Card({ title, action, children, className = "", bodyClass = "p-3 sm:p-4" }: { title?: string; /** @deprecated বর্ণনা সরানো হয়েছে — প্রপ গ্রহণ করা হয় কিন্তু দেখানো হয় না */ subtitle?: string; action?: React.ReactNode; children?: React.ReactNode; className?: string; bodyClass?: string }) {
   return (
     <section className={`card ${className}`}>
       {title || action ? (
-        <header className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-3 py-2.5 sm:px-4">
-          <div>
-            {title ? <h2 className="section-title">{title}</h2> : null}
-            {subtitle ? <p className="muted text-[12px]">{subtitle}</p> : null}
-          </div>
+        <header className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2 sm:px-3.5">
+          {title ? <h2 className="section-title">{title}</h2> : <span />}
           {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
         </header>
       ) : null}
@@ -325,7 +318,7 @@ export function Card({ title, subtitle, action, children, className = "", bodyCl
   );
 }
 
-export function Kpi({ label, value, sub, tone = "default" }: { label: string; value: string; sub?: string; tone?: "default" | "ok" | "warn" | "danger" | "brand" }) {
+export function Kpi({ label, value, tone = "default" }: { label: string; value: string; /** @deprecated বর্ণনা সরানো হয়েছে */ sub?: string; tone?: "default" | "ok" | "warn" | "danger" | "brand" }) {
   const color =
     tone === "ok"
       ? "var(--ok)"
@@ -342,7 +335,6 @@ export function Kpi({ label, value, sub, tone = "default" }: { label: string; va
       <span className="kpi-v tabular-nums" style={{ color }}>
         {value}
       </span>
-      {sub ? <span className="muted text-[11px]">{sub}</span> : null}
     </div>
   );
 }

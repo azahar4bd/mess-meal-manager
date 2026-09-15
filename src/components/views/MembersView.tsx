@@ -294,7 +294,7 @@ export function MembersView() {
     <div className="space-y-3">
       {app.can("user.manage") || app.can("members.approve") ? (
         <Card
-          title="যোগদানের অনুমোদন / Member Approval"
+          title="যোগদানের অনুমোদন"
           bodyClass="p-3"
         >
           {!showPending ? (
@@ -330,7 +330,7 @@ export function MembersView() {
 
       {canWrite && rows.length > 1 ? (
         <Card
-          title="সদস্যের ক্রম / Custom Order"
+          title="সদস্যের ক্রম"
           subtitle="টেনে অথবা ↑↓ দিয়ে সাজান — মিল এন্ট্রি পেজেও একই ক্রম থাকবে"
           action={
             <div className="flex flex-wrap gap-2">
@@ -392,7 +392,7 @@ export function MembersView() {
       ) : null}
 
       <EntryPanel<MemberDTO>
-        title="সদস্য ব্যবস্থাপনা / Member Management"
+        title="সদস্য ব্যবস্থাপনা"
         subtitle={`${month?.monthName ?? ""} • ${rows.length} জন সদস্য • ${summary?.activeMembers ?? 0} জন সক্রিয়`}
         fields={fields}
         rows={rows}

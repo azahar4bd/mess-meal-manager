@@ -110,7 +110,8 @@ export function GlobalEditButton() {
         onClick={() => setOpen(true)}
         title="অ্যাপের টেক্সট, হেডার, ফুটার, হিরো ও নোটিশ এডিট করুন"
         aria-label="কন্টেন্ট এডিট করুন"
-        className="fixed bottom-[72px] right-3 z-40 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand)] px-3.5 py-2.5 text-[13px] font-extrabold text-white shadow-lg shadow-black/20 transition hover:brightness-110 sm:bottom-5"
+        className="fixed bottom-[72px] right-3 z-40 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2.5 text-[13px] font-extrabold text-white shadow-lg shadow-black/20 transition hover:brightness-110 sm:bottom-5"
+        style={{ background: "linear-gradient(135deg,#0d9488 0%,var(--brand) 55%,#059669 100%)" }}
       >
         <span aria-hidden>✏️</span>
         <span>এডিট</span>
