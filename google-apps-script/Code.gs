@@ -88,7 +88,7 @@ var ALIASES = {
 var TEXT_COLUMNS = /^(.*ID|.*Id|Phone|OfficeCode|Date|SyncedAt|Status|Active|MemberName|Name|Role|ItemName|Items|Buyer|BuyerName|Category|Note|Source|Type|Scope|Key|Value|MonthName|OfficeName|Branch|Address|Email|CreatedAt|UpdatedAt|PaidBy|ReceivedBy|Purpose)$/;
 
 /** Headers that should be written as real numbers so Google Sheets can total them */
-var NUMERIC_COLUMNS = /^(Year|Month|Day|Days|Meals|Amount|Total.*|.*Rate|.*Cost|.*Extra|.*Balance|DenaPoana|PermanentFund|OtherIncome|NetMealCost|Value|Rows|DurationMs)$/;
+var NUMERIC_COLUMNS = /^(Year|Month|Day|Days|Meals|Amount|Total.*|.*Rate|.*Cost|.*Extra|.*Balance|DenaPoana|PermanentFund|OtherIncome|NetMealCost|Value|Rows|DurationMs|OpeningDue|JerAdjusted|RemainingJer)$/;
 
 /* ───────────────────────── HTTP entry points ───────────────────────── */
 

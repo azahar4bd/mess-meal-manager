@@ -97,6 +97,7 @@ export function memberDTO(m: Member): MemberDTO {
     phone: m.phone,
     note: m.note,
     sortOrder: m.sortOrder,
+    openingDue: toNumber((m as { openingDue?: unknown }).openingDue),
     createdAt: m.createdAt.toISOString(),
   };
 }
@@ -387,9 +388,16 @@ export async function openMonth(
   officeId: string,
   year: number,
   month: number,
-  opts: { copyMembers?: boolean; carryForwardBalance?: number; note?: string; carryMemberBalances?: boolean } = {},
-): Promise<{ month: MessMonth; copiedMembers: number; carriedBalances: number }> {
-  const { copyMembers = true, carryForwardBalance = 0, note = "", carryMemberBalances = false } = opts;
+  opts: {
+    copyMembers?: boolean;
+    carryForwardBalance?: number;
+    note?: string;
+    carryMemberBalances?: boolean;
+    /** আগের মাসের বাকি জের হিসেবে ক্যারি — নতুন মাসে বাজার/নগদ থেকে সমন্বয় হবে (Rule 9) */
+    carryDues?: boolean;
+  } = {},
+): Promise<{ month: MessMonth; copiedMembers: number; carriedBalances: number; carriedDues: number }> {
+  const { copyMembers = true, carryForwardBalance = 0, note = "", carryMemberBalances = false, carryDues = false } = opts;
 
   const prevYear = month === 1 ? year - 1 : year;
   const prevMonth = month === 1 ? 12 : month - 1;
@@ -438,10 +446,14 @@ export async function openMonth(
     }
   }
 
-  /* ── আগের মাসের দেনা-পাওনা নতুন মাসে "সমন্বয়" জমা হিসেবে ক্যারি ──
+  /* ── আগের মাসের দেনা-পাওনা নতুন মাসে ক্যারি ──
+   *  carryDues (নতুন, প্রস্তাবিত): বাকি → সদস্যের জের (opening_due) — নতুন মাসে
+   *  নিজের টাকার বাজার/জের-পরিশোধ থেকে সমন্বয় হবে; পাওনা → সমন্বয় জমা।
+   *  carryMemberBalances (পুরনো): বাকি + পাওনা দুটোই সমন্বয় জমা হিসেবে বসে।
    *  টিক না দিলে নতুন মাস শূন্য থেকে শুরু হয় (পুরনো মাসের রিপোর্টে বাকি থেকেই যায়)। */
   let carriedBalances = 0;
-  if (carryMemberBalances && prev) {
+  let carriedDues = 0;
+  if ((carryDues || carryMemberBalances) && prev) {
     const newMembers = await listMembers(officeId, created.id);
     if (newMembers.length) {
       const { summary } = await getMonthSummary(officeId, prev.id);
@@ -451,12 +463,23 @@ export async function openMonth(
       const firstDay = isoOfDay(year, month, 1);
       const prevLabel = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
       for (const calcRow of summary?.memberCalculations ?? []) {
-        const amount = round2(calcRow.denaPoana);
+        /* অমীমাংসিত পুরনো জেরও নতুন বাকির সঙ্গে যোগ হয়ে এগোয় — না হলে চেইনে জের হারিয়ে যেত।
+         * (পাওনা থাকলে নেট করে: জের ৪০০ − পাওনা ৩৯০ = নতুন জের ১০) */
+        const amount = round2(calcRow.denaPoana - (calcRow.remainingJer ?? 0));
         if (Math.abs(amount) < 1) continue;
         const src = prevMembers.find((m) => m.id === calcRow.memberId);
         const key = (src?.name ?? calcRow.name).trim().toLowerCase();
         const target = (src?.phone ? byPhone.get(src.phone) : undefined) ?? byName.get(key);
         if (!target) continue;
+        // জের-মোডে বাকি (দেনা) জের হিসেবে বসে — সমন্বয়-জমা হয় না (ডাবল-ক্যারি রোধে)
+        if (carryDues && amount < 0) {
+          await db
+            .update(membersTable)
+            .set({ openingDue: String(Math.abs(amount)), updatedAt: new Date() })
+            .where(eq(membersTable.id, target.id));
+          carriedDues += 1;
+          continue;
+        }
         await db.insert(deposits).values({
           id: cryptoId("dep"),
           officeId,
@@ -475,7 +498,7 @@ export async function openMonth(
     }
   }
 
-  return { month: created, copiedMembers, carriedBalances };
+  return { month: created, copiedMembers, carriedBalances, carriedDues };
 }
 
 export async function setMonthClosed(monthId: string, officeId: string, closed: boolean): Promise<MessMonth | null> {
@@ -511,7 +534,7 @@ export async function getMember(officeId: string, memberId: string): Promise<Mem
 export async function createMember(
   officeId: string,
   monthId: string,
-  input: { name: string; phone?: string; role?: string; isActive?: boolean; note?: string },
+  input: { name: string; phone?: string; role?: string; isActive?: boolean; note?: string; openingDue?: number },
 ): Promise<Member> {
   const phone = (input.phone ?? "").trim();
   if (phone) {
@@ -538,6 +561,7 @@ export async function createMember(
       isActive: input.isActive ?? true,
       note: input.note ?? "",
       sortOrder: Number(maxRows[0]?.maxOrder ?? 0) + 1,
+      openingDue: String(Math.max(0, toNumber(input.openingDue))),
       joinedAt: new Date(),
     })
     .returning();
@@ -547,11 +571,14 @@ export async function createMember(
 export async function updateMember(
   officeId: string,
   memberId: string,
-  patch: Partial<Pick<Member, "name" | "phone" | "role" | "isActive" | "note">>,
+  patch: Partial<Pick<Member, "name" | "phone" | "role" | "isActive" | "note">> & { openingDue?: number | string },
 ): Promise<Member | null> {
+  const { openingDue, ...rest } = patch;
+  const set: Record<string, unknown> = { ...rest, updatedAt: new Date() };
+  if (openingDue !== undefined) set.openingDue = String(Math.max(0, toNumber(openingDue)));
   const rows = await db
     .update(membersTable)
-    .set({ ...patch, updatedAt: new Date() })
+    .set(set)
     .where(and(eq(membersTable.id, memberId), eq(membersTable.officeId, officeId)))
     .returning();
   return rows[0] ?? null;
@@ -1130,6 +1157,8 @@ export async function getMonthSummary(
     toDate,
     // carry-forward only applies to the un-filtered full month view
     carryForwardBalance: fromDate || toDate ? 0 : data.carryForwardBalance,
+    // জের-সমাধানও শুধু পুরো মাসের ভিউতে — আংশিক তারিখে পুরনো সূত্রই চলে
+    applySettlement: !(fromDate || toDate),
   };
 
   return {

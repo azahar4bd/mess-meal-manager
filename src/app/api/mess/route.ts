@@ -302,20 +302,27 @@ const handlers: Record<string, ActionHandler> = {
     }
     const copyMembers = body.copyMembers === undefined ? true : Boolean(body.copyMembers);
     const carryMemberBalances = Boolean(body.carryMemberBalances);
+    const carryDues = Boolean(body.carryDues);
     const result = await openMonth(office.id, year, month, {
       copyMembers,
       carryForwardBalance: num(body.carryForwardBalance, 0),
       note: str(body.note).slice(0, 200),
       carryMemberBalances,
+      carryDues,
     });
     await logAction(
       ctx,
       "month.open",
       "month",
       result.month.id,
-      `নতুন মাস খোলা হয়েছে: ${monthLabel(year, month)}${result.carriedBalances ? ` (${result.carriedBalances} জনের বাকি ক্যারি)` : ""}`,
+      `নতুন মাস খোলা হয়েছে: ${monthLabel(year, month)}${result.carriedDues ? ` (${result.carriedDues} জনের জের ক্যারি)` : ""}${result.carriedBalances ? ` (${result.carriedBalances} জনের বাকি ক্যারি)` : ""}`,
     );
-    return { month: monthDTO(result.month), copiedMembers: result.copiedMembers, carriedBalances: result.carriedBalances };
+    return {
+      month: monthDTO(result.month),
+      copiedMembers: result.copiedMembers,
+      carriedBalances: result.carriedBalances,
+      carriedDues: result.carriedDues,
+    };
   },
 
   "month.close": async (ctx, body) => {
@@ -359,6 +366,7 @@ const handlers: Record<string, ActionHandler> = {
       role: str(body.role, "member") || "member",
       isActive: body.isActive === undefined ? true : Boolean(body.isActive),
       note: str(body.note).slice(0, 200),
+      openingDue: Math.max(0, num(body.openingDue, 0)),
     });
     await logAction(ctx, "member.create", "member", created.id, `নতুন সদস্য: ${name}`, month.id);
     return memberDTO(created);
@@ -376,6 +384,7 @@ const handlers: Record<string, ActionHandler> = {
     if (body.role !== undefined) patch.role = str(body.role).slice(0, 20);
     if (body.isActive !== undefined) patch.isActive = Boolean(body.isActive);
     if (body.note !== undefined) patch.note = str(body.note).slice(0, 200);
+    if (body.openingDue !== undefined) patch.openingDue = Math.max(0, num(body.openingDue, 0));
     const updated = need(await updateMember(officeId, id, patch), "সদস্য হালনাগাদ করা যায়নি");
     await logAction(ctx, "member.update", "member", id, `সদস্য হালনাগাদ: ${updated.name}`, month.id);
     return memberDTO(updated);

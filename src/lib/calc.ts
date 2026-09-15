@@ -41,6 +41,11 @@ export interface CalcInput {
   toDate?: string | null;
   /** carried-forward cash balance from the previous month */
   carryForwardBalance?: number;
+  /**
+   * জের-সমাধান প্রয়োগ হবে কিনা। তারিখ-ফিল্টার দেওয়া আংশিক রিপোর্টে false —
+   * আংশিক বাজার দেখে জের মাপা ভুল হবে বলে ওই ভিউতে পুরনো সূত্রই চলে।
+   */
+  applySettlement?: boolean;
 }
 
 const inRange = (date: string, from?: string | null, to?: string | null): boolean => {
@@ -80,8 +85,12 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
   const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
   const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
+  /** জেরের নগদ পরিশোধ (jer_payment) — পুরনো বাকি মেটায়, দেনা-পাওনায় ধরা হয় না */
+  const totalJerCashAll = round2(
+    deposits.filter((d) => (d.type || "") === "jer_payment").reduce((s, r) => s + toNumber(r.amount), 0),
+  );
   /** ফান্ড বাদে সদস্যের সাধারণ জমা/সমন্বয় — শুধু এটাই দেনা-পাওনায় ধরা হয় */
-  const totalMemberPayments = round2(totalDepositsThisMonth - totalFund);
+  const totalMemberPayments = round2(totalDepositsThisMonth - totalFund - totalJerCashAll);
 
   // Rule 5 — shared extra split across ACTIVE members
   const totalSharedExtraRaw = extras
@@ -110,16 +119,21 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     if (nm) mealsByMemberName.set(nm, (mealsByMemberName.get(nm) ?? 0) + v);
   }
 
-  // deposits per member — স্থায়ী ফান্ড সম্পূর্ণ আলাদা খাত, বাকি জমা মাসের পরিশোধ
+  // deposits per member — স্থায়ী ফান্ড সম্পূর্ণ আলাদা খাত, বাকি জমা মাসের পরিশোধ।
+  // jer_payment (জেরের নগদ পরিশোধ) পুরনো বাকি মেটায় — চলতি দেনা-পাওনায় ধরা হয় না।
   const paymentsByMember = new Map<string, number>();
   const paymentsByName = new Map<string, number>();
   const fundByMember = new Map<string, number>();
   const fundByName = new Map<string, number>();
+  const jerCashByMember = new Map<string, number>();
+  const jerCashByName = new Map<string, number>();
   for (const d of deposits) {
     const v = toNumber(d.amount);
-    const isFund = (d.type || "permanent_fund") === "permanent_fund";
-    const byMember = isFund ? fundByMember : paymentsByMember;
-    const byName = isFund ? fundByName : paymentsByName;
+    const dtype = d.type || "permanent_fund";
+    const isFund = dtype === "permanent_fund";
+    const isJerCash = dtype === "jer_payment";
+    const byMember = isFund ? fundByMember : isJerCash ? jerCashByMember : paymentsByMember;
+    const byName = isFund ? fundByName : isJerCash ? jerCashByName : paymentsByName;
     if (d.memberId) byMember.set(d.memberId, (byMember.get(d.memberId) ?? 0) + v);
     const nm = (d.memberName || "").trim().toLowerCase();
     if (nm) byName.set(nm, (byName.get(nm) ?? 0) + v);
@@ -152,8 +166,23 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     const totalDeposit = round2(paymentsByMember.get(m.id) ?? paymentsByName.get(nm) ?? 0);
     const selfPaidBazar = round2(selfPaidByMember.get(m.id) ?? 0);
 
+    /* ── Rule 9 — জের (আগের মাসের বাকি) সমন্বয় ──────────────
+     * 1. নিজের টাকার বাজার আগে জের মেটায় (jerAdjusted) —
+     *    শুধু বাড়তি অংশই চলতি মাসের পাওনা (selfPaidCredit) হয়।
+     * 2. তারপর নগদ জের-পরিশোধ (jer_payment) বাকি জের কমায়।
+     * 3. যা বাকি থাকে (remainingJer) লাস্ট ব্যালেন্স থেকে বাদ যায় —
+     *    তাই সমন্বয়কারী প্রতিটি বাজারে মূলধন আবার বাড়ে।
+     * বাজার-মোট ও মিল রেটে এর কোনো প্রভাব নেই। */
+    const applySettlement = input.applySettlement !== false;
+    const openingDue = applySettlement ? Math.max(0, round2(toNumber((m as MemberDTO).openingDue))) : 0;
+    const jerAdjusted = round2(Math.min(openingDue, selfPaidBazar));
+    const jerCashTotal = round2(jerCashByMember.get(m.id) ?? jerCashByName.get(nm) ?? 0);
+    const jerCashPaid = applySettlement ? round2(Math.min(Math.max(0, openingDue - jerAdjusted), Math.max(0, jerCashTotal))) : 0;
+    const remainingJer = round2(openingDue - jerAdjusted - jerCashPaid);
+    const selfPaidCredit = round2(selfPaidBazar - jerAdjusted);
+
     // Rule 1/2 — স্থায়ী ফান্ড দেনা-পাওনায় মেশে না; মোট খরচ সদস্যের দেনা (−)
-    const denaPoana = round2(totalDeposit + selfPaidBazar - totalCost);
+    const denaPoana = round2(totalDeposit + selfPaidCredit - totalCost);
     const status: MemberCalculation["status"] =
       Math.abs(denaPoana) < 0.005 ? "সমান" : denaPoana < 0 ? "দিবে" : "পাবে";
     const statusEn: MemberCalculation["statusEn"] =
@@ -173,6 +202,11 @@ export function calculateMonth(input: CalcInput): MonthSummary {
       totalCost,
       totalDeposit,
       selfPaidBazar,
+      openingDue,
+      jerAdjusted,
+      jerCashPaid,
+      remainingJer,
+      selfPaidCredit,
       permanentFund,
       denaPoana,
       balance: denaPoana,
@@ -181,14 +215,22 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     };
   });
 
-  /* ── last balance (spec §86) ──────────────────────────────
+  /* ── Rule 9 totals ──────────────────────────────────────── */
+  const totalOpeningDue = round2(memberCalculations.reduce((s, c) => s + c.openingDue, 0));
+  const totalJerAdjusted = round2(memberCalculations.reduce((s, c) => s + c.jerAdjusted, 0));
+  const totalJerCashPaid = round2(memberCalculations.reduce((s, c) => s + c.jerCashPaid, 0));
+  const totalRemainingJer = round2(memberCalculations.reduce((s, c) => s + c.remainingJer, 0));
+
+  /* ── last balance (spec §86 + Rule 9) ─────────────────────
    *  ফান্ড থেকে করা বাজার + অতিরিক্ত − আয় = পরিচালন খরচ।
-   *  নিজের টাকা থেকে করা বাজার ফান্ড থেকে বাদ যায় না — সেটা সদস্যের
-   *  পাওনা হিসেবে দেনা-পাওনায় যোগ হয় (উপরে selfPaidByMember)।
+   *  নিজের টাকা থেকে করা বাজার ফান্ড থেকে বাদ যায় না — জের থাকলে
+   *  সেটা আগে জের মেটায় (উপরে selfPaidByMember), বাড়তিটা পাওনা হয়।
+   *  বাকি জের মূলধন থেকে বাদ থাকে — সমন্বয়কারী বাজার/নগদে জের
+   *  কমলেই লাস্ট ব্যালেন্স (মূলধন) আবার বাড়ে।
    */
   const operating = fundPaidBazar + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
   const carry = toNumber(input.carryForwardBalance, 0);
-  const lastBalance = round2(carry + totalFund - operating);
+  const lastBalance = round2(carry + totalFund - operating - totalRemainingJer);
 
   return {
     totalMembers: members.length,
@@ -200,6 +242,10 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     perMillRate,
     totalFund,
     totalSelfPaidBazar,
+    totalOpeningDue,
+    totalJerAdjusted,
+    totalJerCashPaid,
+    totalRemainingJer,
     fundPaidBazar,
     totalSharedExtra,
     totalIndividualExtra,
