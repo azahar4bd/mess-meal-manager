@@ -32,7 +32,7 @@ import { SheetView } from "@/components/views/SheetView";
 import { AdminView } from "@/components/views/AdminView";
 import { MONTH_NAMES_BN, MONTH_NAMES_EN } from "@/lib/date";
 import { mess as messCall } from "@/lib/client";
-import { ROLE_LABEL } from "@/lib/permissions";
+import { MENU, ROLE_LABEL } from "@/lib/permissions";
 
 /* ══════════════════════════════════════════════════════════
  *  MessApp — the single central component (spec §102)
@@ -124,6 +124,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <AppNoticeTicker />
       <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <ContextBar />
+      <CurrentPageBar />
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
       <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4">
         {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
@@ -338,6 +339,31 @@ function ContextBar() {
       </div>
 
       <NewMonthModal open={openMonthModal} onClose={() => setOpenMonthModal(false)} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  Current page indicator — যে পেজে আছেন উপরে সেই পেজের নাম
+ * ══════════════════════════════════════════════════════════ */
+
+function CurrentPageBar() {
+  const app = useApp();
+  const current = MENU.find((m) => m.tab === app.tab) ?? app.menu.find((m) => m.tab === app.tab);
+  if (!current) return null;
+  const label = app.lang === "bn" ? current.bn : current.en;
+  return (
+    <div className="border-b border-[var(--border)] bg-[var(--card)] no-print">
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-3 py-1.5 sm:px-4">
+        <span className="muted shrink-0 text-[12px] font-semibold">📍 আপনি এখন আছেন:</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-[14px] font-extrabold text-[var(--brand)]">
+          <span aria-hidden className="shrink-0">
+            {current.icon}
+          </span>
+          <span className="truncate">{label}</span>
+        </span>
+        {app.month ? <span className="muted ml-auto shrink-0 text-[11.5px]">• {app.month.monthName}</span> : null}
+      </div>
     </div>
   );
 }
