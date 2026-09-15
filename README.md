@@ -7,6 +7,12 @@
 
 ---
 
+> 🚀 **Render-এ নিজের ইনস্ট্যান্স ডিপ্লয় করুন (ফ্রি):**
+>
+> [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/azahar4bd/mess-meal-manager)
+>
+> বিস্তারিত গাইড: [`docs/RENDER-DEPLOY.md`](docs/RENDER-DEPLOY.md) — `main`-এ push করলেই auto-deploy, migration-ও নিজে থেকে চলে।
+
 > 🌐 **লাইভ ডেমো ডিপ্লয়মেন্ট:** <https://messmealmanager.vercel.app
 **সোর্স কোড:** https://github.com/azahar4bd/mess-meal-manager (private) — `main` ব্রাঞ্চে push করলেই Vercel নিজে থেকে প্রোডাকশনে ডিপ্লয় করে।
 
