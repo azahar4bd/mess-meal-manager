@@ -6,6 +6,7 @@ import { EntryPanel, type ColumnDef, type FieldDef, type FieldExtraCtx, type For
 import { BazarItemsModal, linesToText, linesTotal } from "@/components/BazarItemsModal";
 import { formatMoney0, round2, toNumber } from "@/lib/format";
 import { isoOfDay, toDisplayDate, toIsoDate, todayIso } from "@/lib/date";
+import { extractHistoryItems } from "@/lib/bazar-items";
 import type { BazarCategory, BazarDTO, BazarLine } from "@/lib/types";
 
 /** তালিকায় নেই এমন পুরনো ক্রেতার নামও ড্রপডাউনে দেখানোর জন্য বিশেষ আইডি-প্রিফিক্স */
@@ -29,6 +30,7 @@ export function BazarView() {
   }, [month]);
 
   const rows = data?.bazarExpenses ?? [];
+  const historyItems = useMemo(() => extractHistoryItems(rows as any), [rows]);
   const baseMembers = (data?.members ?? []).map((m) => ({ id: m.id, name: m.name, isActive: m.isActive }));
 
   const members = useMemo(() => {
@@ -223,6 +225,7 @@ export function BazarView() {
         onClose={() => setItemsOpen(false)}
         onApply={applyItems}
         disabled={!canWrite}
+        historyItems={historyItems}
       />
     </>
   );

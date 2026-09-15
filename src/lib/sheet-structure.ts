@@ -89,6 +89,7 @@ export const COLUMNS = {
     "TotalMeals",
     "MealRate",
     "TotalBazar",
+    "FundPaidBazar",
     "OtherIncome",
     "NetMealCost",
     "PermanentFund",

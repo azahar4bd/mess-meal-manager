@@ -133,6 +133,7 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     selfPaidByMember.set(who, round2((selfPaidByMember.get(who) ?? 0) + toNumber(r.amount)));
   }
   const totalSelfPaidBazar = round2([...selfPaidByMember.values()].reduce((s, v) => s + v, 0));
+  const fundPaidBazar = round2(totalBazarCost - totalSelfPaidBazar);
 
   /* ── per member ─────────────────────────────────────────── */
   const memberCalculations: MemberCalculation[] = members.map((m) => {
@@ -180,8 +181,12 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     };
   });
 
-  /* ── last balance (spec §86) ────────────────────────────── */
-  const operating = totalBazarCost + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
+  /* ── last balance (spec §86) ──────────────────────────────
+   *  ফান্ড থেকে করা বাজার + অতিরিক্ত − আয় = পরিচালন খরচ।
+   *  নিজের টাকা থেকে করা বাজার ফান্ড থেকে বাদ যায় না — সেটা সদস্যের
+   *  পাওনা হিসেবে দেনা-পাওনায় যোগ হয় (উপরে selfPaidByMember)।
+   */
+  const operating = fundPaidBazar + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
   const carry = toNumber(input.carryForwardBalance, 0);
   const lastBalance = round2(carry + totalFund - operating);
 
@@ -195,6 +200,7 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     perMillRate,
     totalFund,
     totalSelfPaidBazar,
+    fundPaidBazar,
     totalSharedExtra,
     totalIndividualExtra,
     totalDepositsThisMonth,

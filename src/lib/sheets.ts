@@ -162,6 +162,7 @@ export function buildSyncPayload(
         round2(summary.totalMill),
         round2(summary.perMillRate),
         round2(summary.totalBazarCost),
+        round2(summary.fundPaidBazar ?? summary.totalBazarCost - (summary.totalSelfPaidBazar ?? 0)),
         round2(summary.totalOthersIncome),
         round2(summary.netCost),
         round2(summary.totalFund),

@@ -42,14 +42,22 @@ const ALL_NAMES = BAZAR_ITEMS.map((i) => i.name);
 /**
  * টাইপ করা অক্ষর থেকে মিল খোঁজে — প্রথমে শুরুতে মিল, তারপর ভেতরে মিল।
  * বাংলা/ইংরেজি দুটোতেই কাজ করে; সর্বোচ্চ `limit`টি ফেরত দেয়।
+ * historyItems দিলে “আগের বাজার” থেকে কাস্টম আইটেমও সাজেশনে আসে।
  */
-export function suggestBazarItems(query: string, limit = 8): BazarItemSuggestion[] {
+export function suggestBazarItems(query: string, limit = 8, historyItems: string[] = []): BazarItemSuggestion[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const byName = new Map(BAZAR_ITEMS.map((i) => [i.name, i]));
+  // history থেকে অনন্য আইটেম — যেগুলো মূল তালিকায় নেই সেগুলো “আগের বাজার” গ্রুপে দেখাবে
+  const histClean = [...new Set(historyItems.map((s) => s.trim()).filter(Boolean))];
+  const histSuggestions: BazarItemSuggestion[] = histClean
+    .filter((name) => !BAZAR_ITEMS.some((b) => b.name === name))
+    .map((name) => ({ name, group: "আগের বাজার" }));
+  const combined: BazarItemSuggestion[] = [...BAZAR_ITEMS, ...histSuggestions];
+  const byName = new Map(combined.map((i) => [i.name, i]));
+  const allNames = combined.map((i) => i.name);
   const starts: BazarItemSuggestion[] = [];
   const contains: BazarItemSuggestion[] = [];
-  for (const name of ALL_NAMES) {
+  for (const name of allNames) {
     const n = name.toLowerCase();
     const hit = byName.get(name);
     if (!hit) continue;
@@ -57,6 +65,26 @@ export function suggestBazarItems(query: string, limit = 8): BazarItemSuggestion
     else if (n.includes(q)) contains.push(hit);
   }
   return [...starts, ...contains].slice(0, limit);
+}
+
+/** “আগের বাজার” থেকে কাস্টম আইটেমগুলো বের করা — BazarView থেকে history হিসেবে ব্যবহার হয় */
+export function extractHistoryItems(rows: { items?: string; lines?: { item: string }[] }[]): string[] {
+  const out: string[] = [];
+  for (const r of rows) {
+    if (Array.isArray(r.lines)) {
+      for (const l of r.lines) if (l?.item) out.push(String(l.item).trim());
+    }
+    if (r.items) {
+      // লাইনের বাইরে টাইপ করা আইটেমও থাকতে পারে (পুরনো ডেটা)
+      const parts = String(r.items).split(/[,\n]/).map((s) => s.trim()).filter(Boolean);
+      for (const p of parts) {
+        // “আলু 2 × ৳20” ফরম্যাট থেকে শুধু নাম বের করা
+        const name = p.split(/\s\d/)[0]?.trim() || p;
+        if (name && !out.includes(name)) out.push(name);
+      }
+    }
+  }
+  return [...new Set(out)].slice(0, 200);
 }
 
 /** পুরো তালিকা (গ্রুপ সহ) — এডিটর/গাইডে দেখানোর জন্য */
