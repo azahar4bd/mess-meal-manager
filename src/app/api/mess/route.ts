@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { after, NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { cryptoId, messMonths, offices, sessions, syncLogs, users, type User } from "@/db/schema";
@@ -74,8 +74,10 @@ import {
   updateOffice,
 } from "@/lib/mess-data";
 import {
+  autoSyncEnabled,
   buildSyncPayload,
   extractSheetId,
+  maybeAutoSync,
   pingScript,
   resolveScriptUrl,
   runFullSync,
@@ -300,15 +302,13 @@ const handlers: Record<string, ActionHandler> = {
     if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
       throw new AuthError("bad-request", "সঠিক সাল ও মাস দিন", 400);
     }
-    const copyMembers = body.copyMembers === undefined ? true : Boolean(body.copyMembers);
-    const carryMemberBalances = Boolean(body.carryMemberBalances);
-    const carryDues = Boolean(body.carryDues);
+    // সদস্য তালিকা ও দেনা-পাওনা সর্বদা স্বয়ংক্রিয়ভাবে আগের মাস থেকে চলে আসে
     const result = await openMonth(office.id, year, month, {
-      copyMembers,
+      copyMembers: true,
       carryForwardBalance: num(body.carryForwardBalance, 0),
       note: str(body.note).slice(0, 200),
-      carryMemberBalances,
-      carryDues,
+      carryMemberBalances: false,
+      carryDues: true,
     });
     await logAction(
       ctx,
@@ -422,11 +422,8 @@ const handlers: Record<string, ActionHandler> = {
 
   "ui.editor": async (ctx, body) => {
     const global = str(body.scope) === "global";
-    if (global) {
-      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
-    } else if (!can(ctx.user.role, "settings.write")) {
-      deny(ctx, "settings.write");
-    }
+    // হিরো/হেডার/ফুটার/নোটিশ — যেকোনো স্কোপের কন্টেন্ট এডিট শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন
+    if (ctx.user.role !== "admin") deny(ctx, "settings.write");
     const officeId = global ? null : ctx.activeOfficeId;
     if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
     const [texts, notices] = await Promise.all([getTexts(officeId), getNoticesForEdit(officeId)]);
@@ -435,11 +432,8 @@ const handlers: Record<string, ActionHandler> = {
 
   "ui.updateTexts": async (ctx, body) => {
     const global = str(body.scope) === "global";
-    if (global) {
-      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
-    } else if (!can(ctx.user.role, "settings.write")) {
-      deny(ctx, "settings.write");
-    }
+    // হিরো/হেডার/ফুটার/নোটিশ — যেকোনো স্কোপের কন্টেন্ট এডিট শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন
+    if (ctx.user.role !== "admin") deny(ctx, "settings.write");
     const officeId = global ? null : ctx.activeOfficeId;
     if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
     const raw = (body.texts ?? {}) as Record<string, unknown>;
@@ -450,11 +444,8 @@ const handlers: Record<string, ActionHandler> = {
 
   "ui.updateNotices": async (ctx, body) => {
     const global = str(body.scope) === "global";
-    if (global) {
-      if (ctx.user.role !== "admin") deny(ctx, "settings.write");
-    } else if (!can(ctx.user.role, "settings.write")) {
-      deny(ctx, "settings.write");
-    }
+    // হিরো/হেডার/ফুটার/নোটিশ — যেকোনো স্কোপের কন্টেন্ট এডিট শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন
+    if (ctx.user.role !== "admin") deny(ctx, "settings.write");
     const officeId = global ? null : ctx.activeOfficeId;
     if (!global && !officeId) throw new AuthError("office-required", "কোনো অফিস নির্বাচন করা হয়নি", 400);
     const list: Notice[] = (Array.isArray(body.notices) ? body.notices : [])
@@ -766,7 +757,7 @@ const handlers: Record<string, ActionHandler> = {
       sheetUrl: office.sheetUrl,
       sheetId: office.sheetId,
       lastSyncedAt: office.lastSyncedAt ? office.lastSyncedAt.toISOString() : null,
-      autoSync: String(process.env.AUTO_SYNC ?? "0") === "1",
+      autoSync: autoSyncEnabled(),
       logs,
     };
   },
@@ -1279,11 +1270,70 @@ async function dispatch(action: string, ctx: SessionContext, body: Record<string
   return handler(ctx, body);
 }
 
+/**
+ * যেসব write-এর পর গুগল শিটে স্বয়ংক্রিয় সিংক দরকার — কন্টেন্ট/শিট/অ্যাডমিন
+ * অ্যাকশন বাদ (হিসাব-সংক্রান্ত পরিবর্তনগুলোই শুধু শিটে যায়)।
+ */
+const SHEET_SYNC_ACTIONS = new Set([
+  "meals.saveDay",
+  "meal.set",
+  "meal.delete",
+  "bazar.create",
+  "bazar.update",
+  "bazar.delete",
+  "deposit.create",
+  "deposit.update",
+  "deposit.delete",
+  "income.create",
+  "income.update",
+  "income.delete",
+  "extra.create",
+  "extra.update",
+  "extra.delete",
+  "member.create",
+  "member.update",
+  "member.delete",
+  "month.open",
+  "month.copyRoster",
+]);
+
+/**
+ * Write-এর রেসপন্স ব্লক না করে ব্যাকগ্রাউন্ডে গুগল শিট সিংক — শিট কনফিগার
+ * থাকলে ও AUTO_SYNC বন্ধ না থাকলে। কোনো ভুল হলেও রেসপন্স/ডেটার ক্ষতি নেই।
+ */
+function scheduleSheetSync(ctx: SessionContext, body: Record<string, unknown>, result: unknown) {
+  if (!autoSyncEnabled() || !ctx.activeOfficeId) return;
+  after(async () => {
+    try {
+      const office = await getOffice(ctx.activeOfficeId as string);
+      if (!office || !resolveScriptUrl(office)) return;
+      let monthRow: Awaited<ReturnType<typeof getMonth>> = null;
+      const explicitId = str(body.monthId);
+      if (explicitId) monthRow = await getMonth(explicitId);
+      if ((!monthRow || monthRow.officeId !== office.id) && body.year !== undefined) {
+        monthRow = await getMonthFor(office.id, Number(body.year), Number(body.month));
+      }
+      if (!monthRow || monthRow.officeId !== office.id) {
+        const ret = (result as { month?: { id?: string } } | null)?.month?.id;
+        if (ret) monthRow = await getMonth(ret);
+      }
+      if (!monthRow || monthRow.officeId !== office.id) {
+        monthRow = await ensureCurrentMonth(office.id);
+      }
+      const { data, summary } = await getMonthSummary(office.id, monthRow.id);
+      await maybeAutoSync({ office: officeDTO(office), data, summary, userId: ctx.user.id });
+    } catch (err) {
+      console.error("[auto-sync] background sync failed (ignored):", (err as Error).message);
+    }
+  });
+}
+
 const POST = api({ auth: true, office: false, limit: "write", auditAction: "mess" }, async (_req: NextRequest, ctx: SessionContext, body) => {
   const action = str(body.action);
   if (!action) return fail("action আবশ্যক", 400, "validation", { action: "আবশ্যক" });
   try {
     const data = await dispatch(action, ctx, body);
+    if (SHEET_SYNC_ACTIONS.has(action)) scheduleSheetSync(ctx, body, data);
     return { action, data };
   } catch (err) {
     if (err instanceof ServiceError) return fail(err.message, err.status, "service", err.fields);

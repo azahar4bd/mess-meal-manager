@@ -3,13 +3,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
-import { Badge, Card, ConfirmDialog, EmptyState, Kpi, Loader, Modal } from "@/components/ui";
+import { Badge, Card, EmptyState, Kpi, Loader, Modal } from "@/components/ui";
 import { mess } from "@/lib/client";
 import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { isoOfDay, monthLabelBn, toDisplayDate, toDisplayDateTime } from "@/lib/date";
 import { bazarByCategory, bazarByBuyer } from "@/lib/calc";
 import { CSV_VARIANTS } from "@/lib/report-csv";
-import type { MemberCalculation, MessData, MonthDTO, MonthSummary } from "@/lib/types";
+import type { DepositDTO, MemberCalculation, MessData, MonthDTO, MonthSummary } from "@/lib/types";
 
 interface ReportResponse {
   office: { id: string; name: string; branch: string; code: string } | null;
@@ -23,200 +23,127 @@ interface ReportResponse {
 }
 
 /* ══════════════════════════════════════════════════════════
- *  মাস-শেষ পরিশোধ (Paid Entry) — মাস বন্ধ করার আগে বাকি আদায়।
- *  ফুল দিলে পরের মাসে জের থাকে না; আংশিক দিলে বাকিটা জের হয়ে
- *  নতুন মাসে নিজের টাকার বাজার থেকে সমন্বয় হয় (Rule 9)।
+ *  সাইনড টাকা রেন্ডার — ঋণাত্মক লাল (দেনা), ধনাত্মক সবুজ (পাওনা)
  * ══════════════════════════════════════════════════════════ */
 
-function SettlementCard({ month, onSaved }: { month: MonthDTO; onSaved: () => void }) {
+function SignedMoney({ value, bold = false }: { value: number; bold?: boolean }) {
+  const color = value < -0.005 ? "var(--danger)" : value > 0.005 ? "var(--ok)" : "var(--muted)";
+  return (
+    <span className={`tabular-nums ${bold ? "font-extrabold" : ""}`} style={{ color }}>
+      {value < -0.005 ? "−" : value > 0.005 ? "+" : ""}
+      ৳{formatMoney(Math.abs(value))}
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  দেনা-পাওনার জমা (ইনলাইন) — সদস্য টেবিলের ভেতরেই বসানো যায়।
+ *  সংরক্ষিত জমা দেনা কমায়; অবশিষ্টটাই পরের মাসে জের হিসেবে যায়।
+ *  প্রতি সদস্যের একটিই closing_payment থাকে — পুরোনোটি হালনাগাদ/মুছে
+ *  নতুন পরিমাণ বসানো হয়।
+ * ══════════════════════════════════════════════════════════ */
+
+function ClosingPaymentCell({
+  month,
+  member,
+  paid,
+  existing,
+  canWrite,
+  onSaved,
+}: {
+  month: MonthDTO;
+  member: MemberCalculation;
+  paid: number;
+  existing: DepositDTO[];
+  canWrite: boolean;
+  onSaved: () => void;
+}) {
   const app = useApp();
-  const [settle, setSettle] = useState<ReportResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [busyId, setBusyId] = useState<string | null>(null);
-
-  const canWrite = app.can("fund.write") && !(month.isClosed && app.role !== "admin");
-
-  const loadSettle = useCallback(async () => {
-    setLoading(true);
-    try {
-      // তারিখ-ফিল্টার ছাড়া পুরো মাসের হিসাব — জের-সমাধানসহ সঠিক বাকি
-      const res = await mess<ReportResponse>("report.summary", { monthId: month.id });
-      setSettle(res);
-    } catch (err) {
-      app.toast(err instanceof Error ? err.message : "পরিশোধ তালিকা লোড করা যায়নি", "error");
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month.id]);
+  const [raw, setRaw] = useState(paid > 0 ? String(paid) : "");
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void loadSettle();
-  }, [loadSettle]);
+    setRaw(paid > 0 ? String(paid) : "");
+  }, [paid]);
 
-  // প্রতিটি বাকিতে পুরো টাকা আগে থেকে বসানো — ফুল দিলে জের শূন্য, কম দিলে বাকিটা জের
-  useEffect(() => {
-    const next: Record<string, string> = {};
-    for (const c of settle?.summary?.memberCalculations ?? []) {
-      const due = Math.max(0, round2(-c.denaPoana));
-      if (due > 0) next[c.memberId] = String(due);
-    }
-    setAmounts(next);
-  }, [settle]);
+  const amount = round2(Number(raw.trim()) || 0);
+  const dirty = Math.abs(amount - round2(paid)) > 0.005;
+  const lastDay = isoOfDay(month.year, month.month, month.totalDays);
+  const note = `দেনা-পাওনার জমা (${month.monthName})`;
 
-  const save = async (row: MemberCalculation) => {
-    const due = Math.max(0, round2(-row.denaPoana));
-    const amount = round2(Number((amounts[row.memberId] ?? "").trim()));
-    if (!Number.isFinite(amount) || amount <= 0) {
-      app.toast("সঠিক পরিমাণ লিখুন (০ এর বেশি)", "error");
+  const save = async () => {
+    if (!Number.isFinite(amount) || amount < 0) {
+      app.toast("সঠিক পরিমাণ লিখুন (০ বা তার বেশি)", "error");
       return;
     }
-    setBusyId(row.memberId);
-    const res = await app.call<unknown>("deposit.create", {
-      monthId: month.id,
-      memberId: row.memberId,
-      amount,
-      date: isoOfDay(month.year, month.month, month.totalDays),
-      type: "closing_payment",
-      note: `মাস-শেষ পরিশোধ (${month.monthName})`,
-    });
-    setBusyId(null);
+    setBusy(true);
+    let res: unknown = null;
+    if (amount <= 0.005) {
+      // জমা শূন্য — আগের সব মাস-শেষ জমা মুছে ফেলা হয়
+      for (const d of existing) {
+        res = await app.call("deposit.delete", { id: d.id });
+      }
+      if (existing.length === 0) res = true;
+    } else if (existing.length > 0) {
+      // একটি থাকলে হালনাগাদ, একাধিক থাকলে বাকিগুলো মুছে ফেলা হয়
+      const [first, ...rest] = existing;
+      res = await app.call("deposit.update", {
+        id: first.id,
+        memberId: member.memberId,
+        memberName: member.name,
+        amount,
+        date: first.date || lastDay,
+        type: "closing_payment",
+        note,
+      });
+      for (const d of rest) await app.call("deposit.delete", { id: d.id });
+    } else {
+      res = await app.call("deposit.create", {
+        monthId: month.id,
+        memberId: member.memberId,
+        memberName: member.name,
+        amount,
+        date: lastDay,
+        type: "closing_payment",
+        note,
+      });
+    }
+    setBusy(false);
     if (!res) return;
-    app.toast(
-      amount >= due - 0.005
-        ? `${row.name} — পুরো পরিশোধ সম্পন্ন ✓ পরের মাসে জের থাকবে না`
-        : `${row.name} — ৳${formatMoney(amount)} পরিশোধ ✓ বাকি ৳${formatMoney(due - amount)} জের হবে`,
-      "success",
-    );
+    app.toast(`${member.name} — দেনা-পাওনার জমা ৳${formatMoney(amount)} সংরক্ষিত হয়েছে ✓`, "success");
     onSaved();
-    await loadSettle();
   };
 
-  const calcs = settle?.summary?.memberCalculations ?? [];
-  const dueRows = calcs.filter((c) => c.denaPoana < -0.005).sort((a, b) => a.denaPoana - b.denaPoana);
-  const receiveRows = calcs.filter((c) => c.denaPoana > 0.005);
-  const settledCount = calcs.length - dueRows.length - receiveRows.length;
+  if (!canWrite) {
+    return <span className="tabular-nums">{paid > 0 ? `৳${formatMoney(paid)}` : "—"}</span>;
+  }
 
   return (
-    <Card
-      title="মাস-শেষ পরিশোধ / Closing Settlement (Paid Entry)"
-      subtitle="মাস বন্ধ করার আগে বাকি আদায় করুন — ফুল দিলে জের শূন্য, আংশিক দিলে বাকিটা পরের মাসে জের হবে"
-      bodyClass="p-0"
-    >
-      {loading ? (
-        <div className="p-3">
-          <Loader label="পরিশোধ তালিকা লোড হচ্ছে…" />
-        </div>
-      ) : (
-        <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-          {!canWrite ? (
-            <p className="border-b border-[var(--border)] px-3 py-2 text-[12px] font-semibold text-[var(--warn)]">
-              🔒 এই মাসটি বন্ধ — পরিশোধ এন্ট্রি দিতে মাসটি খুলুন (শুধু অ্যাডমিন বন্ধ মাসে এন্ট্রি দিতে পারেন)।
-            </p>
-          ) : null}
-          {dueRows.length === 0 ? (
-            <div className="p-3">
-              <EmptyState icon="✅" title="সবার পরিশোধ সম্পন্ন" hint="এই মাসে কারো বাকি নেই — পরের মাসে কোনো জের যাবে না।" />
-            </div>
-          ) : (
-            <table className="data" style={{ minWidth: 760 }}>
-              <thead>
-                <tr>
-                  <th>সদস্য / Member</th>
-                  <th className="num">মোট খরচ</th>
-                  <th className="num">জমা</th>
-                  <th className="num">নিজের বাজার (ক্রেডিট)</th>
-                  <th className="num">বাকি / Due</th>
-                  <th className="num">পরিশোধ / Paid (৳)</th>
-                  <th className="text-center">—</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dueRows.map((m) => {
-                  const due = Math.max(0, round2(-m.denaPoana));
-                  const entered = round2(Number((amounts[m.memberId] ?? "").trim()) || 0);
-                  const rest = round2(due - entered);
-                  return (
-                    <tr key={m.memberId}>
-                      <td>
-                        <span className="block font-bold">{m.name}</span>
-                        <span className="muted block text-[11px]">
-                          {m.role}
-                          {m.phone ? ` • ${m.phone}` : ""}
-                        </span>
-                      </td>
-                      <td className="num tabular-nums">৳{formatMoney(m.totalCost)}</td>
-                      <td className="num tabular-nums text-[var(--ok)]">৳{formatMoney(m.totalDeposit)}</td>
-                      <td className="num tabular-nums text-[var(--ok)]">
-                        {(m.selfPaidCredit ?? 0) > 0 ? `৳${formatMoney(m.selfPaidCredit ?? 0)}` : "—"}
-                      </td>
-                      <td className="num font-extrabold tabular-nums text-[var(--danger)]">৳{formatMoney(due)}</td>
-                      <td className="num">
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          className="input h-9 w-28 text-right tabular-nums"
-                          value={amounts[m.memberId] ?? ""}
-                          disabled={!canWrite || busyId === m.memberId}
-                          onChange={(e) => setAmounts((p) => ({ ...p, [m.memberId]: e.target.value }))}
-                          aria-label={`${m.name} এর পরিশোধ`}
-                        />
-                        {entered > 0 ? (
-                          <span
-                            className="block text-[10.5px] font-semibold tabular-nums"
-                            style={{ color: rest > 0.005 ? "var(--warn)" : "var(--ok)" }}
-                          >
-                            {rest > 0.005 ? `জের থাকবে ৳${formatMoney(rest)}` : rest < -0.005 ? `পাওনা হবে ৳${formatMoney(-rest)}` : "✓ সম্পন্ন — জের শূন্য"}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="text-center">
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          disabled={!canWrite || busyId === m.memberId}
-                          onClick={() => void save(m)}
-                        >
-                          {busyId === m.memberId ? "…" : "✓ সংরক্ষণ"}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>মোট বাকি</td>
-                  <td className="num tabular-nums">৳{formatMoney(round2(dueRows.reduce((s, m) => s + m.totalCost, 0)))}</td>
-                  <td className="num tabular-nums">৳{formatMoney(round2(dueRows.reduce((s, m) => s + m.totalDeposit, 0)))}</td>
-                  <td className="num tabular-nums">
-                    ৳{formatMoney(round2(dueRows.reduce((s, m) => s + (m.selfPaidCredit ?? 0), 0)))}
-                  </td>
-                  <td className="num tabular-nums">৳{formatMoney(round2(dueRows.reduce((s, m) => s + Math.abs(m.denaPoana), 0)))}</td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
-            </table>
-          )}
-          <div className="border-t border-[var(--border)] px-3 py-2 text-[11.5px]">
-            <span className="muted">
-              পরিশোধ সম্পন্ন {settledCount} জন
-              {receiveRows.length ? (
-                <>
-                  {" "}• পাবে {receiveRows.length} জন (
-                  {receiveRows.map((r) => `${r.name} ৳${formatMoney(r.denaPoana)}`).join(", ")})
-                </>
-              ) : (
-                ""
-              )}{" "}
-              • পরিশোধ “ফান্ড” ট্যাবেও জমা হিসেবে দেখা যাবে (ধরন: মাস-শেষ পরিশোধ)
-            </span>
-          </div>
-        </div>
-      )}
-    </Card>
+    <div className="flex items-center justify-end gap-1">
+      <input
+        type="number"
+        min={0}
+        step="0.01"
+        inputMode="decimal"
+        className="input h-8 w-24 text-right tabular-nums"
+        value={raw}
+        disabled={busy}
+        placeholder="0"
+        onChange={(e) => setRaw(e.target.value)}
+        aria-label={`${member.name} এর দেনা-পাওনার জমা`}
+      />
+      {dirty ? (
+        <button
+          type="button"
+          className="btn btn-primary btn-sm h-8 px-2"
+          disabled={busy}
+          onClick={() => void save()}
+          title="জমা সংরক্ষণ করুন"
+        >
+          {busy ? "…" : "✓"}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -229,8 +156,6 @@ export function ReportView() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [csvOpen, setCsvOpen] = useState(false);
-  const [closeOpen, setCloseOpen] = useState(false);
-  const [closeBusy, setCloseBusy] = useState(false);
   const [selfOnly, setSelfOnly] = useState(false);
 
   const summary = report?.summary ?? app.summary;
@@ -269,6 +194,18 @@ export function ReportView() {
   const categories = useMemo(() => (data ? bazarByCategory(data.bazarExpenses) : {}), [data]);
   const buyers = useMemo(() => (data ? bazarByBuyer(data.bazarExpenses) : {}), [data]);
 
+  // সদস্যভিত্তিক “দেনা-পাওনার জমা” (closing_payment) — টেবিলের ইনলাইন ঘরে বসে
+  const closingMap = useMemo(() => {
+    const map: Record<string, { paid: number; items: DepositDTO[] }> = {};
+    for (const d of data?.deposits ?? []) {
+      if (d.type !== "closing_payment" || !d.memberId) continue;
+      const entry = (map[d.memberId] ??= { paid: 0, items: [] });
+      entry.paid = round2(entry.paid + Number(d.amount));
+      entry.items.push(d);
+    }
+    return map;
+  }, [data]);
+
   if (!month || !summary) return <Loader label="Loading report…" />;
 
   const calcs = summary.memberCalculations ?? [];
@@ -276,6 +213,12 @@ export function ReportView() {
   const totalReceive = round2(calcs.filter((m) => m.statusEn === "Receive").reduce((s, m) => s + m.denaPoana, 0));
   const totalCost = round2(calcs.reduce((s, m) => s + m.totalCost, 0));
   const hasJer = (summary.totalOpeningDue ?? 0) > 0;
+  // ইনলাইন জমা কলামের যোগফল ও জমা-পূর্ব দেনা/পাওনা
+  const closingOf = (m: MemberCalculation) => round2(closingMap[m.memberId]?.paid ?? 0);
+  const totalClosing = round2(calcs.reduce((s, m) => s + closingOf(m), 0));
+  const beforeRows = calcs.map((m) => round2(m.denaPoana - closingOf(m)));
+  const totalBeforeDue = round2(beforeRows.filter((v) => v < -0.005).reduce((s, v) => s + Math.abs(v), 0));
+  const totalBeforeReceive = round2(beforeRows.filter((v) => v > 0.005).reduce((s, v) => s + v, 0));
 
   const exportUrl = (format: string, variant = "full") => {
     const params = new URLSearchParams({ format, variant, monthId: month.id });
@@ -295,16 +238,11 @@ export function ReportView() {
     app.toast("রিপোর্ট খুলেছে — প্রিন্ট ডায়ালগ থেকে “Save as PDF” নির্বাচন করুন", "info");
   };
 
-  const toggleClose = async () => {
-    setCloseBusy(true);
-    const res = await app.call<MonthDTO>("month.close", { monthId: month.id, closed: !month.isClosed });
-    setCloseBusy(false);
-    setCloseOpen(false);
-    if (res) {
-      app.toast(res.isClosed ? "মাসটি বন্ধ করা হয়েছে 🔒" : "মাসটি পুনরায় খোলা হয়েছে 🔓", "success");
-      await app.bootstrap();
-    }
-  };
+  // জমা ইনপুট শুধু পুরো মাসের ভিউতে — ফিল্টার করা ভিউতে জমা এন্ট্রির তালিকা আংশিক থাকে
+  const fullMonth =
+    fromDate === isoOfDay(month.year, month.month, 1) &&
+    toDate === isoOfDay(month.year, month.month, month.totalDays);
+  const canWriteFund = app.can("fund.write") && fullMonth;
 
   return (
     <div className="space-y-3">
@@ -323,11 +261,6 @@ export function ReportView() {
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCsvOpen(true)}>
             ⬇ Download CSV
           </button>
-          {app.can("month.write") ? (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCloseOpen(true)}>
-              {month.isClosed ? "🔓 মাস খুলুন" : "🔒 মাস বন্ধ করুন"}
-            </button>
-          ) : null}
         </div>
       </div>
 
@@ -411,7 +344,7 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data" style={{ minWidth: hasJer ? 1480 : 1180 }}>
+                <table className="data" style={{ minWidth: hasJer ? 1780 : 1480 }}>
                   <thead>
                     <tr>
                       <th>সদস্য / Member</th>
@@ -430,13 +363,24 @@ export function ReportView() {
                           <th className="num">বাকি জের</th>
                         </>
                       ) : null}
-                      <th className="num">দেনা-পাওনা</th>
+                      <th className="num" title="জমা বসানোর আগের গণিত: মোট জমা/সমন্বয় − মোট খরচ">
+                        দেনা(-)/পাওনা(+) হিসাব
+                      </th>
+                      <th className="num">দেনা-পাওনার জমা (৳)</th>
+                      <th className="num" title="হিসাব − জমা = অবশিষ্ট; এটাই পরের মাসে জের হিসেবে যাবে">
+                        অবশিষ্ট দেনা-পাওনা
+                      </th>
                       <th className="num">স্থায়ী ফান্ড</th>
                       <th className="text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {calcs.map((m) => (
+                    {calcs.map((m) => {
+                      const closing = closingMap[m.memberId];
+                      const closingPaid = round2(closing?.paid ?? 0);
+                      // জমা বসানোর আগের হিসাব; হিসাব − জমা = অবশিষ্ট (denaPoana)
+                      const dueBefore = round2(m.denaPoana - closingPaid);
+                      return (
                       <tr key={m.memberId}>
                         <td>
                           <span className="block font-bold">{m.name}</span>
@@ -485,10 +429,21 @@ export function ReportView() {
                             </td>
                           </>
                         ) : null}
-                        <td className="num font-extrabold tabular-nums">
-                          <span style={{ color: m.denaPoana < 0 ? "var(--danger)" : m.denaPoana > 0 ? "var(--ok)" : "var(--muted)" }}>
-                            {m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳{formatMoney(Math.abs(m.denaPoana))}
-                          </span>
+                        <td className="num tabular-nums">
+                          <SignedMoney value={dueBefore} />
+                        </td>
+                        <td className="num">
+                          <ClosingPaymentCell
+                            month={month}
+                            member={m}
+                            paid={closingPaid}
+                            existing={closing?.items ?? []}
+                            canWrite={canWriteFund}
+                            onSaved={() => void load()}
+                          />
+                        </td>
+                        <td className="num tabular-nums" style={{ background: "var(--brand-soft)" }}>
+                          <SignedMoney value={m.denaPoana} bold />
                         </td>
                         <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(m.permanentFund)}</td>
                         <td className="text-center">
@@ -497,7 +452,8 @@ export function ReportView() {
                           </Badge>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                   <tfoot>
                     <tr>
@@ -519,16 +475,26 @@ export function ReportView() {
                           <td className="num tabular-nums">৳{formatMoney(summary.totalRemainingJer ?? 0)}</td>
                         </>
                       ) : null}
-                      <td className="num tabular-nums">দিবে ৳{formatMoney(totalDue)} • পাবে ৳{formatMoney(totalReceive)}</td>
+                      <td className="num tabular-nums" style={{ fontSize: 11 }}>
+                        দিবে ৳{formatMoney(totalBeforeDue)}
+                        <br />
+                        পাবে ৳{formatMoney(totalBeforeReceive)}
+                      </td>
+                      <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(totalClosing)}</td>
+                      <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)", fontSize: 11 }}>
+                        দিবে ৳{formatMoney(totalDue)}
+                        <br />
+                        পাবে ৳{formatMoney(totalReceive)}
+                      </td>
                       <td className="num tabular-nums">৳{formatMoney(summary.totalFund)}</td>
                       <td />
                     </tr>
                   </tfoot>
                 </table>
                 <p className="muted border-t border-[var(--border)] px-3 py-2 text-[11.5px]">
-                  দেনা-পাওনা = জমা/সমন্বয় + নিজের টাকা থেকে বাজার{hasJer ? " (জের সমন্বয়ের পর বাড়তি অংশ)" : ""} − মোট
-                  খরচ • স্থায়ী ফান্ড আলাদা খাত, এই হিসাবে মেশে না
-                  {hasJer ? " • বাকি জের লাস্ট ব্যালেন্স থেকে বাদ থাকে — সমন্বয় হলেই মূলধন বাড়ে" : ""}
+                  <b>অবশিষ্ট দেনা-পাওনা = হিসাব (জমা/সমন্বয় + নিজের টাকার বাজার{hasJer ? " + জের সমন্বয়" : ""} − মোট খরচ) − দেনা-পাওনার জমা।</b>{" "}
+                  লাল ঋণাত্মক = সদস্য দিবে, সবুজ ধনাত্মক = সদস্য পাবে; <b>এই অবশিষ্ট টাকাই পরবর্তী মাসে জের হিসেবে স্বয়ংক্রিয় চলে যায়।</b>{" "}
+                  স্থায়ী ফান্ড আলাদা খাত, এই হিসাবে মেশে না।
                 </p>
               </div>
             )}
@@ -596,8 +562,6 @@ export function ReportView() {
             </Card>
           </div>
 
-          {app.can("fund.write") ? <SettlementCard month={month} onSaved={() => void load()} /> : null}
-
           <p className="muted text-[11px]">
             রিপোর্ট তৈরির সময়: {report?.generatedAt ? toDisplayDateTime(report.generatedAt) : "—"} • হিসাবের সূত্র অপরিবর্তনীয়
             (spec §121)।
@@ -621,20 +585,6 @@ export function ReportView() {
           ))}
         </div>
       </Modal>
-
-      <ConfirmDialog
-        open={closeOpen}
-        busy={closeBusy}
-        title={month.isClosed ? "মাসটি পুনরায় খুলবেন?" : "মাসটি বন্ধ করবেন?"}
-        message={
-          month.isClosed
-            ? `${month.monthName} মাসটি আবার খোলা হবে — ম্যানেজাররাও তখন এন্ট্রি দিতে/বদলাতে পারবেন।`
-            : `${month.monthName} মাসটি বন্ধ করলে ম্যানেজাররা আর কোনো এন্ট্রি যোগ বা পরিবর্তন করতে পারবেন না (শুধু অ্যাডমিন পারবেন)। আগের সব হিসাব দেখা যাবে।`
-        }
-        confirmLabel={month.isClosed ? "খুলুন" : "বন্ধ করুন"}
-        onCancel={() => setCloseOpen(false)}
-        onConfirm={() => void toggleClose()}
-      />
     </div>
   );
 }

@@ -79,14 +79,16 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "members.approve": true,
     "report.view": true,
     "report.export": true,
-    "sheet.view": true,
-    "sheet.sync": true,
+    // গুগল শিট সিংক স্বয়ংক্রিয় (সার্ভার-সাইড); ম্যানেজার প্যানেলে শিট ট্যাব দেখানো হয় না
+    "sheet.view": false,
+    "sheet.sync": false,
     "month.write": true,
     "office.manage": false,
     "user.manage": false,
     "audit.view": false,
     "guide.view": true,
-    "settings.write": true,
+    // হিরো/হেডার/ফুটার/নোটিশ — সব কন্টেন্ট এডিট শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন
+    "settings.write": false,
   },
 
   /* ── Member: Reports menu only (spec §7, §70) ───────────── */
@@ -135,7 +137,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "members.approve": false,
     "report.view": true,
     "report.export": true,
-    "sheet.view": true,
+    "sheet.view": false,
     "sheet.sync": false,
     "month.write": false,
     "office.manage": false,

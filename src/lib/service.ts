@@ -13,6 +13,7 @@ import {
   findOfficeByCode,
   getOffice,
   listMonths,
+  openMonth,
   syncUserToRosters,
   updateOffice,
 } from "@/lib/mess-data";
@@ -268,7 +269,13 @@ export async function officeMonthOverview(officeId: string) {
 /** ensure the office has an open month for "now" (called on login / bootstrap) */
 export async function ensureCurrentMonth(officeId: string) {
   const now = dhakaNow();
-  return ensureMonth(officeId, now.year, now.month);
+  // নতুন ক্যালেন্ডার মাসে পড়লে খালি মাস নয় — আগের মাসের সক্রিয় সদস্য ও তাদের
+  // অবশিষ্ট দেনা-পাওনা (জের) স্বয়ংক্রিয়ভাবে ক্যারি করে মাস তৈরি হয়।
+  const { month } = await openMonth(officeId, now.year, now.month, {
+    copyMembers: true,
+    carryDues: true,
+  });
+  return month;
 }
 
 export async function countOfficeMembers(officeId: string) {

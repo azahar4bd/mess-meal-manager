@@ -10,8 +10,8 @@ import { DEFAULT_TEXTS, HERO_THEMES, type Notice, type UiTexts } from "@/lib/ui-
  *  এডিটেবল টেক্সট + স্ক্রলিং নোটিশ বোর্ড (ক্লায়েন্ট অংশ)
  *  • useUiContent  — অফিস অনুযায়ী টেক্সট/নোটিশ লোড ও ক্যাশ
  *  • NoticeTicker  — বাম→ডান স্ক্রলিং নোটিশ (শুধু প্রেজেন্টেশন)
- *  • GlobalEditButton — যেকোনো পেজ থেকে একটাই ভাসমান ✏️ এডিট বাটন
- *  • UiContentEditor — অ্যাডমিন (গ্লোবাল) / ম্যানেজার (অফিস) এডিটর
+ *  • GlobalEditButton — যেকোনো পেজ থেকে একটাই ভাসমান ✏️ এডিট বাটন (শুধুমাত্র অ্যাডমিন)
+ *  • UiContentEditor — অ্যাডমিন এডিটর (গ্লোবাল/অফিস দুই স্কোপই)
  * ══════════════════════════════════════════════════════════ */
 
 type Content = { texts: UiTexts; notices: Notice[] };
@@ -96,11 +96,11 @@ export function AppNoticeTicker() {
   return <NoticeTicker notices={notices} label={texts.marqueeLabel} />;
 }
 
-/** ═══════════ একটাই ভাসমান এডিট বাটন — যে পেজেই থাকুন ═══════════ */
+/** ═══════════ একটাই ভাসমান এডিট বাটন — শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন ═══════════ */
 export function GlobalEditButton() {
   const app = useApp();
   const [open, setOpen] = useState(false);
-  if (!app.can("settings.write")) return null;
+  if (app.user?.role !== "admin") return null;
   // অফিস নির্বাচিত থাকলে ডিফল্ট scope অফিস; অফিসহীন অ্যাডমিন হলে গ্লোবাল
   const initial: Scope = app.user?.role === "admin" && !app.office ? "global" : "office";
   return (

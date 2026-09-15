@@ -50,6 +50,13 @@ export interface CsvContext {
 }
 
 export function memberSummaryCsv({ data, summary }: CsvContext): string {
+  // সদস্যভিত্তিক “দেনা-পাওনার জমা” (closing_payment) — DenaPoana হলো জমা বাদে অবশিষ্ট
+  const closingByMember = new Map<string, number>();
+  for (const d of data.deposits) {
+    if (d.type !== "closing_payment" || !d.memberId) continue;
+    closingByMember.set(d.memberId, (closingByMember.get(d.memberId) ?? 0) + Number(d.amount));
+  }
+  const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
   return toCsv(
     [
       "MemberID",
@@ -68,33 +75,40 @@ export function memberSummaryCsv({ data, summary }: CsvContext): string {
       "OpeningDue",
       "JerAdjusted",
       "RemainingJer",
-      "DenaPoana",
+      "BeforeSettlement",
+      "ClosingPayment",
+      "RemainingDenaPoana",
       "PermanentFund",
       "Status",
       "MonthID",
     ],
-    summary.memberCalculations.map((m) => [
-      m.memberId,
-      m.name,
-      m.role,
-      m.phone,
-      m.isActive ? "Yes" : "No",
-      m.totalMill,
-      m.perMillRate,
-      m.mealCost,
-      m.individualExtra,
-      m.sharedExtra,
-      m.totalCost,
-      m.totalDeposit,
-      m.selfPaidBazar,
-      m.openingDue ?? 0,
-      (m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0),
-      m.remainingJer ?? 0,
-      m.denaPoana,
-      m.permanentFund,
-      `${m.status}/${m.statusEn}`,
-      data.id,
-    ]),
+    summary.memberCalculations.map((m) => {
+      const paid = round(closingByMember.get(m.memberId) ?? 0);
+      return [
+        m.memberId,
+        m.name,
+        m.role,
+        m.phone,
+        m.isActive ? "Yes" : "No",
+        m.totalMill,
+        m.perMillRate,
+        m.mealCost,
+        m.individualExtra,
+        m.sharedExtra,
+        m.totalCost,
+        m.totalDeposit,
+        m.selfPaidBazar,
+        m.openingDue ?? 0,
+        (m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0),
+        m.remainingJer ?? 0,
+        round(m.denaPoana - paid),
+        paid,
+        m.denaPoana,
+        m.permanentFund,
+        `${m.status}/${m.statusEn}`,
+        data.id,
+      ];
+    }),
   );
 }
 

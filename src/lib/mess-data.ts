@@ -422,7 +422,7 @@ export async function openMonth(
         ? await db
             .select()
             .from(membersTable)
-            .where(eq(membersTable.monthId, prev.id))
+            .where(and(eq(membersTable.monthId, prev.id), eq(membersTable.isActive, true)))
             .orderBy(asc(membersTable.sortOrder), asc(membersTable.createdAt))
         : [];
       if (source.length) {
@@ -453,7 +453,13 @@ export async function openMonth(
    *  টিক না দিলে নতুন মাস শূন্য থেকে শুরু হয় (পুরনো মাসের রিপোর্টে বাকি থেকেই যায়)। */
   let carriedBalances = 0;
   let carriedDues = 0;
-  if ((carryDues || carryMemberBalances) && prev) {
+  // idempotency guard — আগেই ক্যারি-ফরওয়ার্ড জমা বসানো থাকলে দ্বিতীয়বার বসবে না
+  const priorCarry = await db
+    .select({ id: deposits.id })
+    .from(deposits)
+    .where(and(eq(deposits.monthId, created.id), eq(deposits.createdBy, "system:carry-forward")))
+    .limit(1);
+  if ((carryDues || carryMemberBalances) && prev && priorCarry.length === 0) {
     const newMembers = await listMembers(officeId, created.id);
     if (newMembers.length) {
       const { summary } = await getMonthSummary(officeId, prev.id);

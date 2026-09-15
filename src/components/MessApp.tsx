@@ -14,7 +14,6 @@ import {
   Modal,
   NumberInput,
   Select,
-  TextArea,
   TextInput,
   ToastStack,
 } from "@/components/ui";
@@ -307,10 +306,8 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
 function ContextBar() {
   const app = useApp();
   const [openMonthModal, setOpenMonthModal] = useState(false);
-  const [reopenOpen, setReopenOpen] = useState(false);
-  const [reopenBusy, setReopenBusy] = useState(false);
   const monthOptions = useMemo(() => {
-    const list = app.months.map((m) => ({ id: m.id, label: `${m.monthName}${m.isClosed ? " 🔒" : ""}` }));
+    const list = app.months.map((m) => ({ id: m.id, label: m.monthName }));
     return list.length ? list : app.month ? [{ id: app.month.id, label: app.month.monthName }] : [];
   }, [app.months, app.month]);
 
@@ -357,17 +354,6 @@ function ContextBar() {
           </Select>
         </label>
 
-        {app.can("month.write") && app.month?.isClosed ? (
-          <button
-            type="button"
-            className="btn btn-sm h-9 border-[var(--warn)] bg-[var(--warn-soft)] font-extrabold text-[var(--warn)] hover:brightness-95"
-            onClick={() => setReopenOpen(true)}
-            title="ভুলে মাস বন্ধ হলে এখান থেকে আবার খুলে দিন"
-          >
-            🔓 মাস খুলুন
-          </button>
-        ) : null}
-
         {app.can("month.write") ? (
           <button type="button" className="btn btn-soft btn-sm h-9" onClick={() => setOpenMonthModal(true)}>
             + নতুন মাস
@@ -376,27 +362,6 @@ function ContextBar() {
       </div>
 
       <NewMonthModal open={openMonthModal} onClose={() => setOpenMonthModal(false)} />
-
-      <ConfirmDialog
-        open={reopenOpen}
-        busy={reopenBusy}
-        title={`${app.month?.monthName ?? "এই"} মাসটি পুনরায় খুলবেন?`}
-        message="মাসটি আবার খোলা হবে — এন্ট্রি দেওয়া ও সব হিসাব সংশোধন করা যাবে। ভুল বন্ধ হলে নির্ভয়ে খুলে দিন, কোনো ডেটা মুছবে না।"
-        confirmLabel="🔓 হ্যাঁ, খুলে দিন"
-        cancelLabel="বাতিল"
-        onCancel={() => setReopenOpen(false)}
-        onConfirm={async () => {
-          if (!app.month) return;
-          setReopenBusy(true);
-          const res = await app.call<{ isClosed: boolean }>("month.close", { monthId: app.month.id, closed: false });
-          setReopenBusy(false);
-          setReopenOpen(false);
-          if (res) {
-            app.toast("মাসটি পুনরায় খোলা হয়েছে 🔓 — এখন এন্ট্রি ও সংশোধন করা যাবে", "success");
-            await app.bootstrap();
-          }
-        }}
-      />
     </div>
   );
 }
@@ -431,11 +396,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [copyMembers, setCopyMembers] = useState(true);
-  const [carryBalances, setCarryBalances] = useState(false);
-  const [carryDues, setCarryDues] = useState(true);
   const [carry, setCarry] = useState(0);
-  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -446,19 +407,13 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
       setYear(app.month ? (app.month.month === 12 ? app.month.year + 1 : app.month.year) : nextYear);
       setMonth(app.month ? (app.month.month === 12 ? 1 : app.month.month + 1) : nextMonth);
       setCarry(0);
-      setNote("");
     }
   }, [open, app.month]);
 
   const submit = async () => {
     setBusy(true);
-    const created = await app.openNewMonth(year, month, {
-      copyMembers,
-      carryForwardBalance: carry,
-      note,
-      carryMemberBalances: carryBalances && !carryDues,
-      carryDues: carryDues && copyMembers,
-    });
+    // সদস্য তালিকা ও অবশিষ্ট দেনা-পাওনা স্বয়ংক্রিয়ভাবে ক্যারি হয় (সার্ভার-সাইড)
+    const created = await app.openNewMonth(year, month, { carryForwardBalance: carry });
     setBusy(false);
     if (created) onClose();
   };
@@ -467,7 +422,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
     <Modal
       open={open}
       title="নতুন মাস খুলুন / Open New Month"
-      subtitle="সদস্য তালিকা কপি হবে, মিল ০ থেকে শুরু।"
+      subtitle="মিল ০ থেকে শুরু হবে।"
       onClose={onClose}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -496,48 +451,17 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
           </Field>
         </div>
 
-        <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] p-2.5 text-[12.5px]">
-          <label className="flex items-center gap-2 font-semibold">
-            <input type="checkbox" checked={copyMembers} onChange={(e) => setCopyMembers(e.target.checked)} className="h-4 w-4" />
-            আগের মাসের সদস্য তালিকা কপি করুন
-          </label>
-          <label className={`flex items-start gap-2 font-semibold ${copyMembers ? "" : "opacity-55"}`}>
-            <input
-              type="checkbox"
-              checked={carryDues && copyMembers}
-              disabled={!copyMembers}
-              onChange={(e) => setCarryDues(e.target.checked)}
-              className="mt-0.5 h-4 w-4"
-            />
-            <span>
-              আগের মাসের বাকি (জের) নতুন মাসে ক্যারি করুন ✓ প্রস্তাবিত
-              <span className="muted block text-[11.5px] font-medium">
-                বাকি জের হিসেবে বসবে — নতুন মাসে নিজের টাকার বাজার থেকে সমন্বয় হবে, পাওনা সমন্বয়-জমা হবে
-              </span>
-            </span>
-          </label>
-          <label className={`flex items-start gap-2 font-semibold ${copyMembers && !carryDues ? "" : "opacity-55"}`}>
-            <input
-              type="checkbox"
-              checked={carryBalances && copyMembers && !carryDues}
-              disabled={!copyMembers || carryDues}
-              onChange={(e) => setCarryBalances(e.target.checked)}
-              className="mt-0.5 h-4 w-4"
-            />
-            <span>
-              আগের মাসের দেনা-পাওনা সমন্বয়-জমা হিসেবে ক্যারি করুন (পুরনো নিয়ম)
-              <span className="muted block text-[11.5px] font-medium">
-                জের-ক্যারি বন্ধ থাকলে বাকি + পাওনা দুটোই সমন্বয়-জমা হয় • টিক না দিলে নতুন মাস শূন্য থেকে শুরু
-              </span>
-            </span>
-          </label>
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-3 text-[12.5px] leading-relaxed">
+          <div className="font-semibold">✅ স্বয়ংক্রিয়ভাবে চলে আসবে — কোনো কপি অপশন লাগবে না:</div>
+          <ul className="muted mt-1 list-disc pl-5">
+            <li>চলতি মাসের সকল সক্রিয় সদস্য নতুন মাসে যুক্ত হবে</li>
+            <li>প্রত্যেকের অবশিষ্ট দেনা-পাওনা (জের) নতুন মাসের হিসাবে বসবে</li>
+            <li>সদস্য যোগ/বাদ পরবর্তীতে সদস্য তালিকা থেকে করা যাবে</li>
+          </ul>
         </div>
 
-        <Field label="পূর্ববর্তী ব্যালেন্স carried forward (ঐচ্ছিক)" hint="নগদ ব্যালেন্স পরের মাসে নিতে চাইলে লিখুন">
+        <Field label="পূর্ববর্তী নগদ ব্যালেন্স (ঐচ্ছিক)" hint="নগদ ব্যালেন্স পরের মাসে নিতে চাইলে লিখুন">
           <NumberInput value={carry} min={0} step="0.01" onChange={(e) => setCarry(Number(e.target.value))} />
-        </Field>
-        <Field label="নোট (ঐচ্ছিক)">
-          <TextArea value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
         </Field>
       </div>
     </Modal>

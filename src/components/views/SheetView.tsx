@@ -155,19 +155,14 @@ export function SheetView() {
         </Card>
         <Card bodyClass="p-3">
           <div className="kpi-k">Auto Sync</div>
-          <label className="mt-1 flex items-center gap-2 text-[12.5px] font-semibold">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
-              checked={app.autoSync}
-              disabled={!canSync}
-              onChange={(e) => {
-                app.setAutoSync(e.target.checked);
-                app.toast(e.target.checked ? "অটো সিংক চালু হয়েছে — প্রতিটি সেভের পর শিট হালনাগাদ হবে" : "অটো সিংক বন্ধ হয়েছে", "info");
-              }}
-            />
-            {app.autoSync ? "চালু" : "বন্ধ"}
-          </label>
+          <div className="mt-1">
+            <Badge tone={status?.autoSync ? "ok" : "warn"}>
+              {status?.autoSync ? "স্বয়ংক্রিয় চালু" : "সার্ভারে বন্ধ"}
+            </Badge>
+            <div className="muted mt-1 text-[10.5px] leading-tight">
+              প্রতিটি হিসাব এন্ট্রি সংরক্ষণের পর শিট নিজে থেকেই হালনাগাদ হয় — কোনো সুইচ লাগে না।
+            </div>
+          </div>
         </Card>
       </div>
 

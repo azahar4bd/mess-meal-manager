@@ -3,7 +3,7 @@ import { api } from "@/lib/api";
 import { can } from "@/lib/permissions";
 import { AuthError } from "@/lib/auth";
 import { getMonthSummary, getOffice, listSyncLogs, officeDTO } from "@/lib/mess-data";
-import { buildSyncPayload, pingScript, pullSheet, resolveScriptUrl, runFullSync } from "@/lib/sheets";
+import { autoSyncEnabled, buildSyncPayload, pingScript, pullSheet, resolveScriptUrl, runFullSync } from "@/lib/sheets";
 import { str } from "@/lib/validate";
 import { audit } from "@/lib/audit";
 import { dhakaNow } from "@/lib/date";
@@ -119,7 +119,7 @@ export const GET = api({ auth: true, limit: "sync" }, async (_req: NextRequest, 
     sheetUrl: officeRow.sheetUrl,
     sheetId: officeRow.sheetId,
     lastSyncedAt: officeRow.lastSyncedAt ? officeRow.lastSyncedAt.toISOString() : null,
-    autoSync: String(process.env.AUTO_SYNC ?? "0") === "1",
+    autoSync: autoSyncEnabled(),
     logs: await listSyncLogs(officeRow.id, 15),
   };
 });

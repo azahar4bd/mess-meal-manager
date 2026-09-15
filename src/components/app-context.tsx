@@ -265,18 +265,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const result = await mess<T>(action, body);
         const isWrite = !action.endsWith(".list") && !action.endsWith(".data") && !action.startsWith("sheet.") && action !== "bootstrap";
         if (isWrite) {
+          // ডেটা রিফ্রেশ + সার্ভার-সাইড স্বয়ংক্রিয় গুগল শিট সিংক (after()-হুক);
+          // ক্লায়েন্ট থেকে আলাদা সিংক কল করা হয় না (ডুপ্লিকেট/পারমিশন এরর এড়াতে)।
           await refresh();
-          if (autoSync) {
-            setSyncBusy(true);
-            try {
-              await mess("sheet.sync", { monthId: month?.id });
-              toast("অটো সিংক সম্পন্ন ✓", "success");
-            } catch (syncErr) {
-              toast(`ডেটা সংরক্ষিত হয়েছে, কিন্তু অটো সিংক ব্যর্থ: ${syncErr instanceof Error ? syncErr.message : ""}`, "error");
-            } finally {
-              setSyncBusy(false);
-            }
-          }
         }
         return result;
       } catch (err) {
@@ -284,7 +275,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
     },
-    [month, refresh, autoSync, toast],
+    [month, refresh, toast],
   );
 
   const selectMonth = useCallback(

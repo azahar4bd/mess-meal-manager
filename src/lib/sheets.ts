@@ -425,11 +425,19 @@ export async function runFullSync(opts: FullSyncOptions): Promise<FullSyncResult
 }
 
 /**
+ * Auto sync is ON by default (Google Sheet প্রতিটি write-এর পর স্বয়ংক্রিয়ভাবে
+ * আপডেট হয়); শুধু AUTO_SYNC="0" সেট করলে বন্ধ থাকে।
+ */
+export function autoSyncEnabled(): boolean {
+  return String(process.env.AUTO_SYNC ?? "1").trim() !== "0";
+}
+
+/**
  * Auto sync (spec §64) — fire-and-forget, never throws, never blocks the
  * database write that triggered it.
  */
 export async function maybeAutoSync(opts: FullSyncOptions): Promise<void> {
-  if (String(process.env.AUTO_SYNC ?? "0") !== "1") return;
+  if (!autoSyncEnabled()) return;
   try {
     await runFullSync({ ...opts, trigger: "auto" });
   } catch (err) {
