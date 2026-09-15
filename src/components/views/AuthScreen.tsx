@@ -5,7 +5,7 @@ import { apiPost, ApiError } from "@/lib/client";
 import { Field, TextInput, Badge } from "@/components/ui";
 import { useApp } from "@/components/app-context";
 import { NoticeTicker } from "@/components/UiContent";
-import { DEFAULT_TEXTS, type Notice, type UiTexts } from "@/lib/ui-content-types";
+import { DEFAULT_TEXTS, heroBackground, type Notice, type UiTexts } from "@/lib/ui-content-types";
 import type { Role } from "@/lib/types";
 
 export type AuthMode = "login" | "signup" | "join";
@@ -99,6 +99,8 @@ export function AuthScreen({
   const texts = ui?.texts ?? DEFAULT_TEXTS;
   const notices = ui?.notices ?? [];
   const heroFeatures = (texts.heroFeatures || "").split("\n").map((x) => x.trim()).filter(Boolean);
+  const heroBg = heroBackground(texts.heroTheme);
+  const brandInitial = (texts.appName || "M").trim().charAt(0).toUpperCase() || "M";
 
   const switchMode = (m: AuthMode) => {
     setMode(m);
@@ -113,10 +115,13 @@ export function AuthScreen({
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
-      <NoticeTicker notices={notices} />
+      <NoticeTicker notices={notices} label={texts.marqueeLabel} />
       <div className="mx-auto grid min-h-screen w-full max-w-6xl items-stretch gap-0 lg:grid-cols-[1.05fr_1fr]">
         {/* ── brand panel ─────────────────────────────── */}
-        <aside className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand)] p-8 text-white lg:flex">
+        <aside
+          className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand)] p-8 text-white lg:flex"
+          style={heroBg ? { background: heroBg } : undefined}
+        >
           <div
             aria-hidden
             className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10"
@@ -127,7 +132,7 @@ export function AuthScreen({
           />
           <div className="relative">
             <div className="flex items-center gap-3">
-              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-[22px] font-black">M</span>
+              <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15 text-[22px] font-black">{brandInitial}</span>
               <div>
                 <div className="text-[20px] font-extrabold leading-tight">{texts.appName}</div>
                 <div className="text-[12.5px] text-white/80">{texts.heroBadge}</div>
@@ -160,7 +165,7 @@ export function AuthScreen({
           <div className="w-full max-w-md">
             <div className="mb-4 flex items-center justify-between gap-2 lg:hidden">
               <div className="flex items-center gap-2">
-                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--brand)] text-[17px] font-black text-white">M</span>
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--brand)] text-[17px] font-black text-white">{brandInitial}</span>
                 <div>
                   <div className="text-[15px] font-extrabold leading-tight">{texts.appName}</div>
                   <div className="muted text-[11px]">{texts.heroBadge}</div>

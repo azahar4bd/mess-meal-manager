@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { AppProvider, useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
-import { AppNoticeTicker } from "@/components/UiContent";
+import { AppNoticeTicker, GlobalEditButton, useUiContent } from "@/components/UiContent";
 import {
   Badge,
   ConfirmDialog,
@@ -130,9 +130,30 @@ function Shell({ initialTab }: { initialTab?: string }) {
         {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
         <TabRouter />
       </main>
+      <FooterBar />
       <MobileTabBar />
+      <GlobalEditButton />
       <ToastStack toasts={app.toasts} onClose={app.closeToast} />
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  Footer — এডিটেবল (UiContentEditor → ফুটার)
+ * ══════════════════════════════════════════════════════════ */
+
+function FooterBar() {
+  const app = useApp();
+  const { texts } = useUiContent(app.office?.id ?? null);
+  const main = texts.footerText?.trim() || texts.appName || "Mess Meal Manager";
+  const sub = texts.footerSubText?.trim() || "";
+  return (
+    <footer className="mx-auto mt-6 w-full max-w-6xl px-3 pb-24 text-center no-print sm:px-4 sm:pb-6">
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
+        <div className="text-[12.5px] font-extrabold">{main}</div>
+        {sub ? <div className="muted mt-0.5 text-[11px]">{sub}</div> : null}
+      </div>
+    </footer>
   );
 }
 
@@ -203,8 +224,12 @@ function NoAccess() {
 
 function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v: boolean) => void }) {
   const app = useApp();
+  const { texts } = useUiContent(app.office?.id ?? null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const roleLabel = app.role ? ROLE_LABEL[app.role] : null;
+  const brandTitle = texts.headerTitle?.trim() || texts.appName || "Mess Meal Manager";
+  const brandInitial = brandTitle.trim().charAt(0).toUpperCase() || "M";
+  const defaultTagline = `${app.office?.name ?? "—"}${app.office?.branch ? ` • ${app.office.branch}` : ""}`;
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)]/95 backdrop-blur no-print">
@@ -220,12 +245,11 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
         </button>
 
         <button type="button" onClick={() => app.setTab(app.can("dashboard.view") ? "dashboard" : "report")} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--brand)] text-[16px] font-black text-white">M</span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[var(--brand)] text-[16px] font-black text-white">{brandInitial}</span>
           <span className="min-w-0">
-            <span className="block truncate text-[14.5px] font-extrabold leading-tight">Mess Meal Manager</span>
+            <span className="block truncate text-[14.5px] font-extrabold leading-tight">{brandTitle}</span>
             <span className="muted block truncate text-[11px] leading-tight">
-              {app.office?.name ?? "—"}
-              {app.office?.branch ? ` • ${app.office.branch}` : ""}
+              {texts.headerTagline?.trim() || defaultTagline}
             </span>
           </span>
         </button>
@@ -283,6 +307,8 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
 function ContextBar() {
   const app = useApp();
   const [openMonthModal, setOpenMonthModal] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenBusy, setReopenBusy] = useState(false);
   const monthOptions = useMemo(() => {
     const list = app.months.map((m) => ({ id: m.id, label: `${m.monthName}${m.isClosed ? " 🔒" : ""}` }));
     return list.length ? list : app.month ? [{ id: app.month.id, label: app.month.monthName }] : [];
@@ -331,6 +357,17 @@ function ContextBar() {
           </Select>
         </label>
 
+        {app.can("month.write") && app.month?.isClosed ? (
+          <button
+            type="button"
+            className="btn btn-sm h-9 border-[var(--warn)] bg-[var(--warn-soft)] font-extrabold text-[var(--warn)] hover:brightness-95"
+            onClick={() => setReopenOpen(true)}
+            title="ভুলে মাস বন্ধ হলে এখান থেকে আবার খুলে দিন"
+          >
+            🔓 মাস খুলুন
+          </button>
+        ) : null}
+
         {app.can("month.write") ? (
           <button type="button" className="btn btn-soft btn-sm h-9" onClick={() => setOpenMonthModal(true)}>
             + নতুন মাস
@@ -339,6 +376,27 @@ function ContextBar() {
       </div>
 
       <NewMonthModal open={openMonthModal} onClose={() => setOpenMonthModal(false)} />
+
+      <ConfirmDialog
+        open={reopenOpen}
+        busy={reopenBusy}
+        title={`${app.month?.monthName ?? "এই"} মাসটি পুনরায় খুলবেন?`}
+        message="মাসটি আবার খোলা হবে — এন্ট্রি দেওয়া ও সব হিসাব সংশোধন করা যাবে। ভুল বন্ধ হলে নির্ভয়ে খুলে দিন, কোনো ডেটা মুছবে না।"
+        confirmLabel="🔓 হ্যাঁ, খুলে দিন"
+        cancelLabel="বাতিল"
+        onCancel={() => setReopenOpen(false)}
+        onConfirm={async () => {
+          if (!app.month) return;
+          setReopenBusy(true);
+          const res = await app.call<{ isClosed: boolean }>("month.close", { monthId: app.month.id, closed: false });
+          setReopenBusy(false);
+          setReopenOpen(false);
+          if (res) {
+            app.toast("মাসটি পুনরায় খোলা হয়েছে 🔓 — এখন এন্ট্রি ও সংশোধন করা যাবে", "success");
+            await app.bootstrap();
+          }
+        }}
+      />
     </div>
   );
 }
@@ -492,6 +550,7 @@ function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }
 
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const app = useApp();
+  const { texts } = useUiContent(app.office?.id ?? null);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 no-print">
@@ -547,7 +606,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
             </span>
             Logout
           </button>
-          <p className="muted px-3 pt-1 text-[10.5px]">v1.0.0 • Multi-Office Platform</p>
+          <p className="px-3 pt-1 text-[11px] font-bold">{texts.footerText?.trim() || texts.appName || "Mess Meal Manager"}</p>
+          {texts.footerSubText?.trim() ? <p className="muted px-3 text-[10.5px]">{texts.footerSubText}</p> : null}
         </div>
       </aside>
     </div>

@@ -175,12 +175,12 @@ function OverviewPanel() {
 
         <Card title="অ্যাপের টেক্সট ও নোটিশ / App Content" bodyClass="p-3">
           <p className="muted mb-2.5 text-[12.5px]">
-            লগইন পেজের হিরো, হেডার/সাবটাইটেল, ফুটার এবং উপরের স্ক্রলিং নোটিশ — সব অফিসের জন্য কমন টেক্সট এখান থেকে বদলানো যায়।
+            লগইন পেজের হিরো (টাইটেল/স্টাইল), হেডার, ফুটার ও উপরের স্ক্রলিং নোটিশ — সব অফিসের জন্য কমন টেক্সট এখান থেকে বদলানো যায়।
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setContentOpen(true)}>✎ এডিট করুন</button>
             <span className="muted self-center text-[11.5px]">
-              একক অফিসের টেক্সট বদলাতে ড্যাশবোর্ডের ✎ বাটন ব্যবহার করুন।
+              যেকোনো পেজে নিচে-ডানের ভাসমান <strong>✏️ এডিট</strong> বাটন থেকেও একই এডিটর খোলে; অফিসে ঢুকে সেখান থেকে ওই অফিসের টেক্সট বদলানো যায়।
             </span>
           </div>
         </Card>

@@ -2,9 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { cryptoId } from "@/db/schema";
-import { DEFAULT_TEXTS, type Notice, type UiTexts } from "@/lib/ui-content-types";
+import { DEFAULT_TEXTS, HERO_THEMES, heroBackground, type Notice, type UiTexts } from "@/lib/ui-content-types";
 
-export { DEFAULT_TEXTS };
+export { DEFAULT_TEXTS, HERO_THEMES, heroBackground };
 export type { Notice, UiTexts };
 
 /* ══════════════════════════════════════════════════════════
@@ -79,6 +79,11 @@ export async function setTexts(officeId: string | null, patch: Partial<UiTexts>)
   const next: Partial<UiTexts> = { ...current };
   for (const key of Object.keys(DEFAULT_TEXTS) as (keyof UiTexts)[]) {
     if (patch[key] === undefined) continue;
+    if (key === "heroTheme") {
+      const t = String(patch.heroTheme ?? "").trim();
+      next.heroTheme = HERO_THEMES.some((h) => h.id === t) ? t : "green";
+      continue;
+    }
     next[key] = cleanText(patch[key], key === "heroFeatures" || key === "heroDescription" ? 1200 : 300);
   }
   await writeSetting(scopeKey(TEXTS_KEY, officeId), officeId, JSON.stringify(next));

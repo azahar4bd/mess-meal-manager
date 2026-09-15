@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { useApp } from "@/components/app-context";
-import { UiContentEditor, useUiContent } from "@/components/UiContent";
+import { useUiContent } from "@/components/UiContent";
 import { Badge, Card, EmptyState, Kpi, Loader } from "@/components/ui";
 import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
@@ -12,7 +12,6 @@ export function DashboardView() {
   const s = app.summary;
   const data = app.data;
   const { texts } = useUiContent(app.office?.id ?? null);
-  const [editorOpen, setEditorOpen] = useState(false);
 
   const topMembers = useMemo(() => {
     if (!s) return [];
@@ -34,17 +33,6 @@ export function DashboardView() {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <h1 className="truncate text-[19px] font-extrabold leading-tight">{texts.dashboardTitle || "ড্যাশবোর্ড / Dashboard"}</h1>
-            {app.can("settings.write") ? (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm h-7 w-7 shrink-0 px-0 text-[13px]"
-                title="হেডার/সাবটাইটেল ও নোটিশ বোর্ড এডিট করুন"
-                aria-label="টেক্সট ও নোটিশ এডিট করুন"
-                onClick={() => setEditorOpen(true)}
-              >
-                ✎
-              </button>
-            ) : null}
           </div>
           <p className="muted text-[12.5px]">
             {app.office?.name}
@@ -72,7 +60,7 @@ export function DashboardView() {
         </div>
       </div>
 
-      {app.can("settings.write") ? <UiContentEditor open={editorOpen} onClose={() => setEditorOpen(false)} scope="office" /> : null}
+      {/* কন্টেন্ট এডিটর এখন সব পেজে একই ভাসমান ✏️ এডিট বাটন থেকে খোলে */}
 
       {/* ── KPI grid (spec §39, §85) ─────────────────── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
