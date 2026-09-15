@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/app-context";
-import { Card, EmptyState, Loader } from "@/components/ui";
+import { Card, EmptyState, Loader, Modal } from "@/components/ui";
 import { MessageBubble } from "@/components/SupportChat";
 import { mess } from "@/lib/client";
 import { toDisplayDateTime } from "@/lib/date";
@@ -171,5 +171,59 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
         )}
       </Card>
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  অ্যাডমিনের ভাসমান 💬 বাটন — যেকোনো পেজ থেকে ইনবক্স
+ * ══════════════════════════════════════════════════════════ */
+
+export function AdminChatButton() {
+  const app = useApp();
+  const [open, setOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  const refresh = useCallback(async () => {
+    if (app.role !== "admin") return;
+    try {
+      const res = await mess<{ messages?: number; count?: number }>("support.unread");
+      setUnread(res.messages ?? res.count ?? 0);
+    } catch {
+      /* নীরবে */
+    }
+  }, [app.role]);
+
+  useEffect(() => {
+    if (app.role !== "admin") return;
+    void refresh();
+    const t = setInterval(() => void refresh(), 45000);
+    return () => clearInterval(t);
+  }, [app.role, refresh]);
+
+  if (app.role !== "admin") return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="বার্তা ইনবক্স"
+        aria-label="চ্যাট ইনবক্স খুলুন"
+        className="fixed bottom-[74px] left-3 z-40 inline-flex items-center gap-1.5 rounded-full p-3 text-white shadow-lg shadow-black/20 transition hover:brightness-110 sm:bottom-5"
+        style={{ background: "linear-gradient(135deg,#0d9488 0%,var(--brand) 55%,#059669 100%)" }}
+      >
+        <span className="text-[18px]" aria-hidden>
+          💬
+        </span>
+        {unread > 0 ? (
+          <span className="absolute -right-1 -top-1 grid h-5 min-w-[20px] place-items-center rounded-full bg-[var(--danger)] px-1 text-[10.5px] font-extrabold text-white">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        ) : null}
+      </button>
+      <Modal open={open} title="💬 বার্তা ইনবক্স" onClose={() => setOpen(false)} wide>
+        <AdminMessages key={open ? "open" : "closed"} />
+      </Modal>
+    </>
   );
 }

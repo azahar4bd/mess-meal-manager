@@ -94,48 +94,43 @@ export async function unreadForAdmin(): Promise<{ messages: number; threads: num
   return { messages: rows[0]?.messages ?? 0, threads: rows[0]?.threads ?? 0 };
 }
 
-/** অ্যাডমিনের ইনবক্স — প্রতি ব্যবহারকারী এক সারি, সাম্প্রতিক আগে */
+/** অ্যাডমিনের ইনবক্স — প্রতি ব্যবহারকারী এক সারি, সাম্প্রতিক আগে (ড্রাইভার-নিরপেক্ষ: query builder) */
 export async function listThreads(): Promise<SupportThread[]> {
-  const rows = await db.execute<{
-    user_id: string;
-    user_name: string;
-    role: string;
-    office_id: string;
-    office_name: string;
-    last_at: Date;
-    last_body: string;
-    last_sender: string;
-    unread: number;
-    total: number;
-  }>(sql`
-    select distinct on (${supportMessages.userId})
-      ${supportMessages.userId} as user_id,
-      ${supportMessages.userName} as user_name,
-      ${supportMessages.role} as role,
-      ${supportMessages.officeId} as office_id,
-      ${supportMessages.officeName} as office_name,
-      ${supportMessages.at} as last_at,
-      ${supportMessages.body} as last_body,
-      ${supportMessages.sender} as last_sender,
-      count(*) over (partition by ${supportMessages.userId})::int as total,
-      coalesce(sum(case when ${supportMessages.read} = false and ${supportMessages.sender} = 'user' then 1 else 0 end)
-        over (partition by ${supportMessages.userId}), 0)::int as unread
-    from ${supportMessages}
-    order by ${supportMessages.userId}, ${supportMessages.at} desc
-  `);
-  const list = (rows as unknown as Array<Record<string, unknown>>).map((r) => ({
-    userId: String(r.user_id),
-    userName: String(r.user_name ?? ""),
-    role: String(r.role ?? ""),
-    officeId: String(r.office_id ?? ""),
-    officeName: String(r.office_name ?? ""),
-    lastAt: (r.last_at as Date).toISOString(),
-    lastBody: String(r.last_body ?? ""),
-    lastSender: r.last_sender === "admin" ? ("admin" as const) : ("user" as const),
-    unread: Number(r.unread ?? 0),
-    total: Number(r.total ?? 0),
-  }));
-  return list.sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
+  const rows = await db
+    .select()
+    .from(supportMessages)
+    .orderBy(asc(supportMessages.at));
+  const map = new Map<string, SupportThread & { _lastAt: number }>();
+  type MutableThread = SupportThread & { _lastAt: number };
+  for (const r of rows) {
+    const unread = r.read === false && r.sender === "user" ? 1 : 0;
+    const existing = map.get(r.userId);
+    if (existing) {
+      existing.total += 1;
+      existing.unread += unread;
+      existing.lastAt = r.at.toISOString();
+      existing.lastBody = r.body;
+      existing.lastSender = r.sender === "admin" ? "admin" : "user";
+      existing._lastAt = r.at.getTime();
+    } else {
+      map.set(r.userId, {
+        userId: r.userId,
+        userName: r.userName,
+        role: r.role,
+        officeId: r.officeId,
+        officeName: r.officeName,
+        lastAt: r.at.toISOString(),
+        lastBody: r.body,
+        lastSender: r.sender === "admin" ? "admin" : "user",
+        unread,
+        total: 1,
+        _lastAt: r.at.getTime(),
+      });
+    }
+  }
+  return [...map.values()]
+    .sort((a, b) => b._lastAt - a._lastAt)
+    .map(({ _lastAt, ...t }: MutableThread) => t);
 }
 
 /** নির্দিষ্ট ব্যবহারকারীর পুরো থ্রেড; খোলামাত্র ইনবাউন্ড পঠিত ধরা হয় */

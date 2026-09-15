@@ -30,6 +30,7 @@ import { MembersView } from "@/components/views/MembersView";
 import { ReportView } from "@/components/views/ReportView";
 import { SheetView } from "@/components/views/SheetView";
 import { AdminView } from "@/components/views/AdminView";
+import { AdminChatButton } from "@/components/views/AdminMessages";
 import { MONTH_NAMES_BN, MONTH_NAMES_EN } from "@/lib/date";
 import { mess as messCall } from "@/lib/client";
 import { MENU, ROLE_LABEL } from "@/lib/permissions";
@@ -134,6 +135,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <MobileTabBar />
       <GlobalEditButton />
       <SupportChatButton />
+      <AdminChatButton />
       <ToastStack toasts={app.toasts} onClose={app.closeToast} />
     </div>
   );
