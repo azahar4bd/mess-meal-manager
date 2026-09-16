@@ -7,7 +7,7 @@
  * GET /api/report/export?format=html (a standalone .html file).
  */
 import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
-import { toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
+import { isoOfDay, toDisplayDate, toDisplayDateTime, monthLabelBn } from "@/lib/date";
 import { bazarByBuyer, bazarByCategory } from "@/lib/calc";
 import type { MessData, MonthSummary, OfficeDTO } from "@/lib/types";
 
@@ -88,8 +88,13 @@ export function buildPrintHtml(input: PrintReportInput): string {
   const paymentTotalPaid = round2(paymentRows.reduce((s, r) => s + r.paid, 0));
   const paymentRemainDue = round2(paymentRows.filter((r) => r.m.denaPoana < -0.005).reduce((s, r) => s + Math.abs(r.m.denaPoana), 0));
   const paymentRemainRecv = round2(paymentRows.filter((r) => r.m.denaPoana > 0.005).reduce((s, r) => s + r.m.denaPoana, 0));
+  // পূর্ণ-মাস রেঞ্জ (১–শেষ তারিখ) আসলে ফিল্টার নয় — জমা টেবিল তখনও দেখাই
+  const rangeIsFull =
+    !fromDate || !toDate
+      ? true
+      : fromDate <= isoOfDay(data.year, data.month, 1) && toDate >= isoOfDay(data.year, data.month, data.totalDays);
   const paymentTableHtml =
-    !fromDate && !toDate && paymentRows.length > 0
+    rangeIsFull && paymentRows.length > 0
       ? `
     <h2>★ দেনা-পাওনা জমা (সদস্য হিসেবের পরিপূরক)</h2>
     <table>

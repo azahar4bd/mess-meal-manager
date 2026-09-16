@@ -305,13 +305,16 @@ export function ReportView() {
   const [reloadTick, setReloadTick] = useState(0);
   const reload = useCallback(() => setReloadTick((x) => x + 1), []);
 
-  const summary = report?.summary ?? app.summary;
-  const data = report?.data ?? app.data;
+  // অন্য মাসের রেসপন্স যেন এই মাসে ভুলে রেন্ডার না হয় (ব্লিংকিং দূর করতে)
+  const currentReport = report && month && report.month?.id === month.id ? report : null;
+  const summary = currentReport?.summary ?? (app.month?.id === month?.id ? app.summary : null);
+  const data = currentReport?.data ?? (app.month?.id === month?.id ? app.data : null);
 
   const firstDay = month ? isoOfDay(month.year, month.month, 1) : "";
   const lastDayIso = month ? isoOfDay(month.year, month.month, month.totalDays) : "";
 
-  // মাস বদলালে ফিল্টার পুরো মাসে রিসেট — বাছামাত্র নিচের ইফেক্ট রিপোর্ট আনে
+  // মাস বদলালে ফিল্টার পুরো মাসে রিসেট — বাছামাত্র নিচের ইফেক্ট রিপোর্ট আনে।
+  const monthRef = useRef<string | undefined>(month?.id);
   useEffect(() => {
     if (!month) return;
     setFromDate(isoOfDay(month.year, month.month, 1));
@@ -323,29 +326,38 @@ export function ReportView() {
   // তারিখ বাছামাত্র স্বয়ংক্রিয়ভাবে রিপোর্ট লোড (কোনো OK/দেখুন বাটন নেই)
   useEffect(() => {
     if (!month || !fromDate || !toDate) return;
-    // রেঞ্জ ভিন্ন মাসে পড়লে সেই মাসে স্বয়ংক্রিয় সুইচ (মাস মডেল মাস-ভিত্তিক)
     const fromYM = fromDate.slice(0, 7);
     const toYM = toDate.slice(0, 7);
     const curYM = isoOfDay(month.year, month.month, 1).slice(0, 7);
-    if (fromYM !== toYM) {
-      setRangeWarn("শুরু ও শেষ তারিখ একই মাসের হতে হবে — এক মাসের রিপোর্ট দেখানো হয়।");
+
+    // মাস এইমাত্র বদলেছে — তারিখ রিসেট-ইফেক্ট নতুন মান বসালে এই ইফেক্ট
+    // আবার চলবে; এই পাসে পুরোনো মাসের তারিখ নিয়ে কিছু করা যাবে না।
+    if (monthRef.current !== month.id) {
+      monthRef.current = month.id;
       return;
     }
-    if (fromDate < firstDay || toDate > lastDayIso) {
+    if (fromYM !== toYM) {
+      setRangeWarn("শুরু ও শেষ তারিখ একই মাসের হতে হবে — এক মাসের রিপোর্ট দেখানো হয়।");
+      setLoading(false);
+      return;
+    }
+    if (fromYM !== curYM) {
+      // ইচ্ছাকৃতভাবে অন্য মাসের তারিখ টাইপ/বাছা হয়েছে — সেই মাস খোলা থাকলে সুইচ
       const target = app.months.find((x) => isoOfDay(x.year, x.month, 1).slice(0, 7) === fromYM);
       if (target && target.id !== month.id) {
         void app.selectMonth(target.id);
         return;
       }
-      setRangeWarn(
-        fromYM === curYM
-          ? ""
-          : "এই তারিখের মাস এখনো খোলা হয়নি — উপরের মাস সিলেক্টর থেকে মাস বেছে নিন।",
-      );
-      if (fromYM !== curYM) return;
-    } else {
-      setRangeWarn("");
+      setLoading(false);
+      setRangeWarn("এই তারিখের মাস এখনো খোলা হয়নি — উপরের মাস সিলেক্টর থেকে মাস বেছে নিন।");
+      return;
     }
+    if (fromDate < firstDay || toDate > lastDayIso) {
+      setLoading(false);
+      setRangeWarn("তারিখ নির্বাচিত মাসের ভেতরে হতে হবে।");
+      return;
+    }
+    setRangeWarn("");
 
     const myReq = ++reqId.current;
     setLoading(true);

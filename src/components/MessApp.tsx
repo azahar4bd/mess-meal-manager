@@ -309,6 +309,8 @@ function ContextBar() {
   const app = useApp();
   const [closeOpen, setCloseOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const monthOptions = useMemo(() => {
     const list = app.months.map((m) => ({ id: m.id, label: `${m.isClosed ? "🔒 " : ""}${m.monthName}${m.isClosed ? " (বন্ধ)" : ""}` }));
     return list.length ? list : app.month ? [{ id: app.month.id, label: app.month.monthName }] : [];
@@ -368,11 +370,11 @@ function ContextBar() {
           </button>
         ) : null}
 
-        {app.can("month.write") && app.month?.isClosed ? (
+        {app.can("office.manage") && app.month?.isClosed ? (
           <button
             type="button"
             className="btn btn-soft btn-sm h-9 border-[var(--brand)] text-[var(--brand)]"
-            onClick={() => void app.reopenMonth(app.month!.id)}
+            onClick={() => setReopenOpen(true)}
             title="পুরনো/বন্ধ মাস পুনরায় চালু করুন (সংশোধনের পর আবার ক্লোজ করা যাবে)"
           >
             🔓 মাস চালু করুন
@@ -384,7 +386,7 @@ function ContextBar() {
         open={closeOpen}
         busy={closing}
         title="চালু মাস ক্লোজ করবেন?"
-        message={`${app.month?.monthName ?? ""} মাস বন্ধ হলেই সঙ্গে সঙ্গে পরের মাস খুলে যাবে — সক্রিয় সদস্য, নগদ লাস্ট ব্যালেন্স ও অবশিষ্ট জের/পাওনা স্বয়ংক্রিয় ক্যারি হবে। বন্ধ মাসের পুরনো হিসাব অপরিবর্তিত থাকবে (অ্যাডমিন প্যানেল থেকে পুনরায় চালু করা যায়)।`}
+        message={`${app.month?.monthName ?? ""} মাস বন্ধ হলেই সঙ্গে সঙ্গে পরের মাস খুলে যাবে — সক্রিয় সদস্য, নগদ লাস্ট ব্যালেন্স ও অবশিষ্ট জের/পাওনা স্বয়ংক্রিয় ক্যারি হবে। বন্ধ মাসের পুরনো হিসাব অপরিবর্তিত থাকবে (প্রয়োজনে শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন পুনরায় চালু করতে পারবেন)।`}
         confirmLabel="হ্যাঁ, ক্লোজ করে পরের মাস খুলুন"
         cancelLabel="বাতিল"
         onCancel={() => setCloseOpen(false)}
@@ -393,6 +395,23 @@ function ContextBar() {
           const next = await app.closeCurrentMonth();
           setClosing(false);
           if (next) setCloseOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={reopenOpen}
+        busy={reopening}
+        title="বন্ধ মাস পুনরায় চালু করবেন?"
+        message={`${app.month?.monthName ?? ""} মাস চালু করা হলে সংশোধন করতে পারবেন। পরের মাসে তখনো কোনো এন্ট্রি না পড়লে সংশোধন শেষে আবার ক্লোজ করার সময় জের/নগদ নতুন হিসাবে নিখুঁতভাবে বসবে; পরের মাসে এন্ট্রি পড়ে গেলে তা ছোঁয়া হবে না।`}
+        confirmLabel="হ্যাঁ, মাস চালু করুন"
+        cancelLabel="বাতিল"
+        onCancel={() => setReopenOpen(false)}
+        onConfirm={async () => {
+          if (!app.month) return;
+          setReopening(true);
+          const ok = await app.reopenMonth(app.month.id);
+          setReopening(false);
+          if (ok) setReopenOpen(false);
         }}
       />
     </div>

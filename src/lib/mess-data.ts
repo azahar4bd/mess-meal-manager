@@ -416,34 +416,39 @@ export async function openMonth(
   }
 
   let copiedMembers = 0;
-  if (copyMembers) {
-    const existing = await db.select({ id: membersTable.id }).from(membersTable).where(eq(membersTable.monthId, created.id));
-    if (existing.length === 0) {
-      const source = prev
-        ? await db
-            .select()
-            .from(membersTable)
-            .where(and(eq(membersTable.monthId, prev.id), eq(membersTable.isActive, true)))
-            .orderBy(asc(membersTable.sortOrder), asc(membersTable.createdAt))
-        : [];
-      if (source.length) {
-        await db.insert(membersTable).values(
-          source.map((m, i) => ({
-            id: cryptoId("mem"),
-            officeId,
-            monthId: created.id,
-            name: m.name,
-            role: m.role,
-            isActive: m.isActive,
-            phone: m.phone,
-            note: m.note,
-            password: "",
-            sortOrder: m.sortOrder || i + 1,
-            joinedAt: new Date(),
-          })),
-        );
-        copiedMembers = source.length;
-      }
+  if (copyMembers && prev) {
+    // মাস আগে থেকে থাকলেও (যেমন boot সময়ে ensureMonth) যে সক্রিয় সদস্যরা
+    // এখনো নেই, তাঁদের বসিয়ে দিই — ফোন/নাম মিলিয়ে।
+    const [existingRows, source] = await Promise.all([
+      listMembers(officeId, created.id),
+      db
+        .select()
+        .from(membersTable)
+        .where(and(eq(membersTable.monthId, prev.id), eq(membersTable.isActive, true)))
+        .orderBy(asc(membersTable.sortOrder), asc(membersTable.createdAt)),
+    ]);
+    const existingPhones = new Set(existingRows.map((m) => m.phone).filter(Boolean));
+    const existingNames = new Set(existingRows.map((m) => m.name.trim().toLowerCase()));
+    const missing = source.filter(
+      (m) => !(m.phone && existingPhones.has(m.phone)) && !existingNames.has(m.name.trim().toLowerCase()),
+    );
+    if (missing.length) {
+      await db.insert(membersTable).values(
+        missing.map((m, i) => ({
+          id: cryptoId("mem"),
+          officeId,
+          monthId: created.id,
+          name: m.name,
+          role: m.role,
+          isActive: m.isActive,
+          phone: m.phone,
+          note: m.note,
+          password: "",
+          sortOrder: m.sortOrder || existingRows.length + i + 1,
+          joinedAt: new Date(),
+        })),
+      );
+      copiedMembers = missing.length;
     }
   }
 
@@ -454,14 +459,20 @@ export async function openMonth(
    *  টিক না দিলে নতুন মাস শূন্য থেকে শুরু হয় (পুরনো মাসের রিপোর্টে বাকি থেকেই যায়)। */
   let carriedBalances = 0;
   let carriedDues = 0;
-  // idempotency guard — আগেই ক্যারি-ফরওয়ার্ড জমা বসানো থাকলে দ্বিতীয়বার বসবে না
-  const priorCarry = await db
-    .select({ id: deposits.id })
-    .from(deposits)
-    .where(and(eq(deposits.monthId, created.id), eq(deposits.createdBy, "system:carry-forward")))
-    .limit(1);
-  if ((carryDues || carryMemberBalances) && prev && priorCarry.length === 0) {
-    const newMembers = await listMembers(officeId, created.id);
+  // idempotency guard — আগেই ক্যারি বসানো থাকলে (পাওনার সমন্বয়-জমা, অথবা
+  // কারো প্রারম্ভিক জের) দ্বিতীয়বার বসবে না; নইলে পুনঃখোলা/পুনঃক্লোজে জের ডাবল হতো।
+  const [priorCarryRows, newMembersCheck] = await Promise.all([
+    db
+      .select({ id: deposits.id })
+      .from(deposits)
+      .where(and(eq(deposits.monthId, created.id), eq(deposits.createdBy, "system:carry-forward")))
+      .limit(1),
+    listMembers(officeId, created.id),
+  ]);
+  const alreadyHasJer = newMembersCheck.some((m) => toNumber((m as { openingDue?: unknown }).openingDue) > 0);
+  const alreadyCarried = priorCarryRows.length > 0 || alreadyHasJer;
+  if ((carryDues || carryMemberBalances) && prev && !alreadyCarried) {
+    const newMembers = newMembersCheck;
     if (newMembers.length) {
       const { summary } = await getMonthSummary(officeId, prev.id);
       const prevMembers = await listMembers(officeId, prev.id);
@@ -519,6 +530,41 @@ export async function setMonthClosed(monthId: string, officeId: string, closed: 
 }
 
 /**
+ * পরের মাসে আগের ক্লোজের সময় বসে যাওয়া ক্যারি চিহ্ন মুছে দেয় (প্রারম্ভিক জের ও
+ * সিস্টেম ক্যারি-ফরোয়ার্ড সমন্বয়-জমা), যাতে সংশোধনের পর পুনঃক্লোজে নতুন হিসাব
+ * নিখুঁতভাবে বসতে পারে। ব্যবহারকারীর নিজের কোনো এন্ট্রি (মিল/বাজার/জমা) ছোঁয় না।
+ */
+export async function resetCarryArtifacts(officeId: string, monthId: string): Promise<void> {
+  await db
+    .delete(deposits)
+    .where(and(eq(deposits.monthId, monthId), eq(deposits.createdBy, "system:carry-forward"), eq(deposits.officeId, officeId)));
+  await db
+    .update(membersTable)
+    .set({ openingDue: "0", updatedAt: new Date() })
+    .where(and(eq(membersTable.monthId, monthId), eq(membersTable.officeId, officeId)));
+  await db
+    .update(messMonths)
+    .set({ carryForwardBalance: "0", updatedAt: new Date() })
+    .where(and(eq(messMonths.id, monthId), eq(messMonths.officeId, officeId)));
+}
+
+/** মাসটিতে ব্যবহারকারীর কোনো এন্ট্রি (মিল/বাজার/জমা/আয়/খরচ) আছে কিনা */
+export async function monthHasUserData(monthId: string): Promise<boolean> {
+  const [meals, bazar, deps, inc, ext] = await Promise.all([
+    db.select({ id: dailyMeals.id }).from(dailyMeals).where(eq(dailyMeals.monthId, monthId)).limit(1),
+    db.select({ id: bazarExpenses.id }).from(bazarExpenses).where(eq(bazarExpenses.monthId, monthId)).limit(1),
+    db
+      .select({ id: deposits.id })
+      .from(deposits)
+      .where(and(eq(deposits.monthId, monthId), sql`${deposits.createdBy} <> 'system:carry-forward'`))
+      .limit(1),
+    db.select({ id: otherIncomes.id }).from(otherIncomes).where(eq(otherIncomes.monthId, monthId)).limit(1),
+    db.select({ id: extraExpenses.id }).from(extraExpenses).where(eq(extraExpenses.monthId, monthId)).limit(1),
+  ]);
+  return [meals, bazar, deps, inc, ext].some((r) => r.length > 0);
+}
+
+/**
  * চালু মাস ক্লোজ → সঙ্গে সঙ্গে পরের মাস স্বয়ংক্রিয় খোলা (একমাত্র সমর্থিত ফ্লো)।
  *  • মাসের চূড়ান্ত হিসাব থেকে লাস্ট ব্যালেন্স পরের মাসে নগদ ক্যারি হয়
  *  • রোস্টার ও অবশিষ্ট জের/পাওনা openMonth-এর মাধ্যমে স্বয়ংক্রিয় ক্যারি হয়
@@ -558,6 +604,13 @@ export async function closeMonthAndOpenNext(
     }
   }
 
+  // পরের মাস আগে থেকেই থেকে থাকলে (যেমন boot-এ ensureMonth) আর তাতে ব্যবহারকারীর
+  // কোনো এন্ট্রি না থাকলে আগের অসম্পূর্ণ/পুরোনো ক্যারি চিহ্ন মুছে নতুন করে বসাই।
+  const existingNext = await getMonthFor(officeId, nextYear, nextMonthNo);
+  if (existingNext && !(await monthHasUserData(existingNext.id))) {
+    await resetCarryArtifacts(officeId, existingNext.id);
+  }
+
   const { summary } = await getMonthSummary(officeId, month.id);
   // পরের মাসে শুধু প্রকৃত হাত-নগদ ক্যারি হয় (জের-বাদ রিজার্ভ নয়),
   // নইলে একই জের দুই মাসে দুইবার রিজার্ভ থেকে বাদ পড়ে হিসাব গরমিল হতো।
@@ -571,6 +624,25 @@ export async function closeMonthAndOpenNext(
     carryDues: true,
   });
 
+  // পরের মাসের পরে যে খালি স্বয়ংক্রিয়-মাসগুলো (boot-এ চেইন করে তৈরি) আগেই
+  // গড়ে উঠে থাকতে পারে — ব্যবহারকারীর এন্ট্রি না থাকলে সেগুলোর পুরোনো/ভাঙা
+  // ক্যারি মুছে পূর্ববর্তী মাসের চূড়ান্ত হিসাব থেকে নতুন করে সাজাই।
+  let chainCursor = opened.month;
+  for (let guard = 0; guard < 36; guard += 1) {
+    const ny = chainCursor.month === 12 ? chainCursor.year + 1 : chainCursor.year;
+    const nm = chainCursor.month === 12 ? 1 : chainCursor.month + 1;
+    const further = await getMonthFor(officeId, ny, nm);
+    if (!further || (await monthHasUserData(further.id))) break;
+    await resetCarryArtifacts(officeId, further.id);
+    const { summary: curSummary } = await getMonthSummary(officeId, chainCursor.id);
+    const reopened = await openMonth(officeId, ny, nm, {
+      copyMembers: true,
+      carryDues: true,
+      carryForwardBalance: round2(curSummary.cashBalance ?? curSummary.lastBalance),
+    });
+    chainCursor = reopened.month;
+  }
+
   const closedMonth = (await setMonthClosed(month.id, officeId, true)) ?? month;
 
   return {
@@ -581,6 +653,33 @@ export async function closeMonthAndOpenNext(
     carriedDues: opened.carriedDues,
     lastBalance: cashBalance,
   };
+}
+
+/**
+ * অ্যাডমিন-অনলি রিওপেন: মাস চালু করা হয়; পরের (স্বয়ংক্রিয়) মাসে ব্যবহারকারীর
+ * কোনো এন্ট্রি না থাকলে তার পুরোনো ক্যারি চিহ্ন (প্রারম্ভিক জের/সমন্বয়-জমা)
+ * মুছে দেওয়া হয়, যাতে সংশোধনের পর আবার ক্লোজ করলে নতুন হিসাব নিখুঁত বসে।
+ * ফেরত: reopened month + পরের মাসে ক্যারি রিসেট হয়েছে কিনা।
+ */
+export async function reopenMonth(
+  officeId: string,
+  monthId: string,
+): Promise<{ month: MessMonth; nextCleared: boolean }> {
+  const month = await getMonth(monthId);
+  if (!month || month.officeId !== officeId) {
+    throw new ValidationError("মাস পাওয়া যায়নি", {}, 404);
+  }
+  const updated = (await setMonthClosed(month.id, officeId, false)) ?? month;
+
+  const nextYear = month.month === 12 ? month.year + 1 : month.year;
+  const nextMonthNo = month.month === 12 ? 1 : month.month + 1;
+  const next = await getMonthFor(officeId, nextYear, nextMonthNo);
+  let nextCleared = false;
+  if (next && !(await monthHasUserData(next.id))) {
+    await resetCarryArtifacts(officeId, next.id);
+    nextCleared = true;
+  }
+  return { month: updated, nextCleared };
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1219,6 +1318,15 @@ export async function getMonthSummary(
   const fromDate = range?.fromDate ? toIsoDate(range.fromDate) : null;
   const toDate = range?.toDate ? toIsoDate(range.toDate) : null;
 
+  // পূর্ণ-মাস রেঞ্জ (১ তারিখ–শেষ তারিখ) আসলে ফিল্টার নয় — তখন জের-সমন্বয় ও
+  // ক্যারি-ফরোয়ার্ড স্বাভাবিকভাবেই প্রয়োগ হয়; নইলে রিপোর্ট পেজে গত মাসের
+  // জের কলাম/দেনা হারিয়ে যেত।
+  const firstDay = isoOfDay(data.year, data.month, 1);
+  const lastDay = isoOfDay(data.year, data.month, data.totalDays);
+  const isFullRange = (!fromDate || fromDate <= firstDay) && (!toDate || toDate >= lastDay);
+  const effectiveFrom = isFullRange ? null : fromDate;
+  const effectiveTo = isFullRange ? null : toDate;
+
   const input: CalcInput = {
     members: data.members,
     dailyMeals: data.dailyMeals,
@@ -1226,12 +1334,11 @@ export async function getMonthSummary(
     otherIncomes: data.otherIncomes,
     deposits: data.deposits,
     extraExpenses: data.extraExpenses,
-    fromDate,
-    toDate,
-    // carry-forward only applies to the un-filtered full month view
-    carryForwardBalance: fromDate || toDate ? 0 : data.carryForwardBalance,
-    // জের-সমাধানও শুধু পুরো মাসের ভিউতে — আংশিক তারিখে পুরনো সূত্রই চলে
-    applySettlement: !(fromDate || toDate),
+    fromDate: effectiveFrom,
+    toDate: effectiveTo,
+    // পূর্ণ মাসে ক্যারি-ফরোয়ার্ড নগদ ও জের-সমন্বয় প্রয়োগ হয়; আংশিক রেঞ্জে নয়
+    carryForwardBalance: effectiveFrom || effectiveTo ? 0 : data.carryForwardBalance,
+    applySettlement: !(effectiveFrom || effectiveTo),
   };
 
   return {

@@ -64,6 +64,7 @@ import {
   monthDTO,
   officeDTO,
   openMonth,
+  reopenMonth,
   saveDayMeals,
   setMeal,
   setMonthClosed,
@@ -371,14 +372,20 @@ const handlers: Record<string, ActionHandler> = {
     };
   },
 
-  /** অ্যাডমিন প্যানেল: পুরনো/বন্ধ মাস পুনরায় চালু (রিওপেন) */
+  /** অ্যাডমিন-অনলি: পুরনো/বন্ধ মাস পুনরায় চালু (রিওপেন) — ম্যানেজার পারবেন না */
   "month.reopen": async (ctx, body) => {
-    if (!can(ctx.user.role, "month.write")) deny(ctx, "month.write");
+    if (!can(ctx.user.role, "office.manage")) deny(ctx, "office.manage");
     const { officeId, month } = await resolveMonth(ctx, body);
     if (!month.isClosed) return monthDTO(month);
-    const updated = need(await setMonthClosed(month.id, officeId, false), "মাস হালনাগাদ করা যায়নি");
-    await logAction(ctx, "month.reopen", "month", month.id, `${month.monthName} মাস পুনরায় চালু করা হয়েছে`);
-    return monthDTO(updated);
+    const result = await reopenMonth(officeId, month.id);
+    await logAction(
+      ctx,
+      "month.reopen",
+      "month",
+      month.id,
+      `${month.monthName} মাস পুনরায় চালু করা হয়েছে${result.nextCleared ? " (পরের মাসের পুরোনো ক্যারি রিসেট)" : ""}`,
+    );
+    return monthDTO(result.month);
   },
 
   "month.copyRoster": async (ctx, body) => {

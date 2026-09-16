@@ -11,6 +11,7 @@ import {
   createOffice,
   ensureMonth,
   findOfficeByCode,
+  getMonthSummary,
   getOffice,
   listMonths,
   openMonth,
@@ -269,13 +270,42 @@ export async function officeMonthOverview(officeId: string) {
 /** ensure the office has an open month for "now" (called on login / bootstrap) */
 export async function ensureCurrentMonth(officeId: string) {
   const now = dhakaNow();
-  // নতুন ক্যালেন্ডার মাসে পড়লে খালি মাস নয় — আগের মাসের সক্রিয় সদস্য ও তাদের
-  // অবশিষ্ট দেনা-পাওনা (জের) স্বয়ংক্রিয়ভাবে ক্যারি করে মাস তৈরি হয়।
-  const { month } = await openMonth(officeId, now.year, now.month, {
-    copyMembers: true,
-    carryDues: true,
-  });
-  return month;
+  const months = await listMonths(officeId); // নতুন→পুরনো ক্রমে
+  const current = months.find((m) => m.year === now.year && m.month === now.month);
+  if (current) return current;
+
+  // বর্তমান ক্যালেন্ডার মাস না থাকলে সবশেষ মাস থেকে এক এক করে সামনে এগিয়ে
+  // প্রতিটি মাস খুলি — রোস্টার, নগদ ও জের চেইন ঠিক থাকে; লাফ দিয়ে খালি মাস
+  // (বিনা-সদস্য/বিনা-জের) তৈরি হওয়ার বাগ এড়ানো হয়।
+  let anchor = months[0];
+  if (!anchor) {
+    const opened = await openMonth(officeId, now.year, now.month, {
+      copyMembers: true,
+      carryDues: true,
+    });
+    return opened.month;
+  }
+
+  let y = anchor.year;
+  let mNo = anchor.month;
+  let guard = 0;
+  while (y < now.year || (y === now.year && mNo < now.month)) {
+    if (guard++ > 36) break; // সুরক্ষা — সর্বোচ্চ ৩ বছর
+    mNo += 1;
+    if (mNo > 12) {
+      mNo = 1;
+      y += 1;
+    }
+    // পূর্ববর্তী মাসের চূড়ান্ত নগদ ক্যারি করি
+    const { summary: prevSummary } = await getMonthSummary(officeId, anchor.id);
+    const opened = await openMonth(officeId, y, mNo, {
+      copyMembers: true,
+      carryDues: true,
+      carryForwardBalance: Math.round((prevSummary.cashBalance ?? prevSummary.lastBalance) * 100) / 100,
+    });
+    anchor = opened.month;
+  }
+  return anchor;
 }
 
 export async function countOfficeMembers(officeId: string) {
