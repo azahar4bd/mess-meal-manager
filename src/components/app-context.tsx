@@ -64,17 +64,10 @@ export interface AppContextValue {
   refresh: () => Promise<void>;
   bootstrap: () => Promise<void>;
   selectMonth: (monthId: string) => Promise<void>;
-  openNewMonth: (
-    year: number,
-    month: number,
-    opts?: {
-      copyMembers?: boolean;
-      carryForwardBalance?: number;
-      note?: string;
-      carryMemberBalances?: boolean;
-      carryDues?: boolean;
-    },
-  ) => Promise<MonthDTO | null>;
+  /** চালু মাস ক্লোজ করে সঙ্গে সঙ্গে পরের মাস খোলে (রোস্টার + নগদ + জের ক্যারি) */
+  closeCurrentMonth: () => Promise<MonthDTO | null>;
+  /** অ্যাডমিন: বন্ধ/পুরনো মাস পুনরায় চালু করা */
+  reopenMonth: (monthId: string) => Promise<boolean>;
   switchOffice: (officeId: string) => Promise<void>;
   logout: () => Promise<void>;
   signIn: (payload: Record<string, unknown>) => Promise<void>;
@@ -300,39 +293,42 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [toast],
   );
 
-  const openNewMonth = useCallback(
-    async (
-      year: number,
-      m: number,
-      opts?: {
-        copyMembers?: boolean;
-        carryForwardBalance?: number;
-        note?: string;
-        carryMemberBalances?: boolean;
-        carryDues?: boolean;
-      },
-    ) => {
-      const created = await call<{ month: MonthDTO; copiedMembers: number; carriedBalances: number; carriedDues: number }>(
-        "month.open",
-        {
-          year,
-          month: m,
-          copyMembers: opts?.copyMembers ?? true,
-          carryForwardBalance: opts?.carryForwardBalance ?? 0,
-          note: opts?.note ?? "",
-          carryMemberBalances: opts?.carryMemberBalances ?? false,
-          carryDues: opts?.carryDues ?? false,
-        },
-      );
-      if (!created) return null;
-      toast(
-        `নতুন মাস খোলা হয়েছে: ${created.month.monthName}${created.copiedMembers ? ` (${created.copiedMembers} জন সদস্য কপি)` : ""}${created.carriedDues ? ` • ${created.carriedDues} জনের জের ক্যারি হয়েছে` : ""}${created.carriedBalances ? ` • ${created.carriedBalances} জনের বাকি ক্যারি হয়েছে` : ""}`,
-        "success",
-      );
+  const closeCurrentMonth = useCallback(async () => {
+    const current = month;
+    if (!current) return null;
+    if (current.isClosed) {
+      toast("এই মাসটি আগেই বন্ধ — উপরের তালিকা থেকে চালু মাস বেছে নিন", "info");
+      return null;
+    }
+    const res = await call<{
+      nextMonth: MonthDTO;
+      copiedMembers: number;
+      carriedBalances: number;
+      carriedDues: number;
+      lastBalance: number;
+    }>("month.closeAndOpen", { monthId: current.id });
+    if (!res) return null;
+    toast(
+      `${current.monthName} ক্লোজ হয়েছে — নতুন মাস ${res.nextMonth.monthName} শুরু হয়েছে (${res.copiedMembers} জন সদস্য • নগদ ক্যারি ৳${res.lastBalance}${
+        res.carriedDues ? ` • ${res.carriedDues} জনের জের` : ""
+      }${res.carriedBalances ? ` • ${res.carriedBalances} জনের পাওনা` : ""})`,
+      "success",
+    );
+    const monthsList = await mess<MonthDTO[]>("months.list").catch(() => null);
+    if (monthsList) setMonths(monthsList);
+    await selectMonth(res.nextMonth.id);
+    return res.nextMonth;
+  }, [call, toast, selectMonth, month]);
+
+  const reopenMonth = useCallback(
+    async (monthId: string) => {
+      const m = await call<MonthDTO>("month.reopen", { monthId });
+      if (!m) return false;
+      toast(`${m.monthName} মাস পুনরায় চালু হয়েছে`, "success");
       const monthsList = await mess<MonthDTO[]>("months.list").catch(() => null);
       if (monthsList) setMonths(monthsList);
-      await selectMonth(created.month.id);
-      return created.month;
+      await selectMonth(monthId);
+      return true;
     },
     [call, toast, selectMonth],
   );
@@ -473,7 +469,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refresh,
       bootstrap,
       selectMonth,
-      openNewMonth,
+      closeCurrentMonth,
+      reopenMonth,
       switchOffice,
       logout,
       signIn,
@@ -485,7 +482,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       user, role, menu, requiresApproval, office, offices, months, month, data, summary, lang, theme, tab,
       loading, bootError, toasts, t, toast, close, setLang, toggleTheme, setTab, call, refresh, bootstrap,
-      selectMonth, openNewMonth, switchOffice, logout, signIn, autoSync, setAutoSync, syncBusy, runSync,
+      selectMonth, closeCurrentMonth, reopenMonth, switchOffice, logout, signIn, autoSync, setAutoSync,
+      syncBusy, runSync,
     ],
   );
 

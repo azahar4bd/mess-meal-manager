@@ -160,6 +160,7 @@ export interface DepositDTO {
   amount: number;
   note: string;
   type: string;
+  createdBy?: string;
 }
 
 export interface IncomeDTO {
@@ -246,7 +247,14 @@ export interface MonthSummary {
   totalDepositsThisMonth: number;
   /** ফান্ড বাদে সদস্যের জমা/সমন্বয় (দেনা-পাওনায় এটাই ধরা হয়) */
   totalMemberPayments: number;
+  /** প্রকৃত নগদ জমা (ক্যারি-ফরোয়ার্ড সমন্বয় বাদে) — লাস্ট ব্যালেন্স বাড়ায় */
+  totalCashCollected: number;
+  /**
+   * জের-বাদ রিজার্ভ (lastBalance) বনাম হাতে থাকা প্রকৃত নগদ।
+   * ক্লোজের সময় পরের মাসে এটাই carryForwardBalance হিসেবে যায়।
+   */
   lastBalance: number;
+  cashBalance: number;
   memberCalculations: MemberCalculation[];
 }
 

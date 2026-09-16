@@ -5,7 +5,7 @@ import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, EmptyState, Loader, MealStepper, SegmentedButtons } from "@/components/ui";
 import { formatMeal, formatMoney, formatRate, round2, toNumber } from "@/lib/format";
-import { isoOfDay, isValidIso, toDisplayDate, toIsoDate, weekdayBn, todayIso } from "@/lib/date";
+import { isoOfDay, isValidIso, toDisplayDate, toIsoDate, weekdayBn, weekdayBnShort, todayIso } from "@/lib/date";
 
 type ViewMode = "day" | "grid";
 
@@ -278,7 +278,9 @@ export function MealsView() {
                     return (
                       <th key={d} className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 44 }}>
                         <span className="block text-[12.5px] font-extrabold tabular-nums">{d}</span>
-                        <span className="muted block text-[9.5px] font-semibold">{weekdayBn(isoOfDay(month.year, month.month, d)).slice(0, 3)}</span>
+                        <span className="block whitespace-nowrap text-center text-[9.5px] font-semibold text-[var(--muted)]">
+                          {weekdayBnShort(isoOfDay(month.year, month.month, d))}
+                        </span>
                       </th>
                     );
                   })}

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
-import { Badge, Card, EmptyState, Kpi, Loader, Modal } from "@/components/ui";
+import { Badge, Card, ConfirmDialog, EmptyState, Field, Kpi, Loader, Modal, Select, TextArea, TextInput } from "@/components/ui";
 import { mess } from "@/lib/client";
 import { formatMeal, formatMoney, formatRate, round2 } from "@/lib/format";
 import { isoOfDay, monthLabelBn, toDisplayDate, toDisplayDateTime } from "@/lib/date";
@@ -37,113 +37,253 @@ function SignedMoney({ value, bold = false }: { value: number; bold?: boolean })
 }
 
 /* ══════════════════════════════════════════════════════════
- *  দেনা-পাওনার জমা (ইনলাইন) — সদস্য টেবিলের ভেতরেই বসানো যায়।
- *  সংরক্ষিত জমা দেনা কমায়; অবশিষ্টটাই পরের মাসে জের হিসেবে যায়।
- *  প্রতি সদস্যের একটিই closing_payment থাকে — পুরোনোটি হালনাগাদ/মুছে
- *  নতুন পরিমাণ বসানো হয়।
+ *  দেনা-পাওনা জমা ম্যানেজার (মোডাল) — সদস্যের প্রতিটি জমা রেকর্ড
+ *  তালিকায় দেখা যায়; নতুন জমা যোগ, যেকোনোটির Edit/Delete চলে।
+ *  জমা দেনা কমায় ও লাস্ট ব্যালেন্স (নগদ) বাড়ায়; বাজার/মিল রেট ছোঁয় না।
  * ══════════════════════════════════════════════════════════ */
 
-function ClosingPaymentCell({
+function PaymentManagerModal({
+  open,
+  onClose,
   month,
   member,
-  paid,
-  existing,
+  items,
   canWrite,
-  onSaved,
+  onChanged,
 }: {
+  open: boolean;
+  onClose: () => void;
   month: MonthDTO;
   member: MemberCalculation;
-  paid: number;
-  existing: DepositDTO[];
+  items: DepositDTO[];
   canWrite: boolean;
-  onSaved: () => void;
+  onChanged: () => void;
 }) {
   const app = useApp();
-  const [raw, setRaw] = useState(paid > 0 ? String(paid) : "");
+  const lastDay = isoOfDay(month.year, month.month, month.totalDays);
+  const defaultNote = `দেনা-পাওনার জমা (${month.monthName})`;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [date, setDate] = useState(lastDay);
+  const [amount, setAmount] = useState("");
+  const [payType, setPayType] = useState("closing_payment");
+  const [note, setNote] = useState(defaultNote);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<DepositDTO | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
-    setRaw(paid > 0 ? String(paid) : "");
-  }, [paid]);
+    if (open) {
+      setEditingId(null);
+      setDate(lastDay);
+      setAmount("");
+      setPayType("closing_payment");
+      setNote(defaultNote);
+      setDeleting(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, month.id, member.memberId]);
 
-  const amount = round2(Number(raw.trim()) || 0);
-  const dirty = Math.abs(amount - round2(paid)) > 0.005;
-  const lastDay = isoOfDay(month.year, month.month, month.totalDays);
-  const note = `দেনা-পাওনার জমা (${month.monthName})`;
+  const startEdit = (d: DepositDTO) => {
+    setEditingId(d.id);
+    setDate(d.date || lastDay);
+    setAmount(String(d.amount));
+    setPayType(d.type || "closing_payment");
+    setNote(d.note || defaultNote);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setDate(lastDay);
+    setAmount("");
+    setPayType("closing_payment");
+    setNote(defaultNote);
+  };
+
+  const typeLabel = (t: string) =>
+    t === "jer_payment"
+      ? "জের পরিশোধ"
+      : t === "member_deposit"
+        ? "সাধারণ জমা"
+        : t === "closing_payment"
+          ? "মাস-শেষ পরিশোধ"
+          : t === "adjustment"
+            ? "সমন্বয়"
+            : t === "refund"
+              ? "ফেরত"
+              : t;
 
   const save = async () => {
-    if (!Number.isFinite(amount) || amount < 0) {
-      app.toast("সঠিক পরিমাণ লিখুন (০ বা তার বেশি)", "error");
+    const value = round2(Number(amount.trim()) || 0);
+    if (!Number.isFinite(value) || value <= 0) {
+      app.toast("সঠিক পরিমাণ লিখুন (০ এর চেয়ে বেশি)", "error");
+      return;
+    }
+    if (!date) {
+      app.toast("তারিখ নির্বাচন করুন", "error");
       return;
     }
     setBusy(true);
-    let res: unknown = null;
-    if (amount <= 0.005) {
-      // জমা শূন্য — আগের সব মাস-শেষ জমা মুছে ফেলা হয়
-      for (const d of existing) {
-        res = await app.call("deposit.delete", { id: d.id });
-      }
-      if (existing.length === 0) res = true;
-    } else if (existing.length > 0) {
-      // একটি থাকলে হালনাগাদ, একাধিক থাকলে বাকিগুলো মুছে ফেলা হয়
-      const [first, ...rest] = existing;
-      res = await app.call("deposit.update", {
-        id: first.id,
-        memberId: member.memberId,
-        memberName: member.name,
-        amount,
-        date: first.date || lastDay,
-        type: "closing_payment",
-        note,
-      });
-      for (const d of rest) await app.call("deposit.delete", { id: d.id });
-    } else {
-      res = await app.call("deposit.create", {
-        monthId: month.id,
-        memberId: member.memberId,
-        memberName: member.name,
-        amount,
-        date: lastDay,
-        type: "closing_payment",
-        note,
-      });
-    }
+    const res = editingId
+      ? await app.call("deposit.update", {
+          id: editingId,
+          memberId: member.memberId,
+          memberName: member.name,
+          amount: value,
+          date,
+          type: payType,
+          note: note.trim() || defaultNote,
+        })
+      : await app.call("deposit.create", {
+          monthId: month.id,
+          memberId: member.memberId,
+          memberName: member.name,
+          amount: value,
+          date,
+          type: payType,
+          note: note.trim() || defaultNote,
+        });
     setBusy(false);
     if (!res) return;
-    app.toast(`${member.name} — দেনা-পাওনার জমা ৳${formatMoney(amount)} সংরক্ষিত হয়েছে ✓`, "success");
-    onSaved();
+    app.toast(`${member.name} — জমা ${editingId ? "হালনাগাদ" : "সংরক্ষিত"} হয়েছে ✓`, "success");
+    resetForm();
+    onChanged();
   };
 
-  if (!canWrite) {
-    return <span className="tabular-nums">{paid > 0 ? `৳${formatMoney(paid)}` : "—"}</span>;
-  }
+  const runDelete = async () => {
+    if (!deleting) return;
+    setDeleteBusy(true);
+    const ok = await app.call("deposit.delete", { id: deleting.id });
+    setDeleteBusy(false);
+    if (!ok) return;
+    if (editingId === deleting.id) resetForm();
+    setDeleting(null);
+    app.toast("জমা রেকর্ড মুছে ফেলা হয়েছে", "success");
+    onChanged();
+  };
+
+  const totalPaid = round2(items.reduce((s, d) => s + Number(d.amount), 0));
 
   return (
-    <div className="flex items-center justify-end gap-1">
-      <input
-        type="number"
-        min={0}
-        step="0.01"
-        inputMode="decimal"
-        className="input h-7 w-[72px] px-1.5 text-right tabular-nums sm:w-20"
-        value={raw}
-        disabled={busy}
-        placeholder="0"
-        onChange={(e) => setRaw(e.target.value)}
-        aria-label={`${member.name} এর দেনা-পাওনার জমা`}
-      />
-      {dirty ? (
-        <button
-          type="button"
-          className="btn btn-primary btn-sm h-7 min-h-0 px-2"
-          disabled={busy}
-          onClick={() => void save()}
-          title="জমা সংরক্ষণ করুন"
-        >
-          {busy ? "…" : "✓"}
-        </button>
+    <Modal
+      open={open}
+      title={`দেনা-পাওনা জমা — ${member.name}`}
+      subtitle={`${month.monthName} • মোট জমা ৳${formatMoney(totalPaid)}`}
+      onClose={onClose}
+    >
+      {canWrite ? (
+        <div className="mb-3 rounded-lg border border-[var(--border)] bg-[var(--brand-soft)]/40 p-3">
+          <div className="mb-2 text-[12.5px] font-bold">{editingId ? "জমা হালনাগাদ করুন" : "নতুন জমা যোগ করুন"}</div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Field label="তারিখ" required>
+              <TextInput
+                type="date"
+                value={date}
+                min={isoOfDay(month.year, month.month, 1)}
+                max={lastDay}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </Field>
+            <Field label="জমার ধরন" required>
+              <Select value={payType} onChange={(e) => setPayType(e.target.value)}>
+                <option value="closing_payment">মাস-শেষ পরিশোধ (দেনা-পাওনা)</option>
+                <option value="member_deposit">সাধারণ জমা</option>
+                <option value="jer_payment">জের পরিশোধ (পুরনো বাকি)</option>
+              </Select>
+            </Field>
+            <Field label="পরিমাণ (৳)" required>
+              <TextInput
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={amount}
+                placeholder="0"
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </Field>
+          </div>
+          <Field label="নোট" className="mt-2">
+            <TextArea value={note} rows={2} onChange={(e) => setNote(e.target.value)} />
+          </Field>
+          <div className="mt-2 flex justify-end gap-2">
+            {editingId ? (
+              <button type="button" className="btn btn-ghost" onClick={resetForm} disabled={busy}>
+                বাতিল করে নতুন
+              </button>
+            ) : null}
+            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={busy}>
+              {busy ? "সংরক্ষণ হচ্ছে…" : editingId ? "Save Changes" : "জমা সংরক্ষণ"}
+            </button>
+          </div>
+        </div>
       ) : null}
-    </div>
+
+      {items.length === 0 ? (
+        <EmptyState icon="💸" title="এখনো কোনো জমা নেই" hint={canWrite ? "উপরে পরিমাণ লিখে প্রথম জমা সংরক্ষণ করুন।" : undefined} />
+      ) : (
+        <div className="table-wrap" style={{ borderWidth: 0 }}>
+          <table className="data">
+            <thead>
+              <tr>
+                <th>তারিখ</th>
+                <th>ধরন</th>
+                <th className="num">পরিমাণ</th>
+                <th>নোট</th>
+                {canWrite ? <th className="text-center">Action</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {items
+                .slice()
+                .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+                .map((d) => (
+                  <tr key={d.id}>
+                    <td className="whitespace-nowrap tabular-nums">{toDisplayDate(d.date)}</td>
+                    <td>
+                      <Badge tone={d.type === "jer_payment" ? "warn" : "brand"}>{typeLabel(d.type)}</Badge>
+                    </td>
+                    <td className="num font-bold tabular-nums text-[var(--ok)]">৳{formatMoney(d.amount)}</td>
+                    <td className="muted text-[12px]">{d.note || "—"}</td>
+                    {canWrite ? (
+                      <td className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button type="button" className="btn btn-ghost btn-sm" onClick={() => startEdit(d)}>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm text-[var(--danger)]"
+                            onClick={() => setDeleting(d)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={2}>মোট জমা</td>
+                <td className="num font-extrabold tabular-nums text-[var(--ok)]">৳{formatMoney(totalPaid)}</td>
+                <td />
+                {canWrite ? <td /> : null}
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleting}
+        busy={deleteBusy}
+        message={`${toDisplayDate(deleting?.date ?? "")} তারিখের ৳${formatMoney(deleting?.amount ?? 0)} জমা মুছে ফেলা হবে — দেনা ও লাস্ট ব্যালেন্স আবার আগের অবস্থায় ফিরে যাবে।`}
+        confirmLabel="মুছে ফেলুন"
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void runDelete()}
+      />
+    </Modal>
   );
 }
 
@@ -153,54 +293,100 @@ export function ReportView() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [rangeWarn, setRangeWarn] = useState("");
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [csvOpen, setCsvOpen] = useState(false);
   const [selfOnly, setSelfOnly] = useState(false);
+  const [payMember, setPayMember] = useState<MemberCalculation | null>(null);
+  const [confirmClear, setConfirmClear] = useState<MemberCalculation | null>(null);
+  const [clearBusy, setClearBusy] = useState(false);
+  const reqId = useRef(0);
+  const [reloadTick, setReloadTick] = useState(0);
+  const reload = useCallback(() => setReloadTick((x) => x + 1), []);
 
   const summary = report?.summary ?? app.summary;
   const data = report?.data ?? app.data;
 
-  const load = useCallback(async () => {
-    if (!month) return;
-    setLoading(true);
-    try {
-      const res = await mess<ReportResponse>("report.summary", {
-        monthId: month.id,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      });
-      setReport(res);
-      setSelfOnly(Boolean(res?.selfOnly));
-    } catch (err) {
-      app.toast(err instanceof Error ? err.message : "রিপোর্ট লোড করা যায়নি", "error");
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month?.id, fromDate, toDate]);
+  const firstDay = month ? isoOfDay(month.year, month.month, 1) : "";
+  const lastDayIso = month ? isoOfDay(month.year, month.month, month.totalDays) : "";
 
-  useEffect(() => {
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month?.id]);
-
+  // মাস বদলালে ফিল্টার পুরো মাসে রিসেট — বাছামাত্র নিচের ইফেক্ট রিপোর্ট আনে
   useEffect(() => {
     if (!month) return;
     setFromDate(isoOfDay(month.year, month.month, 1));
     setToDate(isoOfDay(month.year, month.month, month.totalDays));
-  }, [month?.id, month?.year, month?.month, month?.totalDays]);
+    setRangeWarn("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month?.id]);
+
+  // তারিখ বাছামাত্র স্বয়ংক্রিয়ভাবে রিপোর্ট লোড (কোনো OK/দেখুন বাটন নেই)
+  useEffect(() => {
+    if (!month || !fromDate || !toDate) return;
+    // রেঞ্জ ভিন্ন মাসে পড়লে সেই মাসে স্বয়ংক্রিয় সুইচ (মাস মডেল মাস-ভিত্তিক)
+    const fromYM = fromDate.slice(0, 7);
+    const toYM = toDate.slice(0, 7);
+    const curYM = isoOfDay(month.year, month.month, 1).slice(0, 7);
+    if (fromYM !== toYM) {
+      setRangeWarn("শুরু ও শেষ তারিখ একই মাসের হতে হবে — এক মাসের রিপোর্ট দেখানো হয়।");
+      return;
+    }
+    if (fromDate < firstDay || toDate > lastDayIso) {
+      const target = app.months.find((x) => isoOfDay(x.year, x.month, 1).slice(0, 7) === fromYM);
+      if (target && target.id !== month.id) {
+        void app.selectMonth(target.id);
+        return;
+      }
+      setRangeWarn(
+        fromYM === curYM
+          ? ""
+          : "এই তারিখের মাস এখনো খোলা হয়নি — উপরের মাস সিলেক্টর থেকে মাস বেছে নিন।",
+      );
+      if (fromYM !== curYM) return;
+    } else {
+      setRangeWarn("");
+    }
+
+    const myReq = ++reqId.current;
+    setLoading(true);
+    mess<ReportResponse>("report.summary", { monthId: month.id, fromDate, toDate })
+      .then((res) => {
+        if (myReq !== reqId.current) return;
+        setReport(res);
+        setSelfOnly(Boolean(res?.selfOnly));
+      })
+      .catch((err) => {
+        if (myReq !== reqId.current) return;
+        app.toast(err instanceof Error ? err.message : "রিপোর্ট লোড করা যায়নি", "error");
+      })
+      .finally(() => {
+        if (myReq === reqId.current) setLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month?.id, fromDate, toDate, reloadTick]);
+
+  const resetFullMonth = () => {
+    setRangeWarn("");
+    setFromDate(firstDay);
+    setToDate(lastDayIso);
+  };
 
   const categories = useMemo(() => (data ? bazarByCategory(data.bazarExpenses) : {}), [data]);
   const buyers = useMemo(() => (data ? bazarByBuyer(data.bazarExpenses) : {}), [data]);
 
-  // সদস্যভিত্তিক “দেনা-পাওনার জমা” (closing_payment) — টেবিলের ইনলাইন ঘরে বসে
-  const closingMap = useMemo(() => {
-    const map: Record<string, { paid: number; items: DepositDTO[] }> = {};
+  // সদস্যভিত্তিক নগদ জমা — স্থায়ী ফান্ড বাদ; সিস্টেম ক্যারি-ফরোয়ার্ড সমন্বয়
+  // (নগদ নয়, গত মাসের পাওনা) আলাদা রাখা হয়। jer_payment-ও নগদ জমা।
+  const paymentMap = useMemo(() => {
+    const map: Record<string, { cash: number; carry: number; items: DepositDTO[] }> = {};
     for (const d of data?.deposits ?? []) {
-      if (d.type !== "closing_payment" || !d.memberId) continue;
-      const entry = (map[d.memberId] ??= { paid: 0, items: [] });
-      entry.paid = round2(entry.paid + Number(d.amount));
+      if (!d.memberId) continue;
+      if (d.type === "permanent_fund") continue;
+      const entry = (map[d.memberId] ??= { cash: 0, carry: 0, items: [] });
+      if ((d.createdBy ?? "") === "system:carry-forward") {
+        entry.carry = round2(entry.carry + Number(d.amount));
+        continue;
+      }
+      entry.cash = round2(entry.cash + Number(d.amount));
       entry.items.push(d);
     }
     return map;
@@ -213,12 +399,20 @@ export function ReportView() {
   const totalReceive = round2(calcs.filter((m) => m.statusEn === "Receive").reduce((s, m) => s + m.denaPoana, 0));
   const totalCost = round2(calcs.reduce((s, m) => s + m.totalCost, 0));
   const hasJer = (summary.totalOpeningDue ?? 0) > 0;
-  // ইনলাইন জমা কলামের যোগফল ও জমা-পূর্ব দেনা/পাওনা
-  const closingOf = (m: MemberCalculation) => round2(closingMap[m.memberId]?.paid ?? 0);
-  const totalClosing = round2(calcs.reduce((s, m) => s + closingOf(m), 0));
-  const beforeRows = calcs.map((m) => round2(m.denaPoana - closingOf(m)));
-  const totalBeforeDue = round2(beforeRows.filter((v) => v < -0.005).reduce((s, v) => s + Math.abs(v), 0));
-  const totalBeforeReceive = round2(beforeRows.filter((v) => v > 0.005).reduce((s, v) => s + v, 0));
+  // দেনা-পাওনা জমা টেবিল: প্রতি সদস্যের জমা-পূর্ব দেনা, নগদ জমা ও বাকি
+  const cashOf = (m: MemberCalculation) =>
+    round2(m.totalDeposit - (paymentMap[m.memberId]?.carry ?? 0) + (m.jerCashPaid ?? 0));
+  const payRows = calcs
+    .map((m) => {
+      const paid = cashOf(m);
+      const dueBefore = round2(m.denaPoana - paid);
+      return { m, paid, dueBefore };
+    })
+    .filter((r) => r.dueBefore < -0.005 || r.paid > 0.005);
+  const totalClosing = round2(payRows.reduce((s, r) => s + r.paid, 0));
+  const payTotalDue = round2(payRows.filter((r) => r.dueBefore < -0.005).reduce((s, r) => s + Math.abs(r.dueBefore), 0));
+  const payTotalRemainingDue = round2(payRows.filter((r) => r.m.denaPoana < -0.005).reduce((s, r) => s + Math.abs(r.m.denaPoana), 0));
+  const payTotalRemainingReceive = round2(payRows.filter((r) => r.m.denaPoana > 0.005).reduce((s, r) => s + r.m.denaPoana, 0));
 
   const exportUrl = (format: string, variant = "full") => {
     const params = new URLSearchParams({ format, variant, monthId: month.id });
@@ -268,45 +462,24 @@ export function ReportView() {
 
       <Card title="তারিখ ফিল্টার" bodyClass="p-2.5 sm:p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="block min-w-[140px] flex-1">
+          <label className="block min-w-[150px] flex-1">
             <span className="label">শুরু</span>
-            <input
-              type="date"
-              className="input h-9"
-              value={fromDate}
-              min={isoOfDay(month.year, month.month, 1)}
-              max={isoOfDay(month.year, month.month, month.totalDays)}
-              onChange={(e) => setFromDate(e.target.value)}
-            />
+            <input type="date" className="input h-9" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           </label>
-          <label className="block min-w-[140px] flex-1">
+          <label className="block min-w-[150px] flex-1">
             <span className="label">শেষ</span>
-            <input
-              type="date"
-              className="input h-9"
-              value={toDate}
-              min={isoOfDay(month.year, month.month, 1)}
-              max={isoOfDay(month.year, month.month, month.totalDays)}
-              onChange={(e) => setToDate(e.target.value)}
-            />
+            <input type="date" className="input h-9" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </label>
-          <div className="flex gap-2">
-            <button type="button" className="btn btn-primary" onClick={() => void load()}>
-              দেখুন
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              onClick={() => {
-                setFromDate("");
-                setToDate("");
-                setReport(null);
-              }}
-            >
-              পুরো মাস
-            </button>
-          </div>
+          <button type="button" className="btn btn-ghost h-9" onClick={resetFullMonth}>
+            পুরো মাস
+          </button>
         </div>
+        <p className="muted mt-1.5 text-[11px]">তারিখ ঘরে ট্যাপ করলেই নেটিভ ক্যালেন্ডার খোলে — তারিখ বাছামাত্র রিপোর্ট নিজে থেকেই হালনাগাদ হয়।</p>
+        {rangeWarn ? (
+          <div className="mt-1.5 rounded-lg border border-[var(--warn)] bg-[var(--warn-soft)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--warn)]">
+            {rangeWarn}
+          </div>
+        ) : null}
       </Card>
 
       {loading ? (
@@ -324,7 +497,9 @@ export function ReportView() {
             <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(summary.totalFund)}`} tone="warn" />
             <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(summary.totalSharedExtra)}`} />
             <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
-            <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
+            <Kpi label="নগদ আদায় (জমা)" value={`৳ ${formatMoney(summary.totalCashCollected)}`} tone="brand" />
+            <Kpi label="বাকি জের (সদস্য-দেনা)" value={`৳ ${formatMoney(summary.totalRemainingJer ?? 0)}`} tone="warn" />
+            <Kpi label="লাস্ট ব্যালেন্স (হাত-নগদ)" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
           </div>
 
           {/* ── member report table (spec §40) ──────── */}
@@ -338,7 +513,7 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data report-table" style={{ minWidth: hasJer ? 980 : 760 }}>
+                <table className="data report-table" style={{ minWidth: hasJer ? 820 : 600 }}>
                   <thead>
                     <tr>
                       <th>সদস্য</th>
@@ -357,12 +532,8 @@ export function ReportView() {
                           <th className="num vth">বাকি<br/>জের</th>
                         </>
                       ) : null}
-                      <th className="num vth" title="জমা বসানোর আগের হিসাব">
+                      <th className="num vth" title="জমা-সমন্বয়সহ চূড়ান্ত হিসাব; বিস্তারিত নিচের “দেনা-পাওনা জমা” টেবিলে">
                         দেনা(−)/<br/>পাওনা(+)
-                      </th>
-                      <th className="num vth">দেনা-পাওনার<br/>জমা (৳)</th>
-                      <th className="num vth" title="হিসাব − জমা = অবশিষ্ট; এটাই পরের মাসে জের হিসেবে যায়">
-                        অবশিষ্ট<br/>দেনা-পাওনা
                       </th>
                       <th className="num vth">স্থায়ী<br/>ফান্ড</th>
                       <th className="vth text-center">স্ট্যাটাস</th>
@@ -370,10 +541,6 @@ export function ReportView() {
                   </thead>
                   <tbody>
                     {calcs.map((m) => {
-                      const closing = closingMap[m.memberId];
-                      const closingPaid = round2(closing?.paid ?? 0);
-                      // হিসাব − জমা = অবশিষ্ট (denaPoana)
-                      const dueBefore = round2(m.denaPoana - closingPaid);
                       return (
                       <tr key={m.memberId}>
                         <td>
@@ -420,19 +587,6 @@ export function ReportView() {
                             </td>
                           </>
                         ) : null}
-                        <td className="num tabular-nums">
-                          <SignedMoney value={dueBefore} />
-                        </td>
-                        <td className="num">
-                          <ClosingPaymentCell
-                            month={month}
-                            member={m}
-                            paid={closingPaid}
-                            existing={closing?.items ?? []}
-                            canWrite={canWriteFund}
-                            onSaved={() => void load()}
-                          />
-                        </td>
                         <td className="num tabular-nums" style={{ background: "var(--brand-soft)" }}>
                           <SignedMoney value={m.denaPoana} bold />
                         </td>
@@ -466,12 +620,6 @@ export function ReportView() {
                           <td className="num tabular-nums">৳{formatMoney(summary.totalRemainingJer ?? 0)}</td>
                         </>
                       ) : null}
-                      <td className="num tabular-nums">
-                        দিবে ৳{formatMoney(totalBeforeDue)}
-                        <br />
-                        পাবে ৳{formatMoney(totalBeforeReceive)}
-                      </td>
-                      <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(totalClosing)}</td>
                       <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)" }}>
                         দিবে ৳{formatMoney(totalDue)}
                         <br />
@@ -485,6 +633,99 @@ export function ReportView() {
               </div>
             )}
           </Card>
+
+          {/* ── দেনা-পাওনা জমা টেবিল (সদস্য হিসেবের ঠিক নিচে) ── */}
+          {fullMonth ? (
+            <Card
+              title="💸 দেনা-পাওনা জমা"
+              action={
+                <span className="muted text-[11px] font-semibold">
+                  জমা দিলে দেনা কমে ও লাস্ট ব্যালেন্স বাড়ে; বাজার/মিল রেট অপরিবর্তিত থাকে
+                </span>
+              }
+              bodyClass="p-0"
+            >
+              {payRows.length === 0 ? (
+                <div className="p-3">
+                  <EmptyState icon="✅" title="কারো কোনো দেনা-পাওনা নেই" hint="মিল খরচ বা জমা বসলে এই তালিকায় সদস্য ও জমার হিসাব দেখা যাবে।" />
+                </div>
+              ) : (
+                <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
+                  <table className="data" style={{ minWidth: 640 }}>
+                    <thead>
+                      <tr>
+                        <th>সদস্য</th>
+                        <th className="num vth">মোট দেনা</th>
+                        <th className="num vth">মোট জমা</th>
+                        <th className="num vth">বাকি দেনা(−)/পাওনা(+)</th>
+                        {canWriteFund ? <th className="text-center">Action</th> : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payRows.map(({ m, paid, dueBefore }) => {
+                        const items = paymentMap[m.memberId]?.items ?? [];
+                        return (
+                          <tr key={m.memberId}>
+                            <td>
+                              <span className="block font-bold">{m.name}</span>
+                              <span className="cell-sub muted block text-[10.5px]">
+                                {m.role}
+                                {m.phone ? ` • ${m.phone}` : ""}
+                              </span>
+                            </td>
+                            <td className="num tabular-nums text-[var(--danger)]">
+                              {dueBefore < -0.005 ? `৳${formatMoney(Math.abs(dueBefore))}` : "—"}
+                            </td>
+                            <td className="num tabular-nums text-[var(--ok)]">
+                              {paid > 0.005 ? `৳${formatMoney(paid)}` : "—"}
+                            </td>
+                            <td className="num tabular-nums" style={{ background: "var(--brand-soft)" }}>
+                              <SignedMoney value={m.denaPoana} bold />
+                            </td>
+                            {canWriteFund ? (
+                              <td className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPayMember(m)}>
+                                    {paid > 0.005 ? "Edit" : "+ জমা"}
+                                  </button>
+                                  {paid > 0.005 ? (
+                                    <button
+                                      type="button"
+                                      className="btn btn-ghost btn-sm text-[var(--danger)]"
+                                      onClick={() => setConfirmClear(m)}
+                                    >
+                                      Delete
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </td>
+                            ) : null}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td>মোট</td>
+                        <td className="num font-bold tabular-nums text-[var(--danger)]">৳{formatMoney(payTotalDue)}</td>
+                        <td className="num font-bold tabular-nums text-[var(--ok)]">৳{formatMoney(totalClosing)}</td>
+                        <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)" }}>
+                          দিবে ৳{formatMoney(payTotalRemainingDue)}
+                          <br />
+                          পাবে ৳{formatMoney(payTotalRemainingReceive)}
+                        </td>
+                        {canWriteFund ? <td /> : null}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </Card>
+          ) : (
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-[12px] text-[var(--muted)]">
+              💸 দেনা-পাওনা জমা টেবিল শুধু পুরো মাসের রিপোর্টে দেখানো হয় — “পুরো মাস” বাটনে চাপুন।
+            </div>
+          )}
 
           {/* ── bazar + income summary ──────────────── */}
           <div className="grid gap-3 lg:grid-cols-2">
@@ -550,6 +791,45 @@ export function ReportView() {
 
         </>
       )}
+
+      {/* ── দেনা-পাওনা জমা ম্যানেজার ───────────────── */}
+      {payMember && month ? (
+        <PaymentManagerModal
+          open
+          onClose={() => setPayMember(null)}
+          month={month}
+          member={payMember}
+          items={paymentMap[payMember.memberId]?.items ?? []}
+          canWrite={canWriteFund}
+          onChanged={reload}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={!!confirmClear}
+        busy={clearBusy}
+        message={`${confirmClear?.name ?? ""} — এর দেনা-পাওনার সব জমা (৳${formatMoney(
+          confirmClear ? cashOf(confirmClear) : 0,
+        )}) মুছে ফেলা হবে; দেনা ও লাস্ট ব্যালেন্স আগের অবস্থায় ফিরে যাবে।`}
+        confirmLabel="সব জমা মুছুন"
+        onCancel={() => setConfirmClear(null)}
+        onConfirm={async () => {
+          if (!confirmClear) return;
+          const items = paymentMap[confirmClear.memberId]?.items ?? [];
+          setClearBusy(true);
+          let ok = true;
+          for (const d of items) {
+            const r = await app.call("deposit.delete", { id: d.id });
+            if (!r) ok = false;
+          }
+          setClearBusy(false);
+          if (ok) {
+            app.toast(`${confirmClear.name} — সব জমা মুছে ফেলা হয়েছে`, "success");
+            setConfirmClear(null);
+            reload();
+          }
+        }}
+      />
 
       {/* ── CSV modal ─────────────────────────────── */}
       <Modal

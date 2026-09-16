@@ -85,11 +85,25 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
   const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
   const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
-  /** জেরের নগদ পরিশোধ (jer_payment) — পুরনো বাকি মেটায়, দেনা-পাওনায় ধরা হয় না */
+  /** জেরের নগদ পরিশোধ (jer_payment) — সদস্য-হিসাবে পৃথক স্তম্ভে দেখানো হয় */
   const totalJerCashAll = round2(
     deposits.filter((d) => (d.type || "") === "jer_payment").reduce((s, r) => s + toNumber(r.amount), 0),
   );
-  /** ফান্ড বাদে সদস্যের সাধারণ জমা/সমন্বয় — শুধু এটাই দেনা-পাওনায় ধরা হয় */
+  /**
+   * সিস্টেম-ক্যারি-ফরোয়ার্ড adjustment নগদ আনে না (পুরনো মাসের পাওনা বহন করে),
+   * তাই লাস্ট ব্যালেন্স/নগদ গণনায় বাদ — কিন্তু দেনা-পাওনায় থাকে।
+   */
+  const totalCarryForwardAdjust = round2(
+    deposits
+      .filter((d) => (d.createdBy ?? "") === "system:carry-forward")
+      .reduce((s, r) => s + toNumber(r.amount), 0),
+  );
+  /**
+   * হাতে আসা প্রকৃত নগদ জমা — স্থায়ী ফান্ড ও সিস্টেম-ক্যারি বাদে সবই
+   * (সাধারণ জমা, মাস-শেষ পরিশোধ, জেরের নগদ পরিশোধ)। এটা লাস্ট ব্যালেন্স বাড়ায়।
+   */
+  const totalCashCollected = round2(totalDepositsThisMonth - totalFund - totalCarryForwardAdjust);
+  /** ফান্ড ও জের-নগদ বাদে সাধারণ জমা/সমন্বয় (পুরোনো সামঞ্জস্য-সংখ্যা) */
   const totalMemberPayments = round2(totalDepositsThisMonth - totalFund - totalJerCashAll);
 
   // Rule 5 — shared extra split across ACTIVE members
@@ -181,8 +195,11 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     const remainingJer = round2(openingDue - jerAdjusted - jerCashPaid);
     const selfPaidCredit = round2(selfPaidBazar - jerAdjusted);
 
-    // Rule 1/2 — স্থায়ী ফান্ড দেনা-পাওনায় মেশে না; মোট খরচ সদস্যের দেনা (−)
-    const denaPoana = round2(totalDeposit + selfPaidCredit - totalCost);
+    // দেনা-পাওনা = জমা/সমন্বয় + নিজ-টাকার বাজার + নগদে জের-পরিশোধ
+    //            − চলতি মিল খরচ − গত মাসের জের (openingDue)
+    // জের সমন্বয় (বাজার/নগদ) হলেই এই ঘরে জের কমতে থাকে; জের না থাকলে
+    // পুরোনো সূত্রেই (জমা + নিজ-বাজার − খরচ) ফিরে যায়।
+    const denaPoana = round2(totalDeposit + selfPaidBazar + jerCashPaid - totalCost - openingDue);
     const status: MemberCalculation["status"] =
       Math.abs(denaPoana) < 0.005 ? "সমান" : denaPoana < 0 ? "দিবে" : "পাবে";
     const statusEn: MemberCalculation["statusEn"] =
@@ -221,16 +238,20 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const totalJerCashPaid = round2(memberCalculations.reduce((s, c) => s + c.jerCashPaid, 0));
   const totalRemainingJer = round2(memberCalculations.reduce((s, c) => s + c.remainingJer, 0));
 
-  /* ── last balance (spec §86 + Rule 9) ─────────────────────
-   *  ফান্ড থেকে করা বাজার + অতিরিক্ত − আয় = পরিচালন খরচ।
-   *  নিজের টাকা থেকে করা বাজার ফান্ড থেকে বাদ যায় না — জের থাকলে
-   *  সেটা আগে জের মেটায় (উপরে selfPaidByMember), বাড়তিটা পাওনা হয়।
-   *  বাকি জের মূলধন থেকে বাদ থাকে — সমন্বয়কারী বাজার/নগদে জের
-   *  কমলেই লাস্ট ব্যালেন্স (মূলধন) আবার বাড়ে।
+  /* ── last balance (spec §86) ─────────────────────────────
+   *  লাস্ট ব্যালেন্স = হাতে থাকা প্রকৃত নগদ:
+   *    গত মাসের নগদ ক্যারি + স্থায়ী ফান্ড + সব নগদ জমা (জের-পরিশোধসহ)
+   *    − [ফান্ড থেকে করা বাজার + শেয়ার্ড + ব্যক্তিগত − অন্যান্য আয়]
+   *  নিজের টাকার বাজার ফান্ড ছোঁয় না (fundPaidBazar থেকেই বাদ পড়ে),
+   *  তাই ওই বাজার যে ফান্ড বাঁচায় তা নগদে থেকে যায়।
+   *  বাকি জের নগদ থেকে বাদ হয় না — সদস্যের দেনা হিসেবে আলাদা দেখানো হয়
+   *  (দেনা-পাওনা সারণি); নগদ জমা/জের-সমন্বয় এলেই নগদ ব্যালেন্স বাড়ে।
    */
   const operating = fundPaidBazar + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
   const carry = toNumber(input.carryForwardBalance, 0);
-  const lastBalance = round2(carry + totalFund - operating - totalRemainingJer);
+  const lastBalance = round2(carry + totalFund + totalCashCollected - operating);
+  // লাস্ট ব্যালেন্স এখন নিজেই প্রকৃত হাত-নগদ — ক্লোজের সময় এটাই ক্যারি হয়।
+  const cashBalance = lastBalance;
 
   return {
     totalMembers: members.length,
@@ -251,7 +272,9 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     totalIndividualExtra,
     totalDepositsThisMonth,
     totalMemberPayments,
+    totalCashCollected,
     lastBalance,
+    cashBalance,
     memberCalculations,
   };
 }

@@ -68,7 +68,7 @@ export function DashboardView() {
         <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(s.totalFund)}`} tone="warn" />
         <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(s.totalSharedExtra)}`} />
         <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} />
-        <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(s.lastBalance)}`} tone={s.lastBalance >= 0 ? "ok" : "danger"} />
+        <Kpi label="লাস্ট ব্যালেন্স (নগদ)" value={`৳ ${formatMoney(s.lastBalance)}`} tone={s.lastBalance >= 0 ? "ok" : "danger"} />
       </div>
 
       {/* ── dena paona snapshot ─────────────────────── */}
@@ -211,7 +211,8 @@ export function DashboardView() {
             <li>• স্থায়ী ফান্ড = স্থায়ী মূলধন, মিল খরচ থেকে বাদ যায় না</li>
             <li>• Shared Extra = মোট ÷ সক্রিয় সদস্য সংখ্যা</li>
             <li>• Individual Extra শুধু নির্দিষ্ট সদস্যের হিসাবে</li>
-            <li>• আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার থেকে সমন্বয় হয়</li>
+            <li>• আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা নগদ পরিশোধ থেকে সমন্বয় হয়</li>
+            <li>• সদস্য জমা দিলে লাস্ট ব্যালেন্স (নগদ) বাড়ে; বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে</li>
             <li>• প্রতি মাস আলাদা হিসাব — পুরনো মাস দেখা যাবে, মুছে যাবে না</li>
           </ul>
         </Card>

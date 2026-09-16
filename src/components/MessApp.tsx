@@ -10,12 +10,8 @@ import {
   ConfirmDialog,
   EmptyState,
   ErrorState,
-  Field,
   Loader,
-  Modal,
-  NumberInput,
   Select,
-  TextInput,
   ToastStack,
 } from "@/components/ui";
 import { AuthScreen } from "@/components/views/AuthScreen";
@@ -31,7 +27,6 @@ import { ReportView } from "@/components/views/ReportView";
 import { SheetView } from "@/components/views/SheetView";
 import { AdminView } from "@/components/views/AdminView";
 import { AdminChatButton } from "@/components/views/AdminMessages";
-import { MONTH_NAMES_BN, MONTH_NAMES_EN } from "@/lib/date";
 import { mess as messCall } from "@/lib/client";
 import { MENU, ROLE_LABEL } from "@/lib/permissions";
 
@@ -312,9 +307,10 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
 
 function ContextBar() {
   const app = useApp();
-  const [openMonthModal, setOpenMonthModal] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
   const monthOptions = useMemo(() => {
-    const list = app.months.map((m) => ({ id: m.id, label: m.monthName }));
+    const list = app.months.map((m) => ({ id: m.id, label: `${m.isClosed ? "🔒 " : ""}${m.monthName}${m.isClosed ? " (বন্ধ)" : ""}` }));
     return list.length ? list : app.month ? [{ id: app.month.id, label: app.month.monthName }] : [];
   }, [app.months, app.month]);
 
@@ -361,14 +357,44 @@ function ContextBar() {
           </Select>
         </label>
 
-        {app.can("month.write") ? (
-          <button type="button" className="btn btn-soft btn-sm h-9" onClick={() => setOpenMonthModal(true)}>
-            + নতুন মাস
+        {app.can("month.write") && app.month && !app.month.isClosed ? (
+          <button
+            type="button"
+            className="btn btn-soft btn-sm h-9 border-[var(--warn)] text-[var(--warn)]"
+            onClick={() => setCloseOpen(true)}
+            title="চালু মাস বন্ধ করলে সঙ্গে সঙ্গে পরের মাস স্বয়ংক্রিয় শুরু হবে"
+          >
+            🔒 চালু মাস ক্লোজ
+          </button>
+        ) : null}
+
+        {app.can("month.write") && app.month?.isClosed ? (
+          <button
+            type="button"
+            className="btn btn-soft btn-sm h-9 border-[var(--brand)] text-[var(--brand)]"
+            onClick={() => void app.reopenMonth(app.month!.id)}
+            title="পুরনো/বন্ধ মাস পুনরায় চালু করুন (সংশোধনের পর আবার ক্লোজ করা যাবে)"
+          >
+            🔓 মাস চালু করুন
           </button>
         ) : null}
       </div>
 
-      <NewMonthModal open={openMonthModal} onClose={() => setOpenMonthModal(false)} />
+      <ConfirmDialog
+        open={closeOpen}
+        busy={closing}
+        title="চালু মাস ক্লোজ করবেন?"
+        message={`${app.month?.monthName ?? ""} মাস বন্ধ হলেই সঙ্গে সঙ্গে পরের মাস খুলে যাবে — সক্রিয় সদস্য, নগদ লাস্ট ব্যালেন্স ও অবশিষ্ট জের/পাওনা স্বয়ংক্রিয় ক্যারি হবে। বন্ধ মাসের পুরনো হিসাব অপরিবর্তিত থাকবে (অ্যাডমিন প্যানেল থেকে পুনরায় চালু করা যায়)।`}
+        confirmLabel="হ্যাঁ, ক্লোজ করে পরের মাস খুলুন"
+        cancelLabel="বাতিল"
+        onCancel={() => setCloseOpen(false)}
+        onConfirm={async () => {
+          setClosing(true);
+          const next = await app.closeCurrentMonth();
+          setClosing(false);
+          if (next) setCloseOpen(false);
+        }}
+      />
     </div>
   );
 }
@@ -392,73 +418,6 @@ function CurrentPageBar() {
         {app.month ? <span className="muted ml-auto shrink-0 text-[11.5px] font-semibold">{app.month.monthName}</span> : null}
       </div>
     </div>
-  );
-}
-
-function NewMonthModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const app = useApp();
-  const now = new Date();
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
-  const [carry, setCarry] = useState(0);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      const d = new Date();
-      const nextMonth = d.getMonth() + 2 > 12 ? 1 : d.getMonth() + 2;
-      const nextYear = d.getMonth() + 2 > 12 ? d.getFullYear() + 1 : d.getFullYear();
-      setYear(app.month ? (app.month.month === 12 ? app.month.year + 1 : app.month.year) : nextYear);
-      setMonth(app.month ? (app.month.month === 12 ? 1 : app.month.month + 1) : nextMonth);
-      setCarry(0);
-    }
-  }, [open, app.month]);
-
-  const submit = async () => {
-    setBusy(true);
-    // সদস্য তালিকা ও অবশিষ্ট দেনা-পাওনা স্বয়ংক্রিয়ভাবে ক্যারি হয় (সার্ভার-সাইড)
-    const created = await app.openNewMonth(year, month, { carryForwardBalance: carry });
-    setBusy(false);
-    if (created) onClose();
-  };
-
-  return (
-    <Modal
-      open={open}
-      title="নতুন মাস খুলুন"
-      onClose={onClose}
-      footer={
-        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={busy}>
-            Cancel
-          </button>
-          <button type="button" className="btn btn-primary" onClick={() => void submit()} disabled={busy}>
-            {busy ? "খোলা হচ্ছে…" : "মাস খুলুন"}
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="সাল / Year" required>
-            <NumberInput value={year} min={2000} max={2100} onChange={(e) => setYear(Number(e.target.value))} />
-          </Field>
-          <Field label="মাস / Month" required>
-            <Select value={month} onChange={(e) => setMonth(Number(e.target.value))}>
-              {Array.from({ length: 12 }).map((_, i) => (
-                <option key={i + 1} value={i + 1}>
-                  {MONTH_NAMES_EN[i]} / {MONTH_NAMES_BN[i]}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </div>
-
-        <Field label="পূর্ববর্তী নগদ ব্যালেন্স (ঐচ্ছিক)">
-          <NumberInput value={carry} min={0} step="0.01" onChange={(e) => setCarry(Number(e.target.value))} />
-        </Field>
-      </div>
-    </Modal>
   );
 }
 

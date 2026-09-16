@@ -39,8 +39,6 @@ export function MembersView() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [decision, setDecision] = useState<{ user: PendingUser; status: "approved" | "rejected" | "inactive" } | null>(null);
   const [decisionBusy, setDecisionBusy] = useState(false);
-  const [copyFrom, setCopyFrom] = useState<string>("");
-  const [copyOpen, setCopyOpen] = useState(false);
 
   const rows = data?.members ?? [];
   const calcs = summary?.memberCalculations ?? [];
@@ -199,16 +197,6 @@ export function MembersView() {
     } finally {
       setDecisionBusy(false);
     }
-  };
-
-  const doCopy = async () => {
-    if (!copyFrom) {
-      app.toast("উৎস মাস নির্বাচন করুন", "error");
-      return;
-    }
-    const res = await app.call<{ copied: number }>("month.copyRoster", { fromMonthId: copyFrom });
-    setCopyOpen(false);
-    if (res) app.toast(`${res.copied} জন সদস্য কপি হয়েছে ✓`, "success");
   };
 
   const hasJer = rows.some((r) => toNumber(r.openingDue) > 0);
@@ -409,13 +397,6 @@ export function MembersView() {
         addLabel="+ নতুন সদস্য"
         formTitle="সদস্য"
         search={(r) => `${r.name} ${r.phone} ${r.role}`}
-        toolbar={
-          canWrite && app.months.length > 1 ? (
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCopyOpen(true)}>
-              ⧉ আগের মাস থেকে কপি
-            </button>
-          ) : null
-        }
       />
 
       {canWrite && rows.length > 0 ? (
@@ -429,37 +410,6 @@ export function MembersView() {
           </div>
         </Card>
       ) : null}
-
-      <Modal
-        open={copyOpen}
-        title="আগের মাস থেকে সদস্য কপি করুন"
-        subtitle="শুধু তালিকা কপি হবে, মিল ০ থেকে শুরু"
-        onClose={() => setCopyOpen(false)}
-        footer={
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button type="button" className="btn btn-ghost" onClick={() => setCopyOpen(false)}>
-              Cancel
-            </button>
-            <button type="button" className="btn btn-primary" onClick={() => void doCopy()}>
-              কপি করুন
-            </button>
-          </div>
-        }
-      >
-        <label className="block">
-          <span className="label">উৎস মাস / Source Month</span>
-          <select className="input" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)}>
-            <option value="">— নির্বাচন করুন —</option>
-            {app.months
-              .filter((m) => m.id !== month?.id)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.monthName}
-                </option>
-              ))}
-          </select>
-        </label>
-      </Modal>
 
       <ConfirmDialog
         open={!!decision}

@@ -40,6 +40,9 @@ export const MONTH_NAMES_BN = [
 
 const WEEK_DAYS_BN = ["রবিবার", "সোমবার", "মঙ্গলবার", "বুধবার", "বৃহস্পতিবার", "শুক্রবার", "শনিবার"];
 
+/** গ্রিড/সংক্ষিপ্ত স্থানের জন্য সুন্দর দুই-তিন অক্ষরের বারের নাম */
+const WEEK_DAYS_BN_SHORT = ["রবি", "সোম", "মঙ্গল", "বুধ", "বৃহঃ", "শুক্র", "শনি"];
+
 export function pad2(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
@@ -164,6 +167,13 @@ export function weekdayBn(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
   return WEEK_DAYS_BN[dt.getUTCDay()] ?? "";
+}
+
+/** সংক্ষিপ্ত বারের নাম: রবি, সোম, মঙ্গল, বুধ, বৃহঃ, শুক্র, শনি */
+export function weekdayBnShort(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+  return WEEK_DAYS_BN_SHORT[dt.getUTCDay()] ?? "";
 }
 
 /** ISO of a specific day inside a month */

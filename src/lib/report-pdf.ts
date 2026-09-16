@@ -69,6 +69,65 @@ export function buildPrintHtml(input: PrintReportInput): string {
     )
     .join("");
 
+  // দেনা-পাওনা নগদ জমা: ফান্ড ও সিস্টেম-ক্যারি বাদ; জের-নগদ পরিশোধ ধরা হয়
+  const carryByMember = new Map<string, number>();
+  for (const d of data.deposits) {
+    if (!d.memberId || d.type === "permanent_fund") continue;
+    if ((d.createdBy ?? "") === "system:carry-forward") {
+      carryByMember.set(d.memberId, round2((carryByMember.get(d.memberId) ?? 0) + Number(d.amount)));
+    }
+  }
+  const paymentRows = summary.memberCalculations
+    .map((m) => {
+      const paid = round2(m.totalDeposit - (carryByMember.get(m.memberId) ?? 0) + (m.jerCashPaid ?? 0));
+      const dueBefore = round2(m.denaPoana - paid);
+      return { m, paid, dueBefore };
+    })
+    .filter((r) => r.dueBefore < -0.005 || r.paid > 0.005);
+  const paymentTotalDue = round2(paymentRows.filter((r) => r.dueBefore < -0.005).reduce((s, r) => s + Math.abs(r.dueBefore), 0));
+  const paymentTotalPaid = round2(paymentRows.reduce((s, r) => s + r.paid, 0));
+  const paymentRemainDue = round2(paymentRows.filter((r) => r.m.denaPoana < -0.005).reduce((s, r) => s + Math.abs(r.m.denaPoana), 0));
+  const paymentRemainRecv = round2(paymentRows.filter((r) => r.m.denaPoana > 0.005).reduce((s, r) => s + r.m.denaPoana, 0));
+  const paymentTableHtml =
+    !fromDate && !toDate && paymentRows.length > 0
+      ? `
+    <h2>★ দেনা-পাওনা জমা (সদস্য হিসেবের পরিপূরক)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th class="c">#</th><th>সদস্য</th><th class="r">মোট দেনা</th>
+          <th class="r">মোট জমা</th><th class="r">বাকি দেনা(−)/পাওনা(+)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${paymentRows
+          .map(
+            (r, i) => `
+          <tr>
+            <td class="c">${i + 1}</td>
+            <td>${esc(r.m.name)}</td>
+            <td class="r">${r.dueBefore < -0.005 ? `৳${formatMoney(Math.abs(r.dueBefore))}` : "—"}</td>
+            <td class="r">${r.paid > 0.005 ? `৳${formatMoney(r.paid)}` : "—"}</td>
+            <td class="r b">${r.m.denaPoana < 0 ? "−" : r.m.denaPoana > 0 ? "+" : ""}৳${formatMoney(Math.abs(r.m.denaPoana))}</td>
+          </tr>`,
+          )
+          .join("")}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="r b">মোট</td>
+          <td class="r b">৳${formatMoney(paymentTotalDue)}</td>
+          <td class="r b">৳${formatMoney(paymentTotalPaid)}</td>
+          <td class="r b">দিবে ৳${formatMoney(paymentRemainDue)} / পাবে ৳${formatMoney(paymentRemainRecv)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div class="note">
+      জমা দিলে দেনা কমে ও লাস্ট ব্যালেন্স (নগদ) বাড়ে; বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে।
+      পুরনো মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা জের-পরিশোধ থেকে সমন্বয় হয়।
+    </div>`
+      : "";
+
   const catRows = Object.entries(categories)
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `<tr><td>${esc(k)}</td><td class="r">${formatMoney(v)}</td></tr>`)
@@ -233,6 +292,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
         summary.activeMembers ? summary.totalSharedExtra / summary.activeMembers : 0,
       )} জনপ্রতি।
     </div>
+    ${paymentTableHtml}
 
     <h2>২. বাজার খরচ সামারি / Bazar Summary</h2>
     <div class="two">
@@ -323,7 +383,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
       ৩) মিল রেট = (বাজার − অন্য আয়) ÷ মোট মিল • ৪) Individual Extra নির্দিষ্ট সদস্যের উপর •
       ৫) Shared Extra সক্রিয় সদস্যদের মধ্যে সমান ভাগ • ৬) প্রতিটি অফিসের তথ্য আলাদা •
       ৭) প্রতিটি মাসের হিসাব আলাদা • ৮) আগের মাস সবসময় দেখা যাবে •
-      ৯) আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার থেকে আগে সমন্বয় হয়; বাকি জের লাস্ট ব্যালেন্স থেকে বাদ থাকে।
+      ৯) আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা নগদ পরিশোধ থেকে আগে সমন্বয় হয়; লাস্ট ব্যালেন্স হলো হাতে থাকা নগদ, বাকি জের সদস্য-দেনা হিসেবে আলাদা দেখানো হয়।
     </div>
 
     <div class="sign">

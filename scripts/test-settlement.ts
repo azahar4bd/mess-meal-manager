@@ -5,8 +5,8 @@
  *  ১. নিজের টাকার বাজার আগে জের মেটায়, বাড়তিটাই পাওনা হয়
  *  ২. বাকি জের লাস্ট ব্যালেন্স থেকে বাদ থাকে; সমন্বয়কারী বাজারে মূলধন বাড়ে
  *  ৩. বাজার-মোট ও মিল রেটে জেরের কোনো প্রভাব নেই
- *  ৪. jer_payment নগদে জের কমায়, দেনা-পাওনায় ধরে না
- *  ৫. closing_payment সাধারণ জমার মতোই দেনা-পাওনায় ধরে
+ *  ৪. jer_payment নগদে জের কমায় এবং দেনা-পাওনা ঘরেও স্বচ্ছভাবে ধরা পড়ে
+ *  ৫. closing_payment দেনা-পাওনা কমায় এবং লাস্ট ব্যালেন্স (নগদ) বাড়ায়
  *  ৬. জের না থাকলে পুরনো সূত্র হুবহু একই থাকে; ফিল্টার-ভিউতে জের প্রয়োগ হয় না
  *
  * চালানোর নিয়ম:  npm run test:settlement
@@ -102,19 +102,23 @@ console.log("1) জের সমন্বয়ের মূল দৃশ্য 
   check("জের থেকে সমন্বয় ১০০", eq(rahim.jerAdjusted, 100), String(rahim.jerAdjusted));
   check("বাকি জের ৩০০", eq(rahim.remainingJer, 300), String(rahim.remainingJer));
   check("পাওনা-ক্রেডিট ০ (পুরোটাই জেরে গেছে)", eq(rahim.selfPaidCredit, 0), String(rahim.selfPaidCredit));
-  check("দেনা-পাওনা −১১১০", eq(rahim.denaPoana, -1110), String(rahim.denaPoana));
+  // দেনা = মিল খরচ ১১১০ + গত জের ৪০০ − জের সমন্বয় ১০০ = ১৪১০
+  check("দেনা-পাওনা −১৪১০ (মিল খরচ + জের − সমন্বয়)", eq(rahim.denaPoana, -1410), String(rahim.denaPoana));
   check("মোট বাকি জের ৩০০", eq(s.totalRemainingJer, 300), String(s.totalRemainingJer));
-  // লাস্ট ব্যালেন্স = ০ + ৩০০০ − (২০০০ + ১২০ − ০) − ৩০০ = ৫৮০
-  check("লাস্ট ব্যালেন্স ৫৮০ (জের বাদে)", eq(s.lastBalance, 580), String(s.lastBalance));
+  // লাস্ট ব্যালেন্স = হাত-নগদ = ০ + ৩০০০ + ০ − (ফান্ড-বাজার ২০০০ + ১২০) = ৮৮০
+  // (বাকি জের সদস্য-দেনা হিসেবে আলাদা, নগদ থেকে বাদ হয় না)
+  check("লাস্ট ব্যালেন্স ৮৮০ (প্রকৃত হাত-নগদ)", eq(s.lastBalance, 880), String(s.lastBalance));
 }
 
-console.log("2) বাজারের আগের অবস্থার সঙ্গে তুলনা (মূলধন বাড়ে কিনা)");
+console.log("2) নিজের টাকার বাজার ফান্ড-বাজার প্রতিস্থাপন করলে নগদ বাঁচে");
 {
-  const before = calculateMonth({ ...baseInput(), bazarExpenses: [bazar("b_fund", 2000)] });
+  // before: ২১০০-ই ফান্ড থেকে; after: ২০০০ ফান্ড + ১০০ রহিম নিজে
+  const before = calculateMonth({ ...baseInput(), bazarExpenses: [bazar("b_fund", 2100)] });
   const after = calculateMonth(baseInput());
-  check("বাজারের আগে লাস্ট ব্যালেন্স ৪৮০", eq(before.lastBalance, 480), String(before.lastBalance));
-  check("১০০ বাজারে লাস্ট ব্যালেন্স ১০০ বাড়ে (৫৮০)", eq(after.lastBalance - before.lastBalance, 100));
-  check("বাজারের আগে বাকি জের ৪০০", eq(before.totalRemainingJer, 400), String(before.totalRemainingJer));
+  check("ফান্ড থেকে সব হলে লাস্ট ব্যালেন্স ৭৮০", eq(before.lastBalance, 780), String(before.lastBalance));
+  check("নিজের ১০০ বাজারে নগদ ১০০ বাঁচে (৮৮০)", eq(after.lastBalance, 880), String(after.lastBalance));
+  check("নগদ পার্থক্য ১০০", eq(after.lastBalance - before.lastBalance, 100));
+  check("after-এ বাকি জের ৩০০", eq(after.totalRemainingJer, 300), String(after.totalRemainingJer));
 }
 
 console.log("3) জের পুরো মিটে গেলে বাড়তি বাজার পাওনা হয়");
@@ -141,10 +145,12 @@ console.log("4) নগদ জের-পরিশোধ (jer_payment)");
   const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
   check("নগদে জের মিটেছে ১৫০", eq(rahim.jerCashPaid, 150), String(rahim.jerCashPaid));
   check("বাকি জের ১৫০ (৪০০ − ১০০ − ১৫০)", eq(rahim.remainingJer, 150), String(rahim.remainingJer));
-  check("নগদ জের-পরিশোধ জমা/দেনায় ধরে না (জমা ০)", eq(rahim.totalDeposit, 0), String(rahim.totalDeposit));
-  check("দেনা-পাওনা −১১১০ (অপরিবর্তিত)", eq(rahim.denaPoana, -1110), String(rahim.denaPoana));
+  check("জের-নগদ সাধারণ জমা কলামে নয় (totalDeposit ০)", eq(rahim.totalDeposit, 0), String(rahim.totalDeposit));
+  // দায় ১৫১০ (১১১০ + ৪০০), দিয়েছে ১০০ (বাজার) + ১৫০ (নগদ) → বাকি ১২৬০
+  check("দেনা-পাওনা −১২৬০ (নগদ পরিশোধ দেনা কমায়)", eq(rahim.denaPoana, -1260), String(rahim.denaPoana));
   check("সদস্য-পেমেন্ট মোটে jer_payment বাদ (০)", eq(s.totalMemberPayments, 0), String(s.totalMemberPayments));
-  check("লাস্ট ব্যালেন্স ৭৩০ (জের ১৫০ বাদে)", eq(s.lastBalance, 730), String(s.lastBalance));
+  // নগদে ১৫০ এলো → হাত-নগদ = ৩০০০ + ১৫০ − ২১২০ = ১০৩০ (বাকি জের আলাদা সদস্য-দেনা)
+  check("লাস্ট ব্যালেন্স ১০৩০ (জের-নগদ নগদ বাড়ায়)", eq(s.lastBalance, 1030), String(s.lastBalance));
 }
 
 console.log("5) মাস-শেষ পরিশোধ (closing_payment) সাধারণ জমার মতোই ধরে");
@@ -155,13 +161,17 @@ console.log("5) মাস-শেষ পরিশোধ (closing_payment) সা�
   const s = calculateMonth(input);
   const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
   check("জমায় ৫০০ যোগ হয়েছে", eq(rahim.totalDeposit, 500), String(rahim.totalDeposit));
+  // জের নেই: ৫০০ + নিজ-বাজার ১০০ − খরচ ১১১০ = −৫১০
   check("দেনা-পাওনা −৫১০ (৫০০ + ১০০ − ১১১০)", eq(rahim.denaPoana, -510), String(rahim.denaPoana));
+  // জমা নগদ বলে লাস্ট ব্যালেন্স ৮৮০ → ১৩৮০ বাড়ে; বাজার/মিল রেট অপরিবর্তিত
+  check("জমায় লাস্ট ব্যালেন্স ৫০০ বাড়ে (১৩৮০)", eq(s.lastBalance, 1380), String(s.lastBalance));
+  check("মিল রেট অপরিবর্তিত ৩৫", eq(s.perMillRate, 35), String(s.perMillRate));
 }
 
 console.log("6) জের না থাকলে পুরনো সূত্র হুবহু একই");
 {
   const input = baseInput();
-  input.members = [mem("mem_rahim", "Rahim"), mem("mem_karim", "Karim")];
+  input.members = [mem("mem_rahim", "Rahim", 0), mem("mem_karim", "Karim", 0)];
   const s = calculateMonth(input);
   const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
   check("জের-ফিল্ড সব শূন্য", rahim.openingDue === 0 && rahim.remainingJer === 0 && s.totalRemainingJer === 0);
@@ -177,6 +187,35 @@ console.log("7) তারিখ-ফিল্টার ভিউতে জের 
   check("openingDue ০ হিসেবে ধরে", rahim.openingDue === 0, String(rahim.openingDue));
   check("বাকি জের ০", rahim.remainingJer === 0, String(rahim.remainingJer));
   check("পুরনো সূত্রে দেনা-পাওনা −১০১০", eq(rahim.denaPoana, -1010), String(rahim.denaPoana));
+}
+
+console.log("8) ক্লোজ → নতুন মাস ক্যারি-চেইন (নগদ স্থিতিশীল, জের নগদে মেটে)");
+{
+  const s1 = calculateMonth(baseInput());
+  const rahim1 = s1.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
+  const karim1 = s1.memberCalculations.find((c) => c.memberId === "mem_karim")!;
+  // M2: আগের চূড়ান্ত দেনাই জের; নগদ ক্যারি = M1-এর হাত-নগদ (cashBalance)
+  const m2: CalcInput = {
+    members: [mem("mem_rahim", "Rahim", Math.abs(Math.min(0, rahim1.denaPoana))), mem("mem_karim", "Karim", Math.abs(Math.min(0, karim1.denaPoana)))],
+    dailyMeals: [],
+    bazarExpenses: [],
+    otherIncomes: [],
+    deposits: [],
+    extraExpenses: [],
+    carryForwardBalance: s1.cashBalance,
+  };
+  const s2 = calculateMonth(m2);
+  check("রহিমের M2 জের ১৪১০", eq(s2.memberCalculations[0]!.openingDue, 1410), String(s2.memberCalculations[0]!.openingDue));
+  check("করিমের M2 জের ১১১০", eq(s2.memberCalculations[1]!.openingDue, 1110), String(s2.memberCalculations[1]!.openingDue));
+  check("নিষ্ক্রিয় M2-তে নগদ অপরিবর্তিত ৮৮০ (ডাবল-কাট নেই)", eq(s2.lastBalance, 880), String(s2.lastBalance));
+
+  // রহিম পুরো ১৪১০ নগদে (jer_payment) মেটাল
+  const m2b: CalcInput = { ...m2, deposits: [dep("dj", "mem_rahim", "Rahim", 1410, "jer_payment")] };
+  const s2b = calculateMonth(m2b);
+  const rahim2 = s2b.memberCalculations[0]!;
+  check("রহিম বাকি-জের ০", eq(rahim2.remainingJer, 0), String(rahim2.remainingJer));
+  check("রহিম দেনা-পাওনা ০", eq(rahim2.denaPoana, 0), String(rahim2.denaPoana));
+  check("নগদ বেড়ে ২২৯০ (৮৮০ + ১৪১০)", eq(s2b.lastBalance, 2290), String(s2b.lastBalance));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

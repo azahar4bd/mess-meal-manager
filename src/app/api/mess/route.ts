@@ -52,6 +52,7 @@ import {
   listDeposits,
   listExtras,
   listIncomes,
+  closeMonthAndOpenNext,
   listMembers,
   reorderMembers,
   listMeals,
@@ -341,6 +342,42 @@ const handlers: Record<string, ActionHandler> = {
     const closed = body.closed === undefined ? true : Boolean(body.closed);
     const updated = need(await setMonthClosed(month.id, officeId, closed), "মাস হালনাগাদ করা যায়নি");
     await logAction(ctx, closed ? "month.close" : "month.reopen", "month", month.id, closed ? "মাস বন্ধ করা হয়েছে" : "মাস পুনরায় খোলা হয়েছে");
+    return monthDTO(updated);
+  },
+
+  /**
+   * চালু মাস ক্লোজ → পরের মাস স্বয়ংক্রিয় খোলা (রোস্টার + নগদ ক্যারি + জের)।
+   * কোনো আলাদা "নতুন মাস" অপশন নেই — ক্লোজই নতুন মাস শুরু করে।
+   */
+  "month.closeAndOpen": async (ctx, body) => {
+    if (!can(ctx.user.role, "month.write")) deny(ctx, "month.write");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    if (month.isClosed) throw new AuthError("month-closed", `${month.monthName} মাসটি আগেই বন্ধ`, 409);
+    const result = await closeMonthAndOpenNext(officeId, month.id);
+    await logAction(
+      ctx,
+      "month.close",
+      "month",
+      month.id,
+      `${month.monthName} মাস বন্ধ ও ${result.nextMonth.monthName} স্বয়ংক্রিয় খোলা হয়েছে (নগদ ক্যারি ৳${result.lastBalance}${result.carriedDues ? `, ${result.carriedDues} জনের জের` : ""}${result.carriedBalances ? `, ${result.carriedBalances} জনের পাওনা` : ""})`,
+    );
+    return {
+      closedMonth: monthDTO(result.closedMonth),
+      nextMonth: monthDTO(result.nextMonth),
+      copiedMembers: result.copiedMembers,
+      carriedBalances: result.carriedBalances,
+      carriedDues: result.carriedDues,
+      lastBalance: result.lastBalance,
+    };
+  },
+
+  /** অ্যাডমিন প্যানেল: পুরনো/বন্ধ মাস পুনরায় চালু (রিওপেন) */
+  "month.reopen": async (ctx, body) => {
+    if (!can(ctx.user.role, "month.write")) deny(ctx, "month.write");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    if (!month.isClosed) return monthDTO(month);
+    const updated = need(await setMonthClosed(month.id, officeId, false), "মাস হালনাগাদ করা যায়নি");
+    await logAction(ctx, "month.reopen", "month", month.id, `${month.monthName} মাস পুনরায় চালু করা হয়েছে`);
     return monthDTO(updated);
   },
 

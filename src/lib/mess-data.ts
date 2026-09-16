@@ -183,6 +183,7 @@ export function depositDTO(r: Deposit): DepositDTO {
     amount: toNumber(r.amount),
     note: r.note,
     type: r.type,
+    createdBy: r.createdBy ?? "",
   };
 }
 
@@ -469,9 +470,10 @@ export async function openMonth(
       const firstDay = isoOfDay(year, month, 1);
       const prevLabel = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
       for (const calcRow of summary?.memberCalculations ?? []) {
-        /* অমীমাংসিত পুরনো জেরও নতুন বাকির সঙ্গে যোগ হয়ে এগোয় — না হলে চেইনে জের হারিয়ে যেত।
-         * (পাওনা থাকলে নেট করে: জের ৪০০ − পাওনা ৩৯০ = নতুন জের ১০) */
-        const amount = round2(calcRow.denaPoana - (calcRow.remainingJer ?? 0));
+        /* নতুন সূত্রে denaPoana-তেই প্রারম্ভিক জের, বাজার/নগদ সমন্বয় ও বাকি জের
+         * সব নিট হয়ে গেছে — চূড়ান্ত সংখ্যাটাই ক্যারি হয়:
+         * ঋণাত্মক → নতুন মাসে জের (opening_due); ধনাত্মক → সমন্বয় জমা (পাওনা)। */
+        const amount = round2(calcRow.denaPoana);
         if (Math.abs(amount) < 1) continue;
         const src = prevMembers.find((m) => m.id === calcRow.memberId);
         const key = (src?.name ?? calcRow.name).trim().toLowerCase();
@@ -514,6 +516,71 @@ export async function setMonthClosed(monthId: string, officeId: string, closed: 
     .where(and(eq(messMonths.id, monthId), eq(messMonths.officeId, officeId)))
     .returning();
   return rows[0] ?? null;
+}
+
+/**
+ * চালু মাস ক্লোজ → সঙ্গে সঙ্গে পরের মাস স্বয়ংক্রিয় খোলা (একমাত্র সমর্থিত ফ্লো)।
+ *  • মাসের চূড়ান্ত হিসাব থেকে লাস্ট ব্যালেন্স পরের মাসে নগদ ক্যারি হয়
+ *  • রোস্টার ও অবশিষ্ট জের/পাওনা openMonth-এর মাধ্যমে স্বয়ংক্রিয় ক্যারি হয়
+ *  • idempotent — মাস আগেই বন্ধ থাকলে নতুন করে কিছু বসে না, পরের মাসটিই ফেরত যায়
+ */
+export async function closeMonthAndOpenNext(
+  officeId: string,
+  monthId: string,
+): Promise<{
+  closedMonth: MessMonth;
+  nextMonth: MessMonth;
+  copiedMembers: number;
+  carriedBalances: number;
+  carriedDues: number;
+  lastBalance: number;
+}> {
+  const month = await getMonth(monthId);
+  if (!month || month.officeId !== officeId) {
+    throw new ValidationError("মাস পাওয়া যায়নি", {}, 404);
+  }
+
+  const nextYear = month.month === 12 ? month.year + 1 : month.year;
+  const nextMonthNo = month.month === 12 ? 1 : month.month + 1;
+
+  // আগেই বন্ধ থাকলে শুধু পরের মাসটি নিশ্চিত/ফেরত — ডুপ্লিকেট ক্যারি বসবে না
+  if (month.isClosed) {
+    const existingNext = await getMonthFor(officeId, nextYear, nextMonthNo);
+    if (existingNext) {
+      return {
+        closedMonth: month,
+        nextMonth: existingNext,
+        copiedMembers: 0,
+        carriedBalances: 0,
+        carriedDues: 0,
+        lastBalance: toNumber(month.carryForwardBalance),
+      };
+    }
+  }
+
+  const { summary } = await getMonthSummary(officeId, month.id);
+  // পরের মাসে শুধু প্রকৃত হাত-নগদ ক্যারি হয় (জের-বাদ রিজার্ভ নয়),
+  // নইলে একই জের দুই মাসে দুইবার রিজার্ভ থেকে বাদ পড়ে হিসাব গরমিল হতো।
+  const cashBalance = round2(summary.cashBalance ?? summary.lastBalance);
+
+  const opened = await openMonth(officeId, nextYear, nextMonthNo, {
+    copyMembers: true,
+    carryForwardBalance: cashBalance,
+    note: `${month.monthName} ক্লোজের পর স্বয়ংক্রিয়ভাবে খোলা`,
+    carryMemberBalances: false,
+    carryDues: true,
+  });
+
+  const closedMonth = (await setMonthClosed(month.id, officeId, true)) ?? month;
+
+  return {
+    closedMonth,
+    nextMonth: opened.month,
+    copiedMembers: opened.copiedMembers,
+    carriedBalances: opened.carriedBalances,
+    carriedDues: opened.carriedDues,
+    lastBalance: cashBalance,
+  };
 }
 
 /* ══════════════════════════════════════════════════════════
