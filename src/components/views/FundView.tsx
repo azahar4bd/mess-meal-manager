@@ -184,7 +184,7 @@ export function FundView() {
     <div className="space-y-3">
       
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Card bodyClass="p-3">
           <div className="kpi-k">মোট স্থায়ী তহবিল</div>
           <div className="kpi-v text-[var(--brand)]">৳ {formatMoney(summary?.totalFund ?? 0)}</div>
@@ -196,10 +196,6 @@ export function FundView() {
         <Card bodyClass="p-3">
           <div className="kpi-k">জের নগদ সমন্বয়</div>
           <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalJerCashPaid ?? 0)}</div>
-        </Card>
-        <Card bodyClass="p-3">
-          <div className="kpi-k">হাতে নগদ</div>
-          <div className="kpi-v">৳ {formatMoney(summary?.cashBalance ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
           <div className="kpi-k">লাস্ট ব্যালেন্স</div>

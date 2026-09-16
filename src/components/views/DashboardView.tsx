@@ -74,7 +74,6 @@ export function DashboardView() {
           value={`৳ ${formatMoney(s.lastBalance)}`}
           tone={s.lastBalance >= 0 ? "ok" : "danger"}
         />
-        <Kpi label="হাতে নগদ" value={`৳ ${formatMoney(s.cashBalance ?? s.lastBalance)}`} />
       </div>
 
       {/* ── dena paona snapshot ─────────────────────── */}

@@ -257,7 +257,6 @@ export function buildPrintHtml(input: PrintReportInput): string {
       <div class="kpi"><div class="k">ইন্ডিভিজুয়াল অতিরিক্ত</div><div class="v">৳ ${formatMoney(summary.totalIndividualExtra)}</div></div>
       <div class="kpi"><div class="k">নিজ টাকার বাজার</div><div class="v">৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}</div></div>
       <div class="kpi"><div class="k">অবশিষ্ট বকেয়া জের</div><div class="v">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</div></div>
-      <div class="kpi"><div class="k">হাতে নগদ</div><div class="v">৳ ${formatMoney(summary.cashBalance ?? summary.lastBalance)}</div></div>
       <div class="kpi"><div class="k">লাস্ট ব্যালেন্স</div><div class="v">৳ ${formatMoney(summary.lastBalance)}</div></div>
     </div>
 

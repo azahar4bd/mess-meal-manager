@@ -511,7 +511,6 @@ export function ReportView() {
             <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
             <Kpi label="নিজ টাকার বাজার" value={`৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}`} tone="brand" />
             <Kpi label="বাকি জের (সদস্য-দেনা)" value={`৳ ${formatMoney(summary.totalRemainingJer ?? 0)}`} tone="warn" />
-            <Kpi label="হাতে নগদ" value={`৳ ${formatMoney(summary.cashBalance ?? summary.lastBalance)}`} />
             <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
           </div>
 
