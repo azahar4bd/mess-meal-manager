@@ -68,6 +68,8 @@ export interface AppContextValue {
   closeCurrentMonth: () => Promise<MonthDTO | null>;
   /** অ্যাডমিন: বন্ধ/পুরনো মাস পুনরায় চালু করা */
   reopenMonth: (monthId: string) => Promise<boolean>;
+  /** অ্যাডমিন: মাস সম্পূর্ণ মুছে ফেলা (সব মিল/বাজার/জমা/সদস্যসহ) */
+  deleteMonth: (monthId: string) => Promise<MonthDTO | null>;
   switchOffice: (officeId: string) => Promise<void>;
   logout: () => Promise<void>;
   signIn: (payload: Record<string, unknown>) => Promise<void>;
@@ -333,6 +335,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [call, toast, selectMonth],
   );
 
+  const deleteMonth = useCallback(
+    async (monthId: string) => {
+      const res = await call<{ deleted: boolean; deletedId: string; fallback: MonthDTO | null }>("month.delete", {
+        monthId,
+      });
+      if (!res?.deleted) return null;
+      toast("মাসটি তার সব ডেটাসহ মুছে ফেলা হয়েছে", "success");
+      // বুটস্ট্র্যাপ করে মাস-তালিকা ও চলতি মাস নতুন করে সাজাই
+      await bootstrap();
+      if (res.fallback) await selectMonth(res.fallback.id);
+      return res.fallback;
+    },
+    [call, toast, bootstrap, selectMonth],
+  );
+
   const switchOffice = useCallback(
     async (officeId: string) => {
       setLoading(true);
@@ -471,6 +488,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       selectMonth,
       closeCurrentMonth,
       reopenMonth,
+      deleteMonth,
       switchOffice,
       logout,
       signIn,
@@ -482,7 +500,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       user, role, menu, requiresApproval, office, offices, months, month, data, summary, lang, theme, tab,
       loading, bootError, toasts, t, toast, close, setLang, toggleTheme, setTab, call, refresh, bootstrap,
-      selectMonth, closeCurrentMonth, reopenMonth, switchOffice, logout, signIn, autoSync, setAutoSync,
+      selectMonth, closeCurrentMonth, reopenMonth, deleteMonth, switchOffice, logout, signIn, autoSync,
+      setAutoSync,
       syncBusy, runSync,
     ],
   );

@@ -311,6 +311,8 @@ function ContextBar() {
   const [closing, setClosing] = useState(false);
   const [reopenOpen, setReopenOpen] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const monthOptions = useMemo(() => {
     const list = app.months.map((m) => ({ id: m.id, label: `${m.isClosed ? "🔒 " : ""}${m.monthName}${m.isClosed ? " (বন্ধ)" : ""}` }));
     return list.length ? list : app.month ? [{ id: app.month.id, label: app.month.monthName }] : [];
@@ -380,6 +382,17 @@ function ContextBar() {
             🔓 মাস চালু করুন
           </button>
         ) : null}
+
+        {app.can("office.manage") && app.month ? (
+          <button
+            type="button"
+            className="btn btn-soft btn-sm h-9 border-[var(--danger)] text-[var(--danger)]"
+            onClick={() => setDeleteOpen(true)}
+            title="এই মাসটি তার সব মিল/বাজার/জমা/সদস্যসহ চিরতরে মুছে ফেলুন"
+          >
+            🗑 মাস ডিলিট
+          </button>
+        ) : null}
       </div>
 
       <ConfirmDialog
@@ -412,6 +425,27 @@ function ContextBar() {
           const ok = await app.reopenMonth(app.month.id);
           setReopening(false);
           if (ok) setReopenOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        busy={deleting}
+        title="মাসটি চিরতরে মুছে ফেলবেন?"
+        message={`${
+          app.month?.monthName ?? ""
+        } মাসের সকল মিল, বাজার, জমা/স্থায়ী ফান্ড কপি, আয়, অতিরিক্ত খরচ এবং এই মাসের রোস্টার সদস্য — সবকিছু মুছে যাবে এবং ফেরত আনা যাবে না। ${
+          app.month?.isClosed ? "" : "মাসটি বন্ধ নয় — এতে আপনার চলতি হিসাব থাকতে পারে। "
+        }পরের কোনো খালি মাস থাকলে সেটি পরে খোলার সময় আগের মাস থেকে ফান্ড/জের নতুন করে বসে যাবে।`}
+        confirmLabel="হ্যাঁ, চিরতরে মুছে ফেলুন"
+        cancelLabel="বাতিল"
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={async () => {
+          if (!app.month) return;
+          setDeleting(true);
+          const fallback = await app.deleteMonth(app.month.id);
+          setDeleting(false);
+          if (fallback) setDeleteOpen(false);
         }}
       />
     </div>

@@ -55,6 +55,7 @@ import {
   listIncomes,
   backfillCarryIfMissing,
   closeMonthAndOpenNext,
+  deleteMonth,
   listMembers,
   reorderMembers,
   listMeals,
@@ -391,6 +392,33 @@ const handlers: Record<string, ActionHandler> = {
       `${month.monthName} মাস পুনরায় চালু করা হয়েছে${result.nextCleared ? " (পরের মাসের পুরোনো ক্যারি রিসেট)" : ""}`,
     );
     return monthDTO(result.month);
+  },
+
+  /** অ্যাডমিন-অনলি: যেকোনো মাস (তার সব ডেটাসহ) সম্পূর্ণ মুছে ফেলা */
+  "month.delete": async (ctx, body) => {
+    if (!can(ctx.user.role, "office.manage")) deny(ctx, "office.manage");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    const monthCount = await db
+      .select({ id: messMonths.id })
+      .from(messMonths)
+      .where(eq(messMonths.officeId, officeId))
+      .limit(2);
+    if (monthCount.length <= 1) {
+      throw new AuthError("bad-request", "এটিই একমাত্র মাস — মুছে ফেলা যাবে না", 400);
+    }
+    const result = await deleteMonth(officeId, month.id);
+    if (!result.deleted) throw new AuthError("not-found", "মাস পাওয়া যায়নি", 404);
+    await logAction(ctx, "month.delete", "month", month.id, `${result.monthName} মাস সম্পূর্ণ মুছে ফেলা হয়েছে`);
+    // মুছে ফেলার পর বেছে নেওয়ার মতো একটি মাস ফেরত দিই
+    const remaining = await db
+      .select()
+      .from(messMonths)
+      .where(eq(messMonths.officeId, officeId))
+      .orderBy(desc(messMonths.year), desc(messMonths.month))
+      .limit(1);
+    if (remaining[0]) await ensureCurrentMonth(officeId);
+    const fallback = remaining[0] ?? null;
+    return { deleted: true, deletedId: month.id, fallback: fallback ? monthDTO(fallback) : null };
   },
 
   "month.copyRoster": async (ctx, body) => {

@@ -559,6 +559,33 @@ export async function setMonthClosed(monthId: string, officeId: string, closed: 
 }
 
 /**
+ * অ্যাডমিন-অনলি: একটি মাস সম্পূর্ণ মুছে ফেলা — মাসের সকল রোস্টার সদস্য,
+ * মিল, বাজার, জমা/ফান্ড, আয় ও অতিরিক্ত খরচ একসঙ্গে মুছে যায়।
+ * পরের মাস খালি থাকলে সেটি পরে খোলার সময় তার আগের অবশিষ্ট মাস থেকে
+ * ক্যারি (ফান্ড/জের) স্বয়ংক্রিয় নতুন করে বসে (backfillCarryIfMissing)।
+ */
+export async function deleteMonth(officeId: string, monthId: string): Promise<{ deleted: boolean; monthName: string }> {
+  const month = await getMonth(monthId);
+  if (!month || month.officeId !== officeId) return { deleted: false, monthName: "" };
+
+  await Promise.all([
+    db.delete(dailyMeals).where(and(eq(dailyMeals.monthId, monthId), eq(dailyMeals.officeId, officeId))),
+    db.delete(bazarExpenses).where(and(eq(bazarExpenses.monthId, monthId), eq(bazarExpenses.officeId, officeId))),
+    db.delete(deposits).where(and(eq(deposits.monthId, monthId), eq(deposits.officeId, officeId))),
+    db.delete(otherIncomes).where(and(eq(otherIncomes.monthId, monthId), eq(otherIncomes.officeId, officeId))),
+    db.delete(extraExpenses).where(and(eq(extraExpenses.monthId, monthId), eq(extraExpenses.officeId, officeId))),
+    db.delete(membersTable).where(and(eq(membersTable.monthId, monthId), eq(membersTable.officeId, officeId))),
+  ]);
+
+  const rows = await db
+    .delete(messMonths)
+    .where(and(eq(messMonths.id, monthId), eq(messMonths.officeId, officeId)))
+    .returning({ id: messMonths.id });
+
+  return { deleted: rows.length > 0, monthName: month.monthName };
+}
+
+/**
  * পরের মাসে আগের ক্লোজের সময় বসে যাওয়া ক্যারি চিহ্ন মুছে দেয় (প্রারম্ভিক জের ও
  * সিস্টেম ক্যারি-ফরোয়ার্ড সমন্বয়-জমা), যাতে সংশোধনের পর পুনঃক্লোজে নতুন হিসাব
  * নিখুঁতভাবে বসতে পারে। ব্যবহারকারীর নিজের কোনো এন্ট্রি (মিল/বাজার/জমা) ছোঁয় না।
