@@ -507,24 +507,24 @@ export async function openMonth(
           });
         }
 
-        /* (১) গত মাসের অবশিষ্ট জের (remainingJer) — নতুন মাসে প্রারম্ভিক জের
-         * হিসেবে বসে; এই অংশটাই লাস্ট ব্যালেন্স থেকে বাদ থাকে এবং নিজের-টাকার
-         * বাজার/নগদ পরিশোধে সমন্বয় হয়। */
-        const jerLeft = round2(Math.max(0, calcRow.remainingJer ?? 0));
-        if (carryDues && jerLeft >= 1) {
+        /* (১) মাস-শেষ চূড়ান্ত দেনা (−denaPoana) — পরের মাসে প্রারম্ভিক বকেয়া
+         * জের হিসেবে বসে (গত মাসের জের + চলতি মিল-খরচ/অতিরিক্ত − সব সমন্বয়
+         * বাদে যা বাকি থাকে)। নতুন মাসে নিজের-টাকার বাজার/নগদ জমা আগে এই
+         * জেরই মেটায়। পাওনা (ধনাত্মক denaPoana) জের হয় না। */
+        const dueAtClose = round2(Math.max(0, -(calcRow.denaPoana ?? 0)));
+        if (carryDues && dueAtClose >= 1) {
           await db
             .update(membersTable)
-            .set({ openingDue: String(jerLeft), updatedAt: new Date() })
+            .set({ openingDue: String(dueAtClose), updatedAt: new Date() })
             .where(eq(membersTable.id, target.id));
           carriedDues += 1;
         }
 
-        /* (২) চলতি মাসের নিট বাকি/পাওনা (জের ছাড়া):
-         *   currentPart = denaPoana + remainingJer
-         * নিট দেনা → ঋণাত্মক সমন্বয় এন্ট্রি (নগদ আনে না, লাস্ট ব্যালেন্স ছোঁয় না);
-         * নিট পাওনা → ধনাত্মক ফের। */
+        /* (২) মাস-শেষ চূড়ান্ত পাওনা (+denaPoana) — পরের মাসে ধনাত্মক সমন্বয়
+         * জমা হিসেবে বসে (নগদ আনে না; সদস্য মাস-শেষ পরিশোধ নিলে মিটে যায়)।
+         * পুরনো carryMemberBalances মোডে দেনা+পাওনা দুটোই সমন্বয়ে বসে। */
         const currentPart = round2(
-          carryMemberBalances ? calcRow.denaPoana : calcRow.denaPoana + (calcRow.remainingJer ?? 0),
+          carryMemberBalances ? calcRow.denaPoana : Math.max(0, calcRow.denaPoana ?? 0),
         );
         if (Math.abs(currentPart) >= 1) {
           await db.insert(deposits).values({
@@ -711,6 +711,58 @@ export async function reopenMonth(
     nextCleared = true;
   }
   return { month: updated, nextCleared };
+}
+
+/**
+ * বিদ্যমান মাসে ক্লোজ-ক্যারি (ফান্ড কপি, প্রারম্ভিক জের, পাওনা সমন্বয়) বসানো
+ * না থাকলে পূর্ববর্তী মাসের চূড়ান্ত হিসাব থেকে বসিয়ে দেয়। পুরোনো কোডে তৈরি
+ * হয়ে থাকা (ফান্ড-কপিশূন্য) খালি/চলতি মাস ঠিক করার জন্য boot-এ চালানো হয়।
+ *  • ক্যারি আগেই বসা থাকলে বা পূর্ববর্তী মাস না থাকলে কিছু করে না
+ *  • মাসে ব্যবহারকারীর এন্ট্রি থাকলে শুধু তখনই বসায় যখন পূর্ববর্তী মাস বন্ধ
+ */
+export async function backfillCarryIfMissing(
+  officeId: string,
+  monthId: string,
+): Promise<boolean> {
+  const month = await getMonth(monthId);
+  if (!month || month.officeId !== officeId) return false;
+  const py = month.month === 1 ? month.year - 1 : month.year;
+  const pm = month.month === 1 ? 12 : month.month - 1;
+  const prev = await getMonthFor(officeId, py, pm);
+  if (!prev) return false;
+
+  const [carryRows, dueRows] = await Promise.all([
+    db
+      .select({ id: deposits.id })
+      .from(deposits)
+      .where(and(eq(deposits.monthId, monthId), eq(deposits.createdBy, "system:carry-forward")))
+      .limit(1),
+    db
+      .select({ id: membersTable.id })
+      .from(membersTable)
+      .where(
+        and(
+          eq(membersTable.monthId, monthId),
+          sql`${membersTable.openingDue} <> ''`,
+          sql`${membersTable.openingDue} <> '0'`,
+        ),
+      )
+      .limit(1),
+  ]);
+  if (carryRows.length > 0 || dueRows.length > 0) return false;
+
+  const hasUserData = await monthHasUserData(monthId);
+  if (hasUserData && !prev.isClosed) return false;
+
+  const { summary } = await getMonthSummary(officeId, prev.id);
+  const prevCash = round2(summary.cashBalance ?? summary.lastBalance ?? 0);
+  await resetCarryArtifacts(officeId, monthId);
+  await openMonth(officeId, month.year, month.month, {
+    copyMembers: true,
+    carryDues: true,
+    carryForwardBalance: round2(prevCash - (summary.totalFund ?? 0)),
+  });
+  return true;
 }
 
 /* ══════════════════════════════════════════════════════════

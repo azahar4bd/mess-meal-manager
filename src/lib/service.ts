@@ -8,6 +8,7 @@ import { messMonths, offices, users, cryptoId, type Role, type User, type UserSt
 import { hashPassword } from "@/lib/password";
 import { dhakaNow } from "@/lib/date";
 import {
+  backfillCarryIfMissing,
   createOffice,
   ensureMonth,
   findOfficeByCode,
@@ -272,7 +273,11 @@ export async function ensureCurrentMonth(officeId: string) {
   const now = dhakaNow();
   const months = await listMonths(officeId); // নতুন→পুরনো ক্রমে
   const current = months.find((m) => m.year === now.year && m.month === now.month);
-  if (current) return current;
+  if (current) {
+    // পুরোনো কোডে তৈরি মাসে ফান্ড-কপি/জের ক্যারি বসানো না থাকলে পূর্ব মাস থেকে বসাই
+    await backfillCarryIfMissing(officeId, current.id);
+    return current;
+  }
 
   // বর্তমান ক্যালেন্ডার মাস না থাকলে সবশেষ মাস থেকে এক এক করে সামনে এগিয়ে
   // প্রতিটি মাস খুলি — রোস্টার, নগদ ও জের চেইন ঠিক থাকে; লাফ দিয়ে খালি মাস

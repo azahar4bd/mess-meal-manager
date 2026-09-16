@@ -125,8 +125,9 @@ export function buildPrintHtml(input: PrintReportInput): string {
       </tfoot>
     </table>
     <div class="note">
-      জমা দিলে দেনা কমে ও লাস্ট ব্যালেন্স (নগদ) বাড়ে; বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে।
+      জমা দিলে দেনা/বকেয়া জের কমে; জের মিটলে লাস্ট ব্যালেন্স বাড়ে; বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে।
       পুরনো মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা জের-পরিশোধ থেকে সমন্বয় হয়।
+      লাস্ট ব্যালেন্স = (মোট ফান্ড − অবশিষ্ট বকেয়া জের − নেট মিল খরচ) + নিজ টাকার বাজার।
     </div>`
       : "";
 
@@ -256,6 +257,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
       <div class="kpi"><div class="k">ইন্ডিভিজুয়াল অতিরিক্ত</div><div class="v">৳ ${formatMoney(summary.totalIndividualExtra)}</div></div>
       <div class="kpi"><div class="k">নিজ টাকার বাজার</div><div class="v">৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}</div></div>
       <div class="kpi"><div class="k">অবশিষ্ট বকেয়া জের</div><div class="v">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</div></div>
+      <div class="kpi"><div class="k">হাতে নগদ</div><div class="v">৳ ${formatMoney(summary.cashBalance ?? summary.lastBalance)}</div></div>
       <div class="kpi"><div class="k">লাস্ট ব্যালেন্স</div><div class="v">৳ ${formatMoney(summary.lastBalance)}</div></div>
     </div>
 
@@ -395,7 +397,8 @@ export function buildPrintHtml(input: PrintReportInput): string {
       ৩) মিল রেট = (বাজার − অন্য আয়) ÷ মোট মিল • ৪) Individual Extra নির্দিষ্ট সদস্যের উপর •
       ৫) Shared Extra সক্রিয় সদস্যদের মধ্যে সমান ভাগ • ৬) প্রতিটি অফিসের তথ্য আলাদা •
       ৭) প্রতিটি মাসের হিসাব আলাদা • ৮) আগের মাস সবসময় দেখা যাবে •
-      ৯) আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা নগদ পরিশোধ থেকে আগে সমন্বয় হয়; লাস্ট ব্যালেন্স = প্রকৃত হাত-নগদ − বাকি জের, তাই জের সমন্বয় হলে লাস্ট ব্যালেন্স বাড়ে (বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে)।
+      ৯) আগের মাসের বাকি (জের) নতুন মাসে নিজের টাকার বাজার বা নগদ পরিশোধ থেকে আগে সমন্বয় হয় (বাজার-মোট ও মিল রেট অপরিবর্তিত থাকে)।
+      ১০) লাস্ট ব্যালেন্স = (মোট ফান্ড − অবশিষ্ট বকেয়া জের − নেট মিল খরচ) + নিজ টাকার বাজার; ফান্ড মূল টাকা — মাস ক্লোজে সদস্যের নামে কপি হয়, কখনো ০ হয় না।
     </div>
 
     <div class="sign">

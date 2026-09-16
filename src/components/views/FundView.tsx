@@ -26,9 +26,12 @@ export function FundView() {
   const rows = data?.deposits ?? [];
   const members = (data?.members ?? []).map((m) => ({ id: m.id, name: m.name, isActive: m.isActive }));
 
+  // সদস্যভিত্তিক স্থায়ী ফান্ড — শুধু permanent_fund সারি (ক্লোজ-ক্যারি কপিসহ);
+  // সাধারণ জমা/মাস-শেষ/জের-পরিশোধ/সমন্বয় এখানে কখনো মেশে না → মূল টাকা কখনো ০ হয় না
   const perMemberFund = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of rows) {
+      if (r.type !== "permanent_fund") continue;
       const key = r.memberId ?? `name:${(r.memberName || "").toLowerCase()}`;
       map.set(key, round2((map.get(key) ?? 0) + toNumber(r.amount)));
     }
@@ -181,7 +184,7 @@ export function FundView() {
     <div className="space-y-3">
       
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Card bodyClass="p-3">
           <div className="kpi-k">মোট স্থায়ী তহবিল</div>
           <div className="kpi-v text-[var(--brand)]">৳ {formatMoney(summary?.totalFund ?? 0)}</div>
@@ -193,6 +196,10 @@ export function FundView() {
         <Card bodyClass="p-3">
           <div className="kpi-k">জের নগদ সমন্বয়</div>
           <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalJerCashPaid ?? 0)}</div>
+        </Card>
+        <Card bodyClass="p-3">
+          <div className="kpi-k">হাতে নগদ</div>
+          <div className="kpi-v">৳ {formatMoney(summary?.cashBalance ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
           <div className="kpi-k">লাস্ট ব্যালেন্স</div>
@@ -224,7 +231,7 @@ export function FundView() {
       />
 
       {rows.length > 0 ? (
-        <Card title="সদস্য অনুযায়ী তহবিল" bodyClass="p-3">
+        <Card title="সদস্য অনুযায়ী স্থায়ী ফান্ড (মাস ক্লোজে কপি হয়, কখনো ০ হয় না)" bodyClass="p-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {(data?.members ?? []).map((m) => {
               const amount = perMemberFund.get(m.id) ?? perMemberFund.get(`name:${m.name.toLowerCase()}`) ?? 0;

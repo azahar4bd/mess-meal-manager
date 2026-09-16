@@ -280,10 +280,14 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const carry = toNumber(input.carryForwardBalance, 0);
   // প্রকৃত হাত-নগদ; ক্লোজের সময় পরের মাসে এটাই carryForwardBalance হিসেবে যায়।
   const cashBalance = round2(carry + totalFund + totalCashCollected - operating);
-  // লাস্ট ব্যালেন্স (রিজার্ভ) = প্রকৃত নগদ − এখনো বাকি গত-মাসের জের।
-  // নিজে বাজার/নগদে জের সমন্বয় হলে জের কমে ও ফান্ড-বাজার বাঁচে → LB বাড়ে;
-  // এ মাসের বাজার-মোট, মিল রেট ও মিল খরচ স্বাভাবিকভাবেই ধরা থাকে।
-  const lastBalance = round2(cashBalance - totalRemainingJer);
+  // লাস্ট ব্যালেন্স (ব্যবহারকারীর নির্দিষ্ট সূত্র):
+  //   (মোট ফান্ড − অবশিষ্ট বকেয়া জের − নেট মিল খরচ) + নিজ টাকার বাজার (মোট)
+  // নেট মিল খরচ = মোট বাজার − অন্যান্য আয় (অতিরিক্ত খরচ এতে নেই); নিজ টাকার
+  // বাজার নেট খরচের ভেতরে বাজার হিসেবে বাদ পড়েছিল, gross ফেরত যোগে শুধু
+  // ফান্ড-নির্ভর বাজারই বাদ থাকে। নগদ জমা/মাস-শেষ পরিশোধ এখানে যোগ হয় না —
+  // সেগুলো চলতি দেনা মেটায়; ক্লোজের পর বকেয়া জের হলে পরের মাসে LB-তে আসে।
+  // জের নগদ/নিজ-বাজারে মিটলে অবশিষ্ট জের কমে → LB বাড়ে।
+  const lastBalance = round2(totalFund - totalRemainingJer - netCost + totalSelfPaidBazar);
 
   return {
     totalMembers: members.length,

@@ -39,7 +39,7 @@ function SignedMoney({ value, bold = false }: { value: number; bold?: boolean })
 /* ══════════════════════════════════════════════════════════
  *  দেনা-পাওনা জমা ম্যানেজার (মোডাল) — সদস্যের প্রতিটি জমা রেকর্ড
  *  তালিকায় দেখা যায়; নতুন জমা যোগ, যেকোনোটির Edit/Delete চলে।
- *  জমা দেনা কমায় ও লাস্ট ব্যালেন্স (নগদ) বাড়ায়; বাজার/মিল রেট ছোঁয় না।
+ *  জমা দেনা/বকেয়া জের কমায়; জের মিটলে লাস্ট ব্যালেন্স বাড়ে; বাজার/মিল রেট ছোঁয় না।
  * ══════════════════════════════════════════════════════════ */
 
 function PaymentManagerModal({
@@ -278,7 +278,7 @@ function PaymentManagerModal({
       <ConfirmDialog
         open={!!deleting}
         busy={deleteBusy}
-        message={`${toDisplayDate(deleting?.date ?? "")} তারিখের ৳${formatMoney(deleting?.amount ?? 0)} জমা মুছে ফেলা হবে — দেনা ও লাস্ট ব্যালেন্স আবার আগের অবস্থায় ফিরে যাবে।`}
+        message={`${toDisplayDate(deleting?.date ?? "")} তারিখের ৳${formatMoney(deleting?.amount ?? 0)} জমা মুছে ফেলা হবে — দেনা-পাওনা হিসাব আবার আগের অবস্থায় ফিরে যাবে।`}
         confirmLabel="মুছে ফেলুন"
         onCancel={() => setDeleting(null)}
         onConfirm={() => void runDelete()}
@@ -511,7 +511,8 @@ export function ReportView() {
             <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
             <Kpi label="নিজ টাকার বাজার" value={`৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}`} tone="brand" />
             <Kpi label="বাকি জের (সদস্য-দেনা)" value={`৳ ${formatMoney(summary.totalRemainingJer ?? 0)}`} tone="warn" />
-            <Kpi label="লাস্ট ব্যালেন্স (হাত-নগদ)" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
+            <Kpi label="হাতে নগদ" value={`৳ ${formatMoney(summary.cashBalance ?? summary.lastBalance)}`} />
+            <Kpi label="লাস্ট ব্যালেন্স" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
           </div>
 
           {/* ── member report table (spec §40) ──────── */}
@@ -625,7 +626,7 @@ export function ReportView() {
               title="💸 দেনা-পাওনা জমা"
               action={
                 <span className="muted text-[11px] font-semibold">
-                  জমা দিলে দেনা কমে ও লাস্ট ব্যালেন্স বাড়ে; বাজার/মিল রেট অপরিবর্তিত থাকে
+                  জমা দিলে দেনা/বকেয়া জের কমে; জের মিটলে লাস্ট ব্যালেন্স বাড়ে; বাজার/মিল রেট অপরিবর্তিত থাকে
                 </span>
               }
               bodyClass="p-0"
@@ -795,7 +796,7 @@ export function ReportView() {
         busy={clearBusy}
         message={`${confirmClear?.name ?? ""} — এর দেনা-পাওনার সব জমা (৳${formatMoney(
           confirmClear ? cashOf(confirmClear) : 0,
-        )}) মুছে ফেলা হবে; দেনা ও লাস্ট ব্যালেন্স আগের অবস্থায় ফিরে যাবে।`}
+        )}) মুছে ফেলা হবে; দেনা-পাওনা হিসাব আগের অবস্থায় ফিরে যাবে।`}
         confirmLabel="সব জমা মুছুন"
         onCancel={() => setConfirmClear(null)}
         onConfirm={async () => {
