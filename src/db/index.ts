@@ -54,6 +54,19 @@ export const IS_NEON = DB_DRIVER === "neon";
  */
 if (IS_NEON) {
   neonConfig.coalesceWrites = true;
+  // Node runtimes (local dev/scripts, some serverless hosts) ship no global
+  // WebSocket — then the Neon driver must use the `ws` package. Platforms with
+  // a built-in WebSocket (Vercel) keep their global implementation.
+  if (typeof (globalThis as { WebSocket?: unknown }).WebSocket !== "function") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const wsMod = require("ws") as { WebSocket?: unknown; default?: unknown };
+      const Ws = wsMod.WebSocket ?? wsMod.default ?? wsMod;
+      neonConfig.webSocketConstructor = Ws as typeof WebSocket;
+    } catch {
+      /* no `ws` available — let the driver surface its own connection error */
+    }
+  }
 }
 
 type AnyDatabase = (NodePgDatabase<typeof schema> | NeonDatabase<typeof schema>) &
