@@ -569,7 +569,10 @@ export function ReportView() {
                         <td className="num tabular-nums">{formatMoney(m.individualExtra)}</td>
                         <td className="num tabular-nums">{formatMoney(m.sharedExtra)}</td>
                         <td className="num font-bold tabular-nums text-[var(--danger)]">−৳{formatMoney(m.totalCost)}</td>
-                        <td className="num tabular-nums text-[var(--ok)]">+৳{formatMoney(m.totalDeposit)}</td>
+                        <td className="num tabular-nums">
+                          {/* ধনাত্মক = জমা/ফের (সবুজ); ঋণাত্মক = গত মাসের বাকির সমন্বয়-এন্ট্রি (লাল) */}
+                          <SignedMoney value={m.totalDeposit} />
+                        </td>
                         <td className="num tabular-nums text-[var(--ok)]">
                           {m.selfPaidBazar > 0 ? (
                             <>

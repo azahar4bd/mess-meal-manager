@@ -481,24 +481,32 @@ export async function openMonth(
       const firstDay = isoOfDay(year, month, 1);
       const prevLabel = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
       for (const calcRow of summary?.memberCalculations ?? []) {
-        /* নতুন সূত্রে denaPoana-তেই প্রারম্ভিক জের, বাজার/নগদ সমন্বয় ও বাকি জের
-         * সব নিট হয়ে গেছে — চূড়ান্ত সংখ্যাটাই ক্যারি হয়:
-         * ঋণাত্মক → নতুন মাসে জের (opening_due); ধনাত্মক → সমন্বয় জমা (পাওনা)। */
-        const amount = round2(calcRow.denaPoana);
-        if (Math.abs(amount) < 1) continue;
         const src = prevMembers.find((m) => m.id === calcRow.memberId);
         const key = (src?.name ?? calcRow.name).trim().toLowerCase();
         const target = (src?.phone ? byPhone.get(src.phone) : undefined) ?? byName.get(key);
         if (!target) continue;
-        // জের-মোডে বাকি (দেনা) জের হিসেবে বসে — সমন্বয়-জমা হয় না (ডাবল-ক্যারি রোধে)
-        if (carryDues && amount < 0) {
+
+        /* (১) গত মাসের অবশিষ্ট জের (remainingJer) — নতুন মাসে প্রারম্ভিক জের
+         * হিসেবে বসে; এই অংশটাই লাস্ট ব্যালেন্স থেকে বাদ থাকে এবং নিজের-টাকার
+         * বাজার/নগদ পরিশোধে সমন্বয় হয়। */
+        const jerLeft = round2(Math.max(0, calcRow.remainingJer ?? 0));
+        if (carryDues && jerLeft >= 1) {
           await db
             .update(membersTable)
-            .set({ openingDue: String(Math.abs(amount)), updatedAt: new Date() })
+            .set({ openingDue: String(jerLeft), updatedAt: new Date() })
             .where(eq(membersTable.id, target.id));
           carriedDues += 1;
-          continue;
         }
+
+        /* (২) চলতি মাসের নিট বাকি/পাওনা (জের ছাড়া):
+         *   denaPoana = currentPart − remainingJer  ⇒  currentPart = denaPoana + remainingJer
+         * নিট দেনা → ঋণাত্মক সমন্বয় এন্ট্রি (স্বাভাবিক দেনা হিসেবেই চলে,
+         * নগদ আনে না বলে লাস্ট ব্যালেন্স ছোঁয় না); নিট পাওনা → ধনাত্মক ফের।
+         * carryMemberBalances (পুরোনো মোড) হলে পুরো ব্যালেন্সই এন্ট্রিতে বসে। */
+        const currentPart = round2(
+          carryMemberBalances ? calcRow.denaPoana : calcRow.denaPoana + (calcRow.remainingJer ?? 0),
+        );
+        if (Math.abs(currentPart) < 1) continue;
         await db.insert(deposits).values({
           id: cryptoId("dep"),
           officeId,
@@ -507,8 +515,8 @@ export async function openMonth(
           day: 1,
           memberId: target.id,
           memberName: target.name,
-          amount: String(amount),
-          note: `${prevLabel} এর বাকি — ${amount > 0 ? "পাওনা" : "দেনা"} ৳${Math.abs(amount)}`,
+          amount: String(currentPart),
+          note: `${prevLabel} এর ${currentPart > 0 ? "ফের (পাওনা)" : "বাকি (দেনা)"} ৳${Math.abs(currentPart)}`,
           type: "adjustment",
           createdBy: "system:carry-forward",
         });

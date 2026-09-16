@@ -85,13 +85,13 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
   const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
   const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
-  /** জেরের নগদ পরিশোধ (jer_payment) — সদস্য-হিসাবে পৃথক স্তম্ভে দেখানো হয় */
+  /** জেরের নগদ পরিশোধ (jer_payment) — নগদ বাড়ায়, সদস্য-হিসাবে পৃথক স্তম্ভে দেখানো হয় */
   const totalJerCashAll = round2(
     deposits.filter((d) => (d.type || "") === "jer_payment").reduce((s, r) => s + toNumber(r.amount), 0),
   );
   /**
-   * সিস্টেম-ক্যারি-ফরোয়ার্ড adjustment নগদ আনে না (পুরনো মাসের পাওনা বহন করে),
-   * তাই লাস্ট ব্যালেন্স/নগদ গণনায় বাদ — কিন্তু দেনা-পাওনায় থাকে।
+   * সিস্টেম-ক্যারি-ফরোয়ার্ড adjustment নগদ আনে না (পুরনো মাসের দেনা/পাওনা বহন করে),
+   * তাই নগদ গণনায় বাদ — কিন্তু সদস্যের দেনা-পাওনায় স্বাভাবিক সমন্বয় হিসেবে ধরা হয়।
    */
   const totalCarryForwardAdjust = round2(
     deposits
@@ -100,7 +100,7 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   );
   /**
    * হাতে আসা প্রকৃত নগদ জমা — স্থায়ী ফান্ড ও সিস্টেম-ক্যারি বাদে সবই
-   * (সাধারণ জমা, মাস-শেষ পরিশোধ, জেরের নগদ পরিশোধ)। এটা লাস্ট ব্যালেন্স বাড়ায়।
+   * (সাধারণ জমা, মাস-শেষ পরিশোধ, জেরের নগদ পরিশোধ)।
    */
   const totalCashCollected = round2(totalDepositsThisMonth - totalFund - totalCarryForwardAdjust);
   /** ফান্ড ও জের-নগদ বাদে সাধারণ জমা/সমন্বয় (পুরোনো সামঞ্জস্য-সংখ্যা) */
@@ -249,9 +249,12 @@ export function calculateMonth(input: CalcInput): MonthSummary {
    */
   const operating = fundPaidBazar + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
   const carry = toNumber(input.carryForwardBalance, 0);
-  const lastBalance = round2(carry + totalFund + totalCashCollected - operating);
-  // লাস্ট ব্যালেন্স এখন নিজেই প্রকৃত হাত-নগদ — ক্লোজের সময় এটাই ক্যারি হয়।
-  const cashBalance = lastBalance;
+  // প্রকৃত হাত-নগদ; ক্লোজের সময় পরের মাসে এটাই carryForwardBalance হিসেবে যায়।
+  const cashBalance = round2(carry + totalFund + totalCashCollected - operating);
+  // লাস্ট ব্যালেন্স (রিজার্ভ) = প্রকৃত নগদ − এখনো বাকি গত-মাসের জের।
+  // নিজে বাজার/নগদে জের সমন্বয় হলে জের কমে ও ফান্ড-বাজার বাঁচে → LB বাড়ে;
+  // এ মাসের বাজার-মোট, মিল রেট ও মিল খরচ স্বাভাবিকভাবেই ধরা থাকে।
+  const lastBalance = round2(cashBalance - totalRemainingJer);
 
   return {
     totalMembers: members.length,
