@@ -714,45 +714,37 @@ export async function reopenMonth(
 }
 
 /**
- * বিদ্যমান মাসে ক্লোজ-ক্যারি (ফান্ড কপি, প্রারম্ভিক জের, পাওনা সমন্বয়) বসানো
- * না থাকলে পূর্ববর্তী মাসের চূড়ান্ত হিসাব থেকে বসিয়ে দেয়। পুরোনো কোডে তৈরি
- * হয়ে থাকা (ফান্ড-কপিশূন্য) খালি/চলতি মাস ঠিক করার জন্য boot-এ চালানো হয়।
- *  • ক্যারি আগেই বসা থাকলে বা পূর্ববর্তী মাস না থাকলে কিছু করে না
- *  • মাসে ব্যবহারকারীর এন্ট্রি থাকলে শুধু তখনই বসায় যখন পূর্ববর্তী মাস বন্ধ
+ * খালি মাস (ব্যবহারকারীর কোনো এন্ট্রি নেই) খোলা/দেখার সময় পূর্ববর্তী মাসের
+ * সর্বশেষ হিসাব থেকে ক্যারি (রোস্টার, সদস্যপ্রতি ফান্ড কপি, প্রারম্ভিক জের,
+ * পাওনা সমন্বয়, নগদ ক্যারি) নতুন করে বসিয়ে দেয়। পুরোনো কোডে আগেই তৈরি হয়ে
+ * থাকা খালি মাসে ভুল/পুরোনো জের বসে থাকলে বা ফান্ড কপি না এলে এটিই স্বয়ংক্রিয়
+ * ঠিক করে — সেপ্টেম্বর খোলা থাকা অবস্থাতেও অক্টোবর ঘুরে দেখলে সেপ্টেম্বরের
+ * তাৎক্ষণিক সর্বশেষ হিসাব অনুযায়ী সাজে।
+ *  • ব্যবহারকারীর এন্ট্রি থাকা মাস বা বন্ধ মাস কখনো ছোঁয় না
+ *  • পূর্ববর্তী মাস নিজেও খালি হলে আগের আসল মাস পর্যন্ত চেইন ব্যাকফিল করে
+ *  • প্রতিবার খালি মাস রিসেট করে নতুন করে বসায় (idempotent; রিসেট শুধু
+ *    সিস্টেম-ক্যারি চিহ্ন মোছে, ব্যবহারকারীর এন্ট্রি নয়)
  */
 export async function backfillCarryIfMissing(
   officeId: string,
   monthId: string,
+  depth = 0,
 ): Promise<boolean> {
   const month = await getMonth(monthId);
   if (!month || month.officeId !== officeId) return false;
+  if (month.isClosed) return false;
+  // ব্যবহারকারীর এন্ট্রি থাকা মাসে ক্যারি পুনর্লিখন নিরাপদ নয়
+  if (await monthHasUserData(monthId)) return false;
+
   const py = month.month === 1 ? month.year - 1 : month.year;
   const pm = month.month === 1 ? 12 : month.month - 1;
   const prev = await getMonthFor(officeId, py, pm);
   if (!prev) return false;
 
-  const [carryRows, dueRows] = await Promise.all([
-    db
-      .select({ id: deposits.id })
-      .from(deposits)
-      .where(and(eq(deposits.monthId, monthId), eq(deposits.createdBy, "system:carry-forward")))
-      .limit(1),
-    db
-      .select({ id: membersTable.id })
-      .from(membersTable)
-      .where(
-        and(
-          eq(membersTable.monthId, monthId),
-          sql`${membersTable.openingDue} <> ''`,
-          sql`${membersTable.openingDue} <> '0'`,
-        ),
-      )
-      .limit(1),
-  ]);
-  if (carryRows.length > 0 || dueRows.length > 0) return false;
-
-  const hasUserData = await monthHasUserData(monthId);
-  if (hasUserData && !prev.isClosed) return false;
+  // পূর্ববর্তী মাসও খালি হলে সেটাকে আগে তার পূর্বসূরি থেকে সাজাই
+  if (depth < 24 && !prev.isClosed && !(await monthHasUserData(prev.id))) {
+    await backfillCarryIfMissing(officeId, prev.id, depth + 1);
+  }
 
   const { summary } = await getMonthSummary(officeId, prev.id);
   const prevCash = round2(summary.cashBalance ?? summary.lastBalance ?? 0);
@@ -761,6 +753,9 @@ export async function backfillCarryIfMissing(
     copyMembers: true,
     carryDues: true,
     carryForwardBalance: round2(prevCash - (summary.totalFund ?? 0)),
+    note: prev.isClosed
+      ? `${prev.monthName} ক্লোজের পর স্বয়ংক্রিয়ভাবে খোলা`
+      : `পূর্ববর্তী মাসের সর্বশেষ হিসাব থেকে অস্থায়ী ক্যারি (মাস ক্লোজে চূড়ান্ত হবে)`,
   });
   return true;
 }

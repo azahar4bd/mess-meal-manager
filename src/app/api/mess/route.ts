@@ -53,6 +53,7 @@ import {
   listDeposits,
   listExtras,
   listIncomes,
+  backfillCarryIfMissing,
   closeMonthAndOpenNext,
   listMembers,
   reorderMembers,
@@ -289,6 +290,9 @@ const handlers: Record<string, ActionHandler> = {
   "month.data": async (ctx, body) => {
     if (!can(ctx.user.role, "meals.view")) deny(ctx, "meals.view");
     const { officeId, month } = await resolveMonth(ctx, body);
+    // খালি ভবিষ্যৎ/পরের মাস ভুল/পুরোনো ক্যারি নিয়ে তৈরি থাকলে পূর্ব মাসের
+    // সর্বশেষ হিসাব থেকে জের ও স্থায়ী ফান্ড স্বয়ংক্রিয় নতুন করে বসে
+    await backfillCarryIfMissing(officeId, month.id);
     const fromDate = str(body.fromDate) || null;
     const toDate = str(body.toDate) || null;
     const { data, summary } = await getMonthSummary(
