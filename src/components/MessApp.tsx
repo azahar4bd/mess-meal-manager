@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { AppProvider, useApp } from "@/components/app-context";
+import { I18nWatcher } from "@/components/i18n-watcher";
 import { GuideLine } from "@/components/GuideLine";
 import { AppNoticeTicker, GlobalEditButton, useUiContent } from "@/components/UiContent";
 import { SupportChatButton } from "@/components/SupportChat";
@@ -78,6 +79,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
   if (!app.user) {
     return (
       <>
+        <I18nWatcher />
         <AuthScreen initialMode="login" />
         <ToastStack toasts={app.toasts} onClose={app.closeToast} />
       </>
@@ -87,6 +89,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
   if (app.requiresApproval) {
     return (
       <>
+        <I18nWatcher />
         <PendingApprovalScreen />
         <ToastStack toasts={app.toasts} onClose={app.closeToast} />
       </>
@@ -117,6 +120,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
 
   return (
     <div className="min-h-screen pb-24">
+      <I18nWatcher />
       <AppNoticeTicker />
       <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <ContextBar />
@@ -258,11 +262,19 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={() => app.setLang(app.lang === "bn" ? "en" : "bn")}
-            className="btn btn-ghost btn-sm h-10 px-2 text-[12px]"
-            title="ভাষা পরিবর্তন / Language"
+            onClick={() => {
+              if (app.lang === "bn") {
+                app.setLang("en");
+              } else {
+                // DOM-এ অনূদিত টেক্সট পরিষ্কার করতে বাংলায় ফেরত রিলোড দিই
+                app.setLang("bn");
+                if (typeof window !== "undefined") window.location.reload();
+              }
+            }}
+            className="btn btn-ghost btn-sm h-10 px-2 text-[12px] font-bold"
+            title={app.lang === "bn" ? "Switch to English" : "বাংলায় ফিরুন"}
           >
-            {app.lang === "bn" ? "বাং" : "EN"}
+            {app.lang === "bn" ? "বাং | EN" : "EN | বাং"}
           </button>
           <button
             type="button"

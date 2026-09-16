@@ -361,6 +361,8 @@ export const extraExpenses = pgTable(
       onDelete: "set null",
     }),
     memberName: text("member_name").notNull().default(""),
+    /** অতিরিক্ত খরচটি কোন সদস্য নিজ পকেট থেকে দিয়েছে (খালি = ফান্ড থেকে) */
+    paidByMemberId: text("paid_by_member_id").notNull().default(""),
     note: text("note").notNull().default(""),
     createdBy: text("created_by").notNull().default(""),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

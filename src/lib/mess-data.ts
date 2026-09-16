@@ -210,6 +210,7 @@ export function extraDTO(r: ExtraExpense): ExtraDTO {
     type: r.type,
     memberId: r.memberId,
     memberName: r.memberName,
+    paidByMemberId: r.paidByMemberId ?? "",
     note: r.note,
   };
 }
@@ -1352,6 +1353,8 @@ export interface ExtraInput {
   amount: number;
   type: "shared" | "individual";
   memberId?: string | null;
+  /** কে নিজ পকেট থেকে টাকা দিয়েছে (খালি = ফান্ড থেকে) */
+  paidByMemberId?: string | null;
   note?: string;
 }
 
@@ -1372,6 +1375,7 @@ export async function createExtra(officeId: string, month: MessMonth, input: Ext
       type: input.type,
       memberId: member?.id ?? null,
       memberName: member?.name ?? "",
+      paidByMemberId: input.paidByMemberId ?? "",
       note: input.note ?? "",
       createdBy: actor,
     })
@@ -1393,6 +1397,7 @@ export async function updateExtra(officeId: string, month: MessMonth, id: string
       type: input.type,
       memberId: member?.id ?? null,
       memberName: member?.name ?? "",
+      paidByMemberId: input.paidByMemberId ?? "",
       note: input.note ?? "",
       updatedAt: new Date(),
     })

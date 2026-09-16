@@ -27,6 +27,11 @@ export function ExtrasView() {
   const members = (data?.members ?? []).map((m) => ({ id: m.id, name: m.name, isActive: m.isActive }));
   const activeCount = summary?.activeMembers ?? 0;
   const sharedPerMember = activeCount > 0 ? round2((summary?.totalSharedExtra ?? 0) / activeCount) : 0;
+  // নিজ-পকেটে দেওয়া অতিরিক্ত খরচ — “নিজ টাকার বাজার” ঘরে জমা হয়
+  const selfPaidExtras = useMemo(
+    () => round2((data?.extraExpenses ?? []).filter((r) => r.paidByMemberId).reduce((s, r) => s + toNumber(r.amount), 0)),
+    [data],
+  );
 
   const fields: FieldDef[] = [
     { key: "date", label: "তারিখ / Date", type: "date", required: true, half: true },
@@ -45,10 +50,17 @@ export function ExtrasView() {
     { key: "amount", label: "পরিমাণ / Amount (৳)", type: "money", required: true, placeholder: "1000", half: true },
     {
       key: "memberId",
-      label: "সদস্য (শুধু Individual)",
+      label: "কার জন্য (শুধু Individual) / For member",
       type: "member",
       half: true,
       hint: "Shared নির্বাচন করলে সদস্য লাগবে না",
+    },
+    {
+      key: "paidByMemberId",
+      label: "টাকা প্রদানকারী (নিজ টাকা) / Paid by",
+      type: "member",
+      half: true,
+      hint: "কেউ নিজ পকেট থেকে দিলে তার নাম দিন — “নিজ টাকার বাজার” ঘরে জমা হবে",
     },
     { key: "note", label: "নোট / Note", type: "textarea" },
   ];
@@ -59,6 +71,7 @@ export function ExtrasView() {
     title: "",
     amount: "",
     memberId: "",
+    paidByMemberId: "",
     note: "",
   });
 
@@ -68,6 +81,7 @@ export function ExtrasView() {
     title: row.title ?? "",
     amount: String(row.amount ?? ""),
     memberId: row.memberId ?? "",
+    paidByMemberId: row.paidByMemberId ?? "",
     note: row.note ?? "",
   });
 
@@ -88,6 +102,7 @@ export function ExtrasView() {
       amount,
       type,
       memberId: type === "individual" ? values.memberId : null,
+      paidByMemberId: values.paidByMemberId || null,
       note: values.note,
     };
     const res = await app.call<ExtraDTO>(editingId ? "extra.update" : "extra.create", editingId ? { id: editingId, ...payload } : payload);
@@ -112,7 +127,21 @@ export function ExtrasView() {
       align: "center",
       render: (r) => <Badge tone={r.type === "shared" ? "brand" : "warn"}>{r.type === "shared" ? "Shared" : "Individual"}</Badge>,
     },
-    { key: "member", header: "সদস্য / Member", render: (r) => r.memberName || (r.type === "shared" ? "সবাই" : "—") },
+    { key: "member", header: "কার জন্য / For", render: (r) => r.memberName || (r.type === "shared" ? "সবাই" : "—") },
+    {
+      key: "paidBy",
+      header: "টাকা প্রদানকারী / Paid by",
+      render: (r) => {
+        if (!r.paidByMemberId) return <span className="muted">ফান্ড</span>;
+        const payer = data?.members.find((m) => m.id === r.paidByMemberId)?.name ?? r.paidByMemberId;
+        return (
+          <span className="inline-flex items-center gap-1">
+            <span className="pill pill-warn">নিজ টাকা</span>
+            <span className="font-semibold">{payer}</span>
+          </span>
+        );
+      },
+    },
     {
       key: "amount",
       header: "পরিমাণ / Amount",
@@ -125,16 +154,17 @@ export function ExtrasView() {
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <Kpi label="মোট শেয়ার্ড" value={`৳ ${formatMoney(summary?.totalSharedExtra ?? 0)}`} tone="brand" />
         <Kpi label="জনপ্রতি শেয়ার্ড" value={`৳ ${formatMoney(sharedPerMember)}`} />
         <Kpi label="মোট ইন্ডি." value={`৳ ${formatMoney(summary?.totalIndividualExtra ?? 0)}`} tone="warn" />
         <Kpi label="মোট অতিরিক্ত" value={`৳ ${formatMoney(round2((summary?.totalSharedExtra ?? 0) + (summary?.totalIndividualExtra ?? 0)))}`} />
+        <Kpi label="নিজ টাকায় পরিশোধ" value={`৳ ${formatMoney(selfPaidExtras)}`} tone="brand" />
       </div>
 
       <EntryPanel<ExtraDTO>
         title="অতিরিক্ত খরচ"
-        subtitle={`${month?.monthName ?? ""} • shared ও individual দুই ধরনের খরচ`}
+        subtitle={`${month?.monthName ?? ""} • shared/individual — নিজ টাকায় দিলে “টাকা প্রদানকারী” ঘরে নাম দিন`}
         fields={fields}
         rows={rows}
         columns={columns}
@@ -150,7 +180,10 @@ export function ExtrasView() {
         addLabel="+ নতুন অতিরিক্ত খরচ"
         formTitle="অতিরিক্ত খরচ"
         members={members}
-        search={(r) => `${r.title} ${r.memberName} ${r.type} ${r.note}`}
+        search={(r) => {
+          const payer = data?.members.find((m) => m.id === r.paidByMemberId)?.name ?? "";
+          return `${r.title} ${r.memberName} ${payer} ${r.type} ${r.note}`;
+        }}
       />
     </div>
   );

@@ -87,7 +87,7 @@ function baseInput(): CalcInput {
       dep("d2", "mem_karim", "Karim", 1500, "permanent_fund"),
     ],
     extraExpenses: [
-      { id: "e1", monthId: "x", date: "2026-10-02", day: 2, title: "gas", amount: 120, type: "shared", memberId: null, memberName: "", note: "" },
+      { id: "e1", monthId: "x", date: "2026-10-02", day: 2, title: "gas", amount: 120, type: "shared", memberId: null, memberName: "", paidByMemberId: "", note: "" },
     ],
     carryForwardBalance: 0,
   };
@@ -352,6 +352,35 @@ console.log("12) ক্লোজে পাওনা (+dena) পরের মা�
   check("করিম দেনা-পাওনা +৭০০", eq(s.memberCalculations[1]!.denaPoana, 700), String(s.memberCalculations[1]!.denaPoana));
   check("সমন্বয় নগদ ব্যালেন্সে দ্বিগুণ হয় না (১০০০)", eq(s.cashBalance, 1000), String(s.cashBalance));
   check("কোনো জের নেই → LB ০ (ফান্ড নেই)", eq(s.lastBalance, 0), String(s.lastBalance));
+}
+
+console.log("13) অতিরিক্ত খরচ নিজ টাকায় দিলে নিজ-বাজার ঘরে জমা, ফান্ড ছোঁয় না");
+{
+  const input: CalcInput = {
+    members: [mem("mem_rahim", "Rahim"), mem("mem_karim", "Karim")],
+    dailyMeals: [],
+    bazarExpenses: [],
+    otherIncomes: [],
+    deposits: [
+      dep("d1", "mem_rahim", "Rahim", 1500, "permanent_fund"),
+      dep("d2", "mem_karim", "Karim", 1500, "permanent_fund"),
+    ],
+    extraExpenses: [
+      { id: "e1", monthId: "x", date: "2026-10-02", day: 2, title: "gas", amount: 120, type: "shared", memberId: null, memberName: "", paidByMemberId: "mem_rahim", note: "" },
+    ],
+    carryForwardBalance: 0,
+  };
+  const s = calculateMonth(input);
+  const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
+  const karim = s.memberCalculations.find((c) => c.memberId === "mem_karim")!;
+  // শেয়ার্ড ১২০ → জনপ্রতি ৬০; রহিম নিজ টাকায় দিয়েছে → ১২০ ক্রেডিট
+  check("জনপ্রতি ৬০ চার্জ", Boolean(eq(rahim.sharedExtra, 60) && eq(karim.sharedExtra, 60)));
+  check("রহিমের নিজ টাকার বাজার ক্রেডিট ১২০", eq(rahim.selfPaidCredit, 120), String(rahim.selfPaidCredit));
+  check("রহিম পাবে ৬০ (১২০ − তার ভাগ ৬০)", eq(rahim.denaPoana, 60), String(rahim.denaPoana));
+  check("করিম দেবে ৬০", eq(karim.denaPoana, -60), String(karim.denaPoana));
+  check("KPI নিজ টাকার বাজারে ১২০ দেখায়", eq(s.totalSelfPaidCredit, 120), String(s.totalSelfPaidCredit));
+  check("ফান্ড নগদ ৩০০০ অক্ষত (গ্যাসের টাকা ফান্ড থেকে যায়নি)", eq(s.cashBalance, 3000), String(s.cashBalance));
+  check("লাস্ট ব্যালেন্স ৩১২০ (ফান্ড ৩০০০ + নিজ-পরিশোধ ১২০)", eq(s.lastBalance, 3120), String(s.lastBalance));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

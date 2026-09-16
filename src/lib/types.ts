@@ -183,6 +183,8 @@ export interface ExtraDTO {
   type: ExtraType;
   memberId: string | null;
   memberName: string;
+  /** কে নিজ পকেট থেকে টাকা দিয়েছে (খালি = ফান্ড থেকে) */
+  paidByMemberId: string;
   note: string;
 }
 

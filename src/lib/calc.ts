@@ -166,15 +166,26 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     if (nm) byName.set(nm, (byName.get(nm) ?? 0) + v);
   }
 
-  // নিজের পকেটের টাকা থেকে বাজার → সেই সদস্যের পাওনা (মাস শেষে সমন্বয়)
+  // নিজের পকেটের টাকা থেকে বাজার/অতিরিক্ত খরচ → সেই সদস্যের পাওনা
+  // ("নিজ টাকার বাজার" ঘর; আগে গত-মাসের জের মেটায়, বাড়তিটুকু ক্রেডিট)
   const selfPaidByMember = new Map<string, number>();
   for (const r of bazar) {
     const who = String(r.paidByMemberId ?? "").trim();
     if (!who) continue;
     selfPaidByMember.set(who, round2((selfPaidByMember.get(who) ?? 0) + toNumber(r.amount)));
   }
+  // অতিরিক্ত খরচে "টাকা প্রদানকারী" থাকলে সেও নিজ-পকেটে পরিশোধ গণ্য হয়
+  let selfPaidExtrasRaw = 0;
+  for (const r of extras) {
+    const who = String((r as { paidByMemberId?: string | null }).paidByMemberId ?? "").trim();
+    if (!who) continue;
+    const v = toNumber(r.amount);
+    selfPaidExtrasRaw += v;
+    selfPaidByMember.set(who, round2((selfPaidByMember.get(who) ?? 0) + v));
+  }
+  const selfPaidExtras = round2(selfPaidExtrasRaw);
   const totalSelfPaidBazar = round2([...selfPaidByMember.values()].reduce((s, v) => s + v, 0));
-  const fundPaidBazar = round2(totalBazarCost - totalSelfPaidBazar);
+  const fundPaidBazar = round2(totalBazarCost - (totalSelfPaidBazar - selfPaidExtras));
 
   /* ── per member ───────────────────────────────────────────
    * জের-সমন্বয়ের ক্রম (waterfall):
@@ -276,7 +287,9 @@ export function calculateMonth(input: CalcInput): MonthSummary {
    *  বাকি জের নগদ থেকে বাদ হয় না — সদস্যের দেনা হিসেবে আলাদা দেখানো হয়
    *  (দেনা-পাওনা সারণি); নগদ জমা/জের-সমন্বয় এলেই নগদ ব্যালেন্স বাড়ে।
    */
-  const operating = fundPaidBazar + totalSharedExtra + totalIndividualExtra - totalOthersIncome;
+  // নিজ-পকেটে দেওয়া অতিরিক্ত খরচ ফান্ড থেকে যায় না — তাই অপারেটিং খরচ থেকে বাদ
+  const operating =
+    fundPaidBazar + totalSharedExtra + totalIndividualExtra - selfPaidExtras - totalOthersIncome;
   const carry = toNumber(input.carryForwardBalance, 0);
   // প্রকৃত হাত-নগদ; ক্লোজের সময় পরের মাসে এটাই carryForwardBalance হিসেবে যায়।
   const cashBalance = round2(carry + totalFund + totalCashCollected - operating);

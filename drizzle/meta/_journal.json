@@ -43,6 +43,13 @@
       "when": 1789620000000,
       "tag": "0005_support_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789700000000,
+      "tag": "0006_extra_paid_by",
+      "breakpoints": true
     }
   ]
 }

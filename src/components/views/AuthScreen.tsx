@@ -115,6 +115,21 @@ export function AuthScreen({
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
+      <button
+        type="button"
+        onClick={() => {
+          if (app.lang === "bn") {
+            app.setLang("en");
+          } else {
+            app.setLang("bn");
+            if (typeof window !== "undefined") window.location.reload();
+          }
+        }}
+        className="btn btn-ghost btn-sm fixed right-3 top-3 z-50 border border-[var(--border)] bg-[var(--card)] font-bold shadow-sm"
+        title={app.lang === "bn" ? "Switch to English" : "বাংলায় ফিরুন"}
+      >
+        {app.lang === "bn" ? "বাং | EN" : "EN | বাং"}
+      </button>
       <NoticeTicker notices={notices} label={texts.marqueeLabel} />
       <div className="mx-auto grid min-h-screen w-full max-w-6xl items-stretch gap-0 lg:grid-cols-[1.05fr_1fr]">
         {/* ── brand panel ─────────────────────────────── */}

@@ -159,13 +159,14 @@ export function buildPrintHtml(input: PrintReportInput): string {
     )
     .join("");
 
+  const memberNameById = new Map(data.members.map((m) => [m.id, m.name]));
   const extraRows = data.extraExpenses
-    .map(
-      (r) =>
-        `<tr><td class="c">${toDisplayDate(r.date)}</td><td>${esc(r.title || "—")}</td><td class="c">${esc(
-          r.type === "shared" ? "Shared" : "Individual",
-        )}</td><td>${esc(r.memberName || "—")}</td><td class="r">${formatMoney(r.amount)}</td></tr>`,
-    )
+    .map((r) => {
+      const payer = r.paidByMemberId ? (memberNameById.get(r.paidByMemberId) ?? "নিজ টাকা") : "ফান্ড";
+      return `<tr><td class="c">${toDisplayDate(r.date)}</td><td>${esc(r.title || "—")}</td><td class="c">${esc(
+        r.type === "shared" ? "Shared" : "Individual",
+      )}</td><td>${esc(r.memberName || "—")}</td><td>${esc(payer)}</td><td class="r">${formatMoney(r.amount)}</td></tr>`;
+    })
     .join("");
 
   const bazarRows = [...data.bazarExpenses]
@@ -349,8 +350,8 @@ export function buildPrintHtml(input: PrintReportInput): string {
 
     <h2>৬. অতিরিক্ত খরচ / Extra Expenses</h2>
     <table>
-      <thead><tr><th class="c">তারিখ</th><th>খাত</th><th class="c">ধরন</th><th>সদস্য</th><th class="r">পরিমাণ</th></tr></thead>
-      <tbody>${extraRows || `<tr><td colspan="5" class="c">কোনো অতিরিক্ত খরচ নেই</td></tr>`}</tbody>
+      <thead><tr><th class="c">তারিখ</th><th>খাত</th><th class="c">ধরন</th><th>কার জন্য</th><th>প্রদানকারী</th><th class="r">পরিমাণ</th></tr></thead>
+      <tbody>${extraRows || `<tr><td colspan="6" class="c">কোনো অতিরিক্ত খরচ নেই</td></tr>`}</tbody>
     </table>
 
     <h2>৭. দেনা-পাওনা / Dena-Paona</h2>
