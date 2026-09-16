@@ -296,12 +296,13 @@ export async function ensureCurrentMonth(officeId: string) {
       mNo = 1;
       y += 1;
     }
-    // পূর্ববর্তী মাসের চূড়ান্ত নগদ ক্যারি করি
+    // পূর্ববর্তী মাসের চূড়ান্ত নগদ থেকে ফান্ড বাদ দিয়ে (ফান্ড আলাদাভাবে কপি হয়) ক্যারি
     const { summary: prevSummary } = await getMonthSummary(officeId, anchor.id);
+    const prevCash = prevSummary.cashBalance ?? prevSummary.lastBalance;
     const opened = await openMonth(officeId, y, mNo, {
       copyMembers: true,
       carryDues: true,
-      carryForwardBalance: Math.round((prevSummary.cashBalance ?? prevSummary.lastBalance) * 100) / 100,
+      carryForwardBalance: Math.round((prevCash - prevSummary.totalFund) * 100) / 100,
     });
     anchor = opened.month;
   }

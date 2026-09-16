@@ -35,6 +35,7 @@ import {
   createMember,
   deleteBazar,
   deleteDeposit,
+  getDeposit,
   deleteExtra,
   deleteIncome,
   deleteMeal,
@@ -670,6 +671,10 @@ const handlers: Record<string, ActionHandler> = {
     if (!can(ctx.user.role, "fund.write")) deny(ctx, "fund.write");
     const { officeId, month } = await resolveMonth(ctx, body);
     assertWritable(ctx, month);
+    const existing = need(await getDeposit(officeId, str(body.id)), "জমা এন্ট্রি পাওয়া যায়নি");
+    if ((existing.createdBy ?? "") === "system:carry-forward") {
+      throw new AuthError("forbidden", "স্বয়ংক্রিয় ক্যারি-ফরোয়ার্ড জমা/ফান্ড সরাসরি বদলানো যায় না; সংশোধনের জন্য মাস রিওপেন করুন", 403);
+    }
     const updated = need(
       await updateDeposit(officeId, month, str(body.id), {
         date: str(body.date),
@@ -685,7 +690,22 @@ const handlers: Record<string, ActionHandler> = {
     return depositDTO(updated);
   },
 
-  "deposit.delete": scopedDelete("deposit", "fund.write", "জমা এন্ট্রি মুছে ফেলা হয়েছে"),
+  "deposit.delete": async (ctx, body) => {
+    if (!can(ctx.user.role, "fund.write")) deny(ctx, "fund.write");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    assertWritable(ctx, month);
+    const id = str(body.id);
+    if (!id) throw new AuthError("bad-request", "এন্ট্রি আইডি আবশ্যক", 400);
+    const existing = await getDeposit(officeId, id);
+    if (!existing) throw new AuthError("not-found", "এন্ট্রি পাওয়া যায়নি", 404);
+    if ((existing.createdBy ?? "") === "system:carry-forward") {
+      throw new AuthError("forbidden", "স্বয়ংক্রিয় ক্যারি-ফরোয়ার্ড জমা/ফান্ড সরাসরি মোছা যায় না; সংশোধনের জন্য মাস রিওপেন করুন", 403);
+    }
+    const deleted = await deleteDeposit(officeId, id);
+    if (!deleted) throw new AuthError("not-found", "এন্ট্রি পাওয়া যায়নি", 404);
+    await logAction(ctx, "deposit.delete", "deposit", id, "জমা এন্ট্রি মুছে ফেলা হয়েছে", month.id);
+    return { deleted, id };
+  },
 
   /* ── other income ────────────────────────────────────── */
   "incomes.list": async (ctx, body) => {

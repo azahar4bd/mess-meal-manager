@@ -50,17 +50,13 @@ export interface CsvContext {
 }
 
 export function memberSummaryCsv({ data, summary }: CsvContext): string {
-  // সদস্যভিত্তিক নগদ জমা — ফান্ড ও সিস্টেম ক্যারি-ফরোয়ার্ড বাদ;
-  // জের-নগদ পরিশোধ (jer_payment) আলাদা যোগ হয়।
+  // সদস্যভিত্তিক প্রকৃত নগদ জমা — ফান্ড ও সিস্টেম ক্যারি-ফরোয়ার্ড বাদ
   const cashByMember = new Map<string, number>();
-  const carryByMember = new Map<string, number>();
   for (const d of data.deposits) {
     if (!d.memberId || d.type === "permanent_fund") continue;
-    if ((d.createdBy ?? "") === "system:carry-forward") {
-      carryByMember.set(d.memberId, (carryByMember.get(d.memberId) ?? 0) + Number(d.amount));
-    } else if (d.type !== "jer_payment") {
-      cashByMember.set(d.memberId, (cashByMember.get(d.memberId) ?? 0) + Number(d.amount));
-    }
+    if ((d.createdBy ?? "") === "system:carry-forward") continue;
+    const sign = d.type === "refund" ? -1 : 1;
+    cashByMember.set(d.memberId, (cashByMember.get(d.memberId) ?? 0) + sign * Number(d.amount));
   }
   const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
   return toCsv(
@@ -75,21 +71,19 @@ export function memberSummaryCsv({ data, summary }: CsvContext): string {
       "MealCost",
       "IndividualExtra",
       "SharedExtra",
-      "TotalCost",
-      "Deposits",
-      "SelfPaidBazar",
       "OpeningDue",
-      "JerAdjusted",
+      "TotalCost",
+      "SelfPaidBazarCredit",
+      "JerSettled",
       "RemainingJer",
-      "BeforeSettlement",
       "CashPaid",
-      "RemainingDenaPoana",
+      "DenaPoana",
       "PermanentFund",
       "Status",
       "MonthID",
     ],
     summary.memberCalculations.map((m) => {
-      const paid = round((cashByMember.get(m.memberId) ?? 0) + (m.jerCashPaid ?? 0));
+      const paid = round(cashByMember.get(m.memberId) ?? 0);
       return [
         m.memberId,
         m.name,
@@ -101,13 +95,11 @@ export function memberSummaryCsv({ data, summary }: CsvContext): string {
         m.mealCost,
         m.individualExtra,
         m.sharedExtra,
-        m.totalCost,
-        m.totalDeposit,
-        m.selfPaidBazar,
         m.openingDue ?? 0,
+        m.totalCost,
+        m.selfPaidCredit ?? 0,
         (m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0),
         m.remainingJer ?? 0,
-        round(m.denaPoana - paid),
         paid,
         m.denaPoana,
         m.permanentFund,

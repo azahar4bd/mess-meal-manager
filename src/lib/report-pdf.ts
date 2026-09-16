@@ -43,7 +43,6 @@ export function buildPrintHtml(input: PrintReportInput): string {
   const totalReceive = round2(
     summary.memberCalculations.filter((m) => m.statusEn === "Receive").reduce((s, m) => s + m.denaPoana, 0),
   );
-  const hasJer = (summary.totalOpeningDue ?? 0) > 0;
 
   const memberRows = summary.memberCalculations
     .map(
@@ -56,14 +55,12 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <td class="r">${formatMoney(m.mealCost)}</td>
         <td class="r">${formatMoney(m.individualExtra)}</td>
         <td class="r">${formatMoney(m.sharedExtra)}</td>
+        <td class="r">${(m.openingDue ?? 0) > 0 ? `৳${formatMoney(m.openingDue ?? 0)}` : "—"}</td>
         <td class="r b">−৳${formatMoney(m.totalCost)}</td>
-        <td class="r">৳${formatMoney(m.totalDeposit)}</td>
-        <td class="r">${m.selfPaidBazar > 0 ? `৳${formatMoney(m.selfPaidBazar)}` : "—"}</td>
-        ${hasJer ? `<td class="r">${(m.openingDue ?? 0) > 0 ? `৳${formatMoney(m.openingDue ?? 0)}` : "—"}</td>` : ""}
-        ${hasJer ? `<td class="r">${(m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0) > 0 ? `৳${formatMoney((m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0))}` : "—"}</td>` : ""}
-        ${hasJer ? `<td class="r">${(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}</td>` : ""}
+        <td class="r">${(m.selfPaidCredit ?? 0) > 0 ? `৳${formatMoney(m.selfPaidCredit ?? 0)}` : "—"}</td>
+        <td class="r">${(m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0) > 0 ? `৳${formatMoney((m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0))}` : "—"}</td>
+        <td class="r">${(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}</td>
         <td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(Math.abs(m.denaPoana))}</td>
-        <td class="r">৳${formatMoney(m.permanentFund)}</td>
         <td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(m.status)}</span></td>
       </tr>`,
     )
@@ -257,6 +254,8 @@ export function buildPrintHtml(input: PrintReportInput): string {
       <div class="kpi"><div class="k">স্থায়ী তহবিল</div><div class="v">৳ ${formatMoney(summary.totalFund)}</div></div>
       <div class="kpi"><div class="k">শেয়ার্ড অতিরিক্ত</div><div class="v">৳ ${formatMoney(summary.totalSharedExtra)}</div></div>
       <div class="kpi"><div class="k">ইন্ডিভিজুয়াল অতিরিক্ত</div><div class="v">৳ ${formatMoney(summary.totalIndividualExtra)}</div></div>
+      <div class="kpi"><div class="k">নিজ টাকার বাজার</div><div class="v">৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}</div></div>
+      <div class="kpi"><div class="k">অবশিষ্ট বকেয়া জের</div><div class="v">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</div></div>
       <div class="kpi"><div class="k">লাস্ট ব্যালেন্স</div><div class="v">৳ ${formatMoney(summary.lastBalance)}</div></div>
     </div>
 
@@ -266,12 +265,13 @@ export function buildPrintHtml(input: PrintReportInput): string {
         <tr>
           <th class="c">#</th><th>সদস্য</th><th class="r">মোট মিল</th>
           <th class="r">মিল রেট</th><th class="r">মিল খরচ</th><th class="r">ইন্ডি. অতিরিক্ত</th>
-          <th class="r">শেয়ার্ড অতিরিক্ত</th><th class="r">মোট খরচ (−)</th><th class="r">জমা / সমন্বয়</th>
-          <th class="r">নিজের টাকা থেকে বাজার</th>${hasJer ? `<th class="r">জের (প্রারম্ভিক)</th><th class="r">জের সমন্বয়</th><th class="r">বাকি জের</th>` : ""}<th class="r">দেনা-পাওনা</th><th class="r">স্থায়ী ফান্ড</th><th class="c">স্ট্যাটাস</th>
+          <th class="r">শেয়ার্ড অতিরিক্ত</th><th class="r">প্রারম্ভিক বকেয়া জের</th><th class="r">মোট খরচ (−)</th>
+          <th class="r">নিজ টাকার বাজার</th><th class="r">বকেয়া জের সমন্বয়</th><th class="r">অবশিষ্ট বকেয়া জের</th>
+          <th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th>
         </tr>
       </thead>
       <tbody>
-        ${memberRows || `<tr><td colspan="13" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`}
+        ${memberRows || `<tr><td colspan="14" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`}
       </tbody>
       <tfoot>
         <tr>
@@ -281,8 +281,11 @@ export function buildPrintHtml(input: PrintReportInput): string {
           <td class="r">${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.mealCost, 0)))}</td>
           <td class="r">${formatMoney(summary.totalIndividualExtra)}</td>
           <td class="r">${formatMoney(summary.totalSharedExtra)}</td>
+          <td class="r">${formatMoney(summary.totalOpeningDue ?? 0)}</td>
           <td class="r">${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalCost, 0)))}</td>
-          <td class="r">${formatMoney(summary.totalFund)}</td>
+          <td class="r">${formatMoney(summary.totalSelfPaidCredit ?? 0)}</td>
+          <td class="r">${formatMoney((summary.totalJerAdjusted ?? 0) + (summary.totalJerCashPaid ?? 0))}</td>
+          <td class="r">${formatMoney(summary.totalRemainingJer ?? 0)}</td>
           <td class="r">দিবে ৳${formatMoney(totalDue)} / পাবে ৳${formatMoney(totalReceive)}</td>
           <td class="c">—</td>
         </tr>
@@ -292,10 +295,11 @@ export function buildPrintHtml(input: PrintReportInput): string {
       মিল রেট = (মোট বাজার − অন্য আয়) ÷ মোট মিল = (${formatMoney(summary.totalBazarCost)} − ${formatMoney(
         summary.totalOthersIncome,
       )}) ÷ ${formatMeal(summary.totalMill)} = ৳ ${formatRate(summary.perMillRate)}।
-      স্থায়ী ফান্ড মিল খরচ থেকে বাদ দেওয়া হয় না (আলাদা স্তম্ভ)।
+      স্থায়ী ফান্ড আলাদা খাত (জমা ও তহবিল পেজ), মিল খরচ থেকে বাদ যায় না; মাস ক্লোজে সদস্যভিত্তিক ফান্ড পরের মাসে কপি হয়।
       শেয়ার্ড অতিরিক্ত = ${formatMoney(summary.totalSharedExtra)} ÷ ${summary.activeMembers} জন সক্রিয় সদস্য = ৳ ${formatMoney(
         summary.activeMembers ? summary.totalSharedExtra / summary.activeMembers : 0,
       )} জনপ্রতি।
+      নিজ টাকার বাজার বা নগদ জমা — যেকোনোটাই আগে প্রারম্ভিক বকেয়া জের মেটায়; বাড়তি অংশই ক্রেডিট হিসেবে বসে।
     </div>
     ${paymentTableHtml}
 
@@ -350,32 +354,35 @@ export function buildPrintHtml(input: PrintReportInput): string {
 
     <h2>৭. দেনা-পাওনা / Dena-Paona</h2>
     <table>
-      <thead><tr><th>সদস্য</th><th class="r">মোট খরচ (−)</th><th class="r">জমা / সমন্বয়</th><th class="r">নিজের টাকা থেকে বাজার</th>${hasJer ? `<th class="r">বাকি জের</th>` : ""}<th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th></tr></thead>
+      <thead><tr><th>সদস্য</th><th class="r">মোট খরচ (−)</th><th class="r">নিজ টাকার বাজার</th><th class="r">বকেয়া জের সমন্বয়</th><th class="r">অবশিষ্ট জের</th><th class="r">নগদ/সমন্বয় জমা</th><th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th></tr></thead>
       <tbody>
         ${
           summary.memberCalculations
             .map(
               (m) =>
-                `<tr><td>${esc(m.name)}</td><td class="r">−৳${formatMoney(m.totalCost)}</td><td class="r">৳${formatMoney(
+                `<tr><td>${esc(m.name)}</td><td class="r">−৳${formatMoney(m.totalCost)}</td><td class="r">${
+                  (m.selfPaidCredit ?? 0) > 0 ? `৳${formatMoney(m.selfPaidCredit ?? 0)}` : "—"
+                }</td><td class="r">${
+                  (m.jerSettled ?? 0) > 0 ? `৳${formatMoney(m.jerSettled ?? 0)}` : "—"
+                }</td><td class="r">${(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}</td><td class="r">৳${formatMoney(
                   m.totalDeposit,
-                )}</td><td class="r">${
-                  m.selfPaidBazar > 0 ? `৳${formatMoney(m.selfPaidBazar)}` : "—"
-                }</td>${hasJer ? `<td class="r">${(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}</td>` : ""}<td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(
+                )}</td><td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(
                   Math.abs(m.denaPoana),
                 )}</td><td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(
                   m.status,
                 )} / ${esc(m.statusEn)}</span></td></tr>`,
             )
-            .join("") || `<tr><td colspan="${hasJer ? 7 : 6}" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`
+            .join("") || `<tr><td colspan="8" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`
         }
       </tbody>
       <tfoot>
         <tr>
           <td class="r">মোট</td>
           <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalCost, 0)))}</td>
+          <td class="r">৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}</td>
+          <td class="r">৳ ${formatMoney((summary.totalJerAdjusted ?? 0) + (summary.totalJerCashPaid ?? 0))}</td>
+          <td class="r">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</td>
           <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalDeposit, 0)))}</td>
-          <td class="r">৳ ${formatMoney(summary.totalSelfPaidBazar)}</td>
-          ${hasJer ? `<td class="r">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</td>` : ""}
           <td class="r">দিবে ৳ ${formatMoney(totalDue)} • পাবে ৳ ${formatMoney(totalReceive)}</td>
           <td class="c">—</td>
         </tr>

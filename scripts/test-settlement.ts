@@ -99,7 +99,7 @@ console.log("1) জের সমন্বয়ের মূল দৃশ্য 
   const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
   check("মোট বাজার ২১০০ (নিজের বাজারসহ)", eq(s.totalBazarCost, 2100), String(s.totalBazarCost));
   check("মিল রেট ৩৫ (২১০০ ÷ ৬০)", eq(s.perMillRate, 35), String(s.perMillRate));
-  check("রহিমের মোট খরচ ১১১০ (১০৫০ + ৬০)", eq(rahim.totalCost, 1110), String(rahim.totalCost));
+  check("রহিমের মোট খরচ ১৫১০ (১০৫০ + ৬০ + প্রারম্ভিক জের ৪০০)", eq(rahim.totalCost, 1510), String(rahim.totalCost));
   check("জের থেকে সমন্বয় ১০০", eq(rahim.jerAdjusted, 100), String(rahim.jerAdjusted));
   check("বাকি জের ৩০০", eq(rahim.remainingJer, 300), String(rahim.remainingJer));
   check("পাওনা-ক্রেডিট ০ (পুরোটাই জেরে গেছে)", eq(rahim.selfPaidCredit, 0), String(rahim.selfPaidCredit));
@@ -240,6 +240,60 @@ console.log("8) ক্লোজ → নতুন মাস ক্যারি-�
   check("রহিম দেনা-পাওনা ০", eq(rahim2.denaPoana, 0), String(rahim2.denaPoana));
   check("নগদ ২২৯০ (৮৮০ + ৩০০ + ১১১০)", eq(s2b.cashBalance, 2290), String(s2b.cashBalance));
   check("লাস্ট ব্যালেন্স ২২৯০ (বাকি জের নেই)", eq(s2b.lastBalance, 2290), String(s2b.lastBalance));
+}
+
+console.log("9) নিজ টাকার বাজার ওয়াটারফল (জের আগে মেটে, বাড়তি ক্রেডিট)");
+{
+  // রহিম: বকেয়া ৫০০, নিজ টাকায় বাজার ১০০০ → ৫০০ জের সমন্বয় + ৫০০ ক্রেডিট
+  // করিম: বকেয়া ৫০০, নিজ-বাজার ২০০ + নগদ ১০০০ → ২০০+৩০০ জের, ৭০০ নগদ ক্রেডিট
+  const input: CalcInput = {
+    members: [mem("mem_rahim", "Rahim", 500), mem("mem_karim", "Karim", 500)],
+    dailyMeals: [],
+    bazarExpenses: [
+      bazar("b1", 1000, "mem_rahim", "Rahim"),
+      bazar("b2", 200, "mem_karim", "Karim"),
+    ],
+    otherIncomes: [],
+    deposits: [dep("dc", "mem_karim", "Karim", 1000, "member_deposit")],
+    extraExpenses: [],
+    carryForwardBalance: 0,
+  };
+  const s = calculateMonth(input);
+  const rahim = s.memberCalculations.find((c) => c.memberId === "mem_rahim")!;
+  const karim = s.memberCalculations.find((c) => c.memberId === "mem_karim")!;
+  check("রহিম জের-সমন্বয় (নিজ-বাজার থেকে) ৫০০", eq(rahim.jerAdjusted, 500), String(rahim.jerAdjusted));
+  check("রহিম নিজ-টাকা-বাজার ক্রেডিট ৫০০", eq(rahim.selfPaidCredit, 500), String(rahim.selfPaidCredit));
+  check("রহিম অবশিষ্ট জের ০", eq(rahim.remainingJer, 0), String(rahim.remainingJer));
+  check("রহিম মোট খরচ ৫০০ (কোনো মিল নেই, শুধু জের)", eq(rahim.totalCost, 500), String(rahim.totalCost));
+  // ১০০০ নিজ-বাজার − ৫০০ জের-খরচ = ৫০০ পাবে
+  check("রহিম দেনা-পাওনা +৫০০ (পাবে)", eq(rahim.denaPoana, 500), String(rahim.denaPoana));
+  check("করিম নিজ-বাজারে জের ২০০", eq(karim.jerAdjusted, 200), String(karim.jerAdjusted));
+  check("করিম নগদে জের ৩০০", eq(karim.jerCashPaid, 300), String(karim.jerCashPaid));
+  check("করিম নগদ ক্রেডিট ৭০০", eq(karim.cashCredit, 700), String(karim.cashCredit));
+  check("করিম অবশিষ্ট জের ০", eq(karim.remainingJer, 0), String(karim.remainingJer));
+  // ২০০ নিজ-বাজার + ১০০০ নগদ − ৫০০ জের = +৭০০ পাবে
+  check("করিম দেনা-পাওনা +৭০০ (পাবে)", eq(karim.denaPoana, 700), String(karim.denaPoana));
+  check("KPI নিজ টাকার বাজার ৫০০ (রহিম; করিমের নিজ-বাজার পুরোটা জেরে)", eq(s.totalSelfPaidCredit, 500), String(s.totalSelfPaidCredit));
+  // বাজার ১২০০ পুরোটা নিজ পকেটে (ফান্ড থেকে ০), হাতে আসা নগদ ১০০০
+  check("নগদ ব্যালেন্স ১০০০ (ফান্ড-বাজার ০, নগদ আদায় ১০০০)", eq(s.cashBalance, 1000), String(s.cashBalance));
+}
+
+console.log("10) ক্যারি-ফরোয়ার্ড স্থায়ী ফান্ড ডিপোজিট হিসাবে দ্বিগুণ গণনা হয় না");
+{
+  // নতুন মাসে সদস্যভিত্তিক ফান্ড permanent_fund ক্যারি-রো হিসেবে আসে
+  const input: CalcInput = {
+    ...baseInput(),
+    deposits: [
+      dep("cf1", "mem_rahim", "Rahim", 2000, "permanent_fund", "system:carry-forward"),
+      dep("cf2", "mem_karim", "Karim", 2000, "permanent_fund", "system:carry-forward"),
+    ],
+  };
+  const s = calculateMonth(input);
+  check("ক্যারি ফান্ড মোট ফান্ডে ৪০০০", eq(s.totalFund, 4000), String(s.totalFund));
+  check("ক্যারি ফান্ড নগদ সংগ্রহে ০", eq(s.totalCashCollected, 0), String(s.totalCashCollected));
+  // ৪০০০ ফান্ড হাতেই থাকে; নগদ সংগ্রহ ০ → ৪০০০ − ফান্ড-বাজার ২০০০ − শেয়ার্ড ১২০ = ১৮৮০
+  check("ক্যারি ফান্ড নগদ ব্যালেন্সে একবারই গোনে (১৮৮০)", eq(s.cashBalance, 1880), String(s.cashBalance));
+  check("ক্যারি ফান্ড কোনো সদস্যকে ক্রেডিট দেয় না (রহিম −১৪১০)", eq(s.memberCalculations[0]!.denaPoana, -1410), String(s.memberCalculations[0]!.denaPoana));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

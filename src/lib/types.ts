@@ -212,6 +212,10 @@ export interface MemberCalculation {
   remainingJer: number;
   /** জের সমন্বয়ের পর বাড়তি নিজের-টাকার বাজার — এটাই পাওনা হিসেবে যোগ হয় */
   selfPaidCredit: number;
+  /** নগদ জমার যে অংশ জের মিটিয়ে চলতি মাসের জমা/সমন্বয়ে বসেছে */
+  cashCredit: number;
+  /** মোট বকেয়া জের সমন্বয় (নিজ-বাজার + নগদ) */
+  jerSettled: number;
   /** শুধু permanent_fund ধরনের জমা — দেনা-পাওনার সঙ্গে মেলে না */
   permanentFund: number;
   denaPoana: number;
@@ -230,8 +234,10 @@ export interface MonthSummary {
   netCost: number;
   perMillRate: number;
   totalFund: number;
-  /** সদস্যরা নিজের পকেট থেকে যে বাজার করেছে (তাদের পাওনা) */
+  /** সদস্যরা নিজের পকেট থেকে যে বাজার করেছে (মোট) */
   totalSelfPaidBazar: number;
+  /** নিজ টাকার বাজারের যে অংশ জের মিটিয়ে জমা/সমন্বয়ে বসেছে (KPI) */
+  totalSelfPaidCredit: number;
   /** আগের মাস থেকে ক্যারি হওয়া মোট জের (মাসের শুরুতে) */
   totalOpeningDue: number;
   /** বাজার থেকে সমন্বয় হওয়া মোট জের */

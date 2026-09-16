@@ -486,6 +486,27 @@ export async function openMonth(
         const target = (src?.phone ? byPhone.get(src.phone) : undefined) ?? byName.get(key);
         if (!target) continue;
 
+        /* (০) স্থায়ী তহবিল ক্যারি — ক্লোজের পর পূর্বের মাসের ফান্ড নতুন মাসে
+         * কপি হয়ে আসে (ম্যানেজার সদস্য না-কাটা পর্যন্ত ফান্ড অপরিবর্তিত থাকে)।
+         * এটি cumulative permanent_fund হিসেবে জমা-সারিতে বসে; নগদ ক্যারি
+         * (carryForwardBalance) থেকে ফান্ড বাদ দেওয়া হয় বলে দ্বিগুণ গোনা হয় না। */
+        const fundBalance = round2(Math.max(0, calcRow.permanentFund ?? 0));
+        if (fundBalance >= 1) {
+          await db.insert(deposits).values({
+            id: cryptoId("dep"),
+            officeId,
+            monthId: created.id,
+            date: firstDay,
+            day: 1,
+            memberId: target.id,
+            memberName: target.name,
+            amount: String(fundBalance),
+            note: `${prevLabel} এর স্থায়ী তহবিল (ক্যারি)`,
+            type: "permanent_fund",
+            createdBy: "system:carry-forward",
+          });
+        }
+
         /* (১) গত মাসের অবশিষ্ট জের (remainingJer) — নতুন মাসে প্রারম্ভিক জের
          * হিসেবে বসে; এই অংশটাই লাস্ট ব্যালেন্স থেকে বাদ থাকে এবং নিজের-টাকার
          * বাজার/নগদ পরিশোধে সমন্বয় হয়। */
@@ -499,28 +520,28 @@ export async function openMonth(
         }
 
         /* (২) চলতি মাসের নিট বাকি/পাওনা (জের ছাড়া):
-         *   denaPoana = currentPart − remainingJer  ⇒  currentPart = denaPoana + remainingJer
-         * নিট দেনা → ঋণাত্মক সমন্বয় এন্ট্রি (স্বাভাবিক দেনা হিসেবেই চলে,
-         * নগদ আনে না বলে লাস্ট ব্যালেন্স ছোঁয় না); নিট পাওনা → ধনাত্মক ফের।
-         * carryMemberBalances (পুরোনো মোড) হলে পুরো ব্যালেন্সই এন্ট্রিতে বসে। */
+         *   currentPart = denaPoana + remainingJer
+         * নিট দেনা → ঋণাত্মক সমন্বয় এন্ট্রি (নগদ আনে না, লাস্ট ব্যালেন্স ছোঁয় না);
+         * নিট পাওনা → ধনাত্মক ফের। */
         const currentPart = round2(
           carryMemberBalances ? calcRow.denaPoana : calcRow.denaPoana + (calcRow.remainingJer ?? 0),
         );
-        if (Math.abs(currentPart) < 1) continue;
-        await db.insert(deposits).values({
-          id: cryptoId("dep"),
-          officeId,
-          monthId: created.id,
-          date: firstDay,
-          day: 1,
-          memberId: target.id,
-          memberName: target.name,
-          amount: String(currentPart),
-          note: `${prevLabel} এর ${currentPart > 0 ? "ফের (পাওনা)" : "বাকি (দেনা)"} ৳${Math.abs(currentPart)}`,
-          type: "adjustment",
-          createdBy: "system:carry-forward",
-        });
-        carriedBalances += 1;
+        if (Math.abs(currentPart) >= 1) {
+          await db.insert(deposits).values({
+            id: cryptoId("dep"),
+            officeId,
+            monthId: created.id,
+            date: firstDay,
+            day: 1,
+            memberId: target.id,
+            memberName: target.name,
+            amount: String(currentPart),
+            note: `${prevLabel} এর ${currentPart > 0 ? "ফের (পাওনা)" : "বাকি (দেনা)"} ৳${Math.abs(currentPart)}`,
+            type: "adjustment",
+            createdBy: "system:carry-forward",
+          });
+          carriedBalances += 1;
+        }
       }
     }
   }
@@ -620,13 +641,14 @@ export async function closeMonthAndOpenNext(
   }
 
   const { summary } = await getMonthSummary(officeId, month.id);
-  // পরের মাসে শুধু প্রকৃত হাত-নগদ ক্যারি হয় (জের-বাদ রিজার্ভ নয়),
-  // নইলে একই জের দুই মাসে দুইবার রিজার্ভ থেকে বাদ পড়ে হিসাব গরমিল হতো।
+  // ফান্ড নতুন মাসে স্থায়ী তহবিল হিসেবে কপি হয়, তাই নগদ-ক্যারি থেকে ফান্ড
+  // বাদ দিই (নইলে একই ফান্ড দুইবার গোনা হতো); জের-সমন্বয় নতুন মাসে আলাদা বসে।
   const cashBalance = round2(summary.cashBalance ?? summary.lastBalance);
+  const carryCash = round2(cashBalance - summary.totalFund);
 
   const opened = await openMonth(officeId, nextYear, nextMonthNo, {
     copyMembers: true,
-    carryForwardBalance: cashBalance,
+    carryForwardBalance: carryCash,
     note: `${month.monthName} ক্লোজের পর স্বয়ংক্রিয়ভাবে খোলা`,
     carryMemberBalances: false,
     carryDues: true,
@@ -643,10 +665,11 @@ export async function closeMonthAndOpenNext(
     if (!further || (await monthHasUserData(further.id))) break;
     await resetCarryArtifacts(officeId, further.id);
     const { summary: curSummary } = await getMonthSummary(officeId, chainCursor.id);
+    const curCash = round2(curSummary.cashBalance ?? curSummary.lastBalance);
     const reopened = await openMonth(officeId, ny, nm, {
       copyMembers: true,
       carryDues: true,
-      carryForwardBalance: round2(curSummary.cashBalance ?? curSummary.lastBalance),
+      carryForwardBalance: round2(curCash - curSummary.totalFund),
     });
     chainCursor = reopened.month;
   }
@@ -764,7 +787,35 @@ export async function updateMember(
   return rows[0] ?? null;
 }
 
+/**
+ * সদস্য মুছলে তাঁর সব হিসাব-ডেটা মুছে যায়: মিল ও অতিরিক্ত খরচ FK cascade-তে
+ * মোছার বদলে স্পষ্টভাবে; জমা/ফান্ড ও তাঁর কেনা (বা নিজ-টাকার) বাজারও মোছা হয়,
+ * যাতে মুছে-ফেলা সদস্যের ফান্ড/পাওনা হিসাবে আটকে না থাকে।
+ */
 export async function deleteMember(officeId: string, memberId: string): Promise<boolean> {
+  const member = await getMember(officeId, memberId);
+  if (!member) return false;
+
+  await Promise.all([
+    db
+      .delete(dailyMeals)
+      .where(and(eq(dailyMeals.memberId, memberId), eq(dailyMeals.officeId, officeId))),
+    db
+      .delete(extraExpenses)
+      .where(and(eq(extraExpenses.memberId, memberId), eq(extraExpenses.officeId, officeId))),
+    db
+      .delete(deposits)
+      .where(and(eq(deposits.memberId, memberId), eq(deposits.officeId, officeId))),
+    db
+      .delete(bazarExpenses)
+      .where(
+        and(
+          eq(bazarExpenses.officeId, officeId),
+          or(eq(bazarExpenses.memberId, memberId), eq(bazarExpenses.paidByMemberId, memberId)),
+        ),
+      ),
+  ]);
+
   const rows = await db
     .delete(membersTable)
     .where(and(eq(membersTable.id, memberId), eq(membersTable.officeId, officeId)))
@@ -1092,6 +1143,15 @@ export async function listDeposits(officeId: string, monthId: string): Promise<D
     .from(deposits)
     .where(and(eq(deposits.officeId, officeId), eq(deposits.monthId, monthId)))
     .orderBy(desc(deposits.date), desc(deposits.createdAt));
+}
+
+export async function getDeposit(officeId: string, id: string): Promise<Deposit | null> {
+  const rows = await db
+    .select()
+    .from(deposits)
+    .where(and(eq(deposits.id, id), eq(deposits.officeId, officeId)))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export interface DepositInput {

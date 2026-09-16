@@ -83,6 +83,13 @@ export function FundView() {
       app.toast("পরিমাণ ০ এর বেশি হতে হবে", "error");
       return false;
     }
+    if (editingId) {
+      const existing = rows.find((r) => r.id === editingId);
+      if ((existing?.createdBy ?? "") === "system:carry-forward") {
+        app.toast("ক্যারি-ফরোয়ার্ড হওয়া ফান্ড/সমন্বয় এডিট করা যায় না (সিস্টেম-তৈরি)", "error");
+        return false;
+      }
+    }
     const payload = {
       date: toIsoDate(values.date),
       memberId: values.memberId,
@@ -97,6 +104,10 @@ export function FundView() {
   };
 
   const onDelete = async (row: DepositDTO): Promise<boolean> => {
+    if ((row.createdBy ?? "") === "system:carry-forward") {
+      app.toast("ক্যারি-ফরোয়ার্ড হওয়া ফান্ড/সমন্বয় মোছা যায় না (সিস্টেম-তৈরি)", "error");
+      return false;
+    }
     const res = await app.call<{ deleted: boolean }>("deposit.delete", { id: row.id });
     if (!res) return false;
     app.toast("জমা এন্ট্রি মুছে ফেলা হয়েছে", "success");
@@ -110,8 +121,20 @@ export function FundView() {
       key: "amount",
       header: "পরিমাণ / Amount",
       align: "right",
-      render: (r) => <span className="font-bold tabular-nums text-[var(--ok)]">৳ {formatMoney(r.amount)}</span>,
-      footer: (list) => `৳ ${formatMoney(list.reduce((s, r) => s + toNumber(r.amount), 0))}`,
+      render: (r) => {
+        const v = r.type === "refund" ? -Math.abs(toNumber(r.amount)) : toNumber(r.amount);
+        return (
+          <span
+            className={`font-bold tabular-nums ${v < 0 ? "text-[var(--danger)]" : "text-[var(--ok)]"}`}
+          >
+            {v < 0 ? "−" : ""}৳ {formatMoney(Math.abs(v))}
+          </span>
+        );
+      },
+      footer: (list) =>
+        `৳ ${formatMoney(
+          list.reduce((s, r) => s + (r.type === "refund" ? -Math.abs(toNumber(r.amount)) : toNumber(r.amount)), 0),
+        )}`,
     },
     {
       key: "type",
@@ -120,7 +143,9 @@ export function FundView() {
       render: (r) => (
         <Badge
           tone={
-            r.type === "permanent_fund"
+            (r.createdBy ?? "") === "system:carry-forward"
+              ? "muted"
+              : r.type === "permanent_fund"
               ? "brand"
               : r.type === "refund" || r.type === "jer_payment"
                 ? "warn"
@@ -129,7 +154,9 @@ export function FundView() {
                   : "muted"
           }
         >
-          {r.type === "permanent_fund"
+          {(r.createdBy ?? "") === "system:carry-forward"
+            ? "ক্যারি-ফরোয়ার্ড"
+            : r.type === "permanent_fund"
             ? "স্থায়ী তহবিল"
             : r.type === "member_deposit"
               ? "সদস্যের জমা"
@@ -160,12 +187,12 @@ export function FundView() {
           <div className="kpi-v text-[var(--brand)]">৳ {formatMoney(summary?.totalFund ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
-          <div className="kpi-k">এই মাসের জমা</div>
-          <div className="kpi-v">৳ {formatMoney(summary?.totalDepositsThisMonth ?? 0)}</div>
+          <div className="kpi-k">এই মাসে নগদ আদায়</div>
+          <div className="kpi-v">৳ {formatMoney(summary?.totalCashCollected ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
-          <div className="kpi-k">সদস্যের জমা (ফান্ড বাদে)</div>
-          <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalMemberPayments ?? 0)}</div>
+          <div className="kpi-k">জের নগদ সমন্বয়</div>
+          <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalJerCashPaid ?? 0)}</div>
         </Card>
         <Card bodyClass="p-3">
           <div className="kpi-k">লাস্ট ব্যালেন্স</div>

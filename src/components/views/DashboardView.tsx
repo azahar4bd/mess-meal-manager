@@ -68,6 +68,7 @@ export function DashboardView() {
         <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(s.totalFund)}`} tone="warn" />
         <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(s.totalSharedExtra)}`} />
         <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} />
+        <Kpi label="নিজ টাকার বাজার" value={`৳ ${formatMoney(s.totalSelfPaidCredit ?? 0)}`} tone="brand" />
         <Kpi label="লাস্ট ব্যালেন্স (নগদ)" value={`৳ ${formatMoney(s.lastBalance)}`} tone={s.lastBalance >= 0 ? "ok" : "danger"} />
       </div>
 

@@ -82,29 +82,31 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const perMillRate = round2(rawRate);
 
   // Rule 1/2 — permanent fund is capital, tracked separately
+  const isCarry = (d: DepositDTO) => (d.createdBy ?? "") === "system:carry-forward";
   const fundRows = deposits.filter((d) => (d.type || "permanent_fund") === "permanent_fund");
   const totalFund = round2(fundRows.reduce((s, r) => s + toNumber(r.amount), 0));
   const totalDepositsThisMonth = round2(deposits.reduce((s, r) => s + toNumber(r.amount), 0));
-  /** জেরের নগদ পরিশোধ (jer_payment) — নগদ বাড়ায়, সদস্য-হিসাবে পৃথক স্তম্ভে দেখানো হয় */
-  const totalJerCashAll = round2(
-    deposits.filter((d) => (d.type || "") === "jer_payment").reduce((s, r) => s + toNumber(r.amount), 0),
-  );
   /**
-   * সিস্টেম-ক্যারি-ফরোয়ার্ড adjustment নগদ আনে না (পুরনো মাসের দেনা/পাওনা বহন করে),
-   * তাই নগদ গণনায় বাদ — কিন্তু সদস্যের দেনা-পাওনায় স্বাভাবিক সমন্বয় হিসেবে ধরা হয়।
+   * সিস্টেম-ক্যারি-ফরোয়ার্ড সমন্বয় (নন-ফান্ড) — পুরনো মাসের চলতি বাকি/ফের বহন
+   * করে, নগদ আনে না; নগদ গণনায় বাদ, কিন্তু দেনা-পাওনায় ধরা হয়।
+   * (ফান্ড ক্যারি আলাদা — সেটা permanent_fund সারির ভেতরেই totalFund-এ থাকে।)
    */
-  const totalCarryForwardAdjust = round2(
+  const totalCarryAdjust = round2(
     deposits
-      .filter((d) => (d.createdBy ?? "") === "system:carry-forward")
+      .filter((d) => isCarry(d) && (d.type || "") !== "permanent_fund")
       .reduce((s, r) => s + toNumber(r.amount), 0),
   );
   /**
-   * হাতে আসা প্রকৃত নগদ জমা — স্থায়ী ফান্ড ও সিস্টেম-ক্যারি বাদে সবই
-   * (সাধারণ জমা, মাস-শেষ পরিশোধ, জেরের নগদ পরিশোধ)।
+   * হাতে আসা প্রকৃত নগদ: ফান্ড (নতুন + ক্যারি হওয়া ফান্ড) ও নন-ফান্ড ক্যারি
+   * সমন্বয় বাদে বাকি সব — সাধারণ জমা, মাস-শেষ পরিশোধ, জেরের নগদ পরিশোধ;
+   * refund ঋণাত্মক চিহ্নে নগদ কমায়।
    */
-  const totalCashCollected = round2(totalDepositsThisMonth - totalFund - totalCarryForwardAdjust);
+  const totalCashCollected = round2(totalDepositsThisMonth - totalFund - totalCarryAdjust);
   /** ফান্ড ও জের-নগদ বাদে সাধারণ জমা/সমন্বয় (পুরোনো সামঞ্জস্য-সংখ্যা) */
-  const totalMemberPayments = round2(totalDepositsThisMonth - totalFund - totalJerCashAll);
+  const totalJerCashAll = round2(
+    deposits.filter((d) => (d.type || "") === "jer_payment").reduce((s, r) => s + toNumber(r.amount), 0),
+  );
+  const totalMemberPayments = round2(totalDepositsThisMonth - totalFund - totalJerCashAll - totalCarryAdjust);
 
   // Rule 5 — shared extra split across ACTIVE members
   const totalSharedExtraRaw = extras
@@ -133,21 +135,32 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     if (nm) mealsByMemberName.set(nm, (mealsByMemberName.get(nm) ?? 0) + v);
   }
 
-  // deposits per member — স্থায়ী ফান্ড সম্পূর্ণ আলাদা খাত, বাকি জমা মাসের পরিশোধ।
-  // jer_payment (জেরের নগদ পরিশোধ) পুরনো বাকি মেটায় — চলতি দেনা-পাওনায় ধরা হয় না।
-  const paymentsByMember = new Map<string, number>();
-  const paymentsByName = new Map<string, number>();
+  // সদস্যভিত্তিক জমা তিন ভাগে —
+  //  • fundByMember: স্থায়ী তহবিল (নতুন + ক্লোজে ক্যারি হওয়া ফান্ড)
+  //  • carryByMember: system:carry-forward নন-ফান্ড সমন্বয় (গত মাসের চলতি বাকি/ফের; নগদ নয়)
+  //  • cashByMember: বাকি সব প্রকৃত নগদ (সাধারণ জমা, মাস-শেষ, জের-নগদ; refund ঋণাত্মক)
+  const cashByMember = new Map<string, number>();
+  const cashByName = new Map<string, number>();
   const fundByMember = new Map<string, number>();
   const fundByName = new Map<string, number>();
-  const jerCashByMember = new Map<string, number>();
-  const jerCashByName = new Map<string, number>();
+  const carryByMember = new Map<string, number>();
+  const carryByName = new Map<string, number>();
   for (const d of deposits) {
-    const v = toNumber(d.amount);
+    let v = toNumber(d.amount);
     const dtype = d.type || "permanent_fund";
-    const isFund = dtype === "permanent_fund";
-    const isJerCash = dtype === "jer_payment";
-    const byMember = isFund ? fundByMember : isJerCash ? jerCashByMember : paymentsByMember;
-    const byName = isFund ? fundByName : isJerCash ? jerCashByName : paymentsByName;
+    if (dtype === "refund") v = -Math.abs(v);
+    let byMember: Map<string, number>;
+    let byName: Map<string, number>;
+    if (dtype === "permanent_fund") {
+      byMember = fundByMember;
+      byName = fundByName;
+    } else if (isCarry(d)) {
+      byMember = carryByMember;
+      byName = carryByName;
+    } else {
+      byMember = cashByMember;
+      byName = cashByName;
+    }
     if (d.memberId) byMember.set(d.memberId, (byMember.get(d.memberId) ?? 0) + v);
     const nm = (d.memberName || "").trim().toLowerCase();
     if (nm) byName.set(nm, (byName.get(nm) ?? 0) + v);
@@ -163,7 +176,16 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const totalSelfPaidBazar = round2([...selfPaidByMember.values()].reduce((s, v) => s + v, 0));
   const fundPaidBazar = round2(totalBazarCost - totalSelfPaidBazar);
 
-  /* ── per member ─────────────────────────────────────────── */
+  /* ── per member ───────────────────────────────────────────
+   * জের-সমন্বয়ের ক্রম (waterfall):
+   *   ১. নিজ টাকার বাজার আগে প্রারম্ভিক জের মেটায় → jerAdjusted;
+   *      বাড়তি অংশই “নিজ টাকার বাজার” (selfPaidCredit) ঘরে বসে।
+   *   ২. তারপর নগদ জমা বাকি জের মেটায় → jerCashPaid; বাড়তিটা চলতি
+   *      মাসের জমা/সমন্বয় (cashCredit)।
+   *   • মোট খরচ = মিল খরচ + ইন্ডি + শেয়ার্ড + প্রারম্ভিক বকেয়া জের
+   *   • বকেয়া জের সমন্বয় = jerAdjusted + jerCashPaid
+   *   • অবশিষ্ট বকেয়া জের = প্রারম্ভিক − সমন্বয়
+   */
   const memberCalculations: MemberCalculation[] = members.map((m) => {
     const nm = (m.name || "").trim().toLowerCase();
     const totalMemberMeals = round2(mealsByMember.get(m.id) ?? mealsByMemberName.get(nm) ?? 0);
@@ -173,33 +195,36 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     );
     const sharedExtra = m.isActive !== false ? round2(sharedPerMember) : 0;
 
-    // Rule 1/2 — total cost NEVER subtracts the permanent fund
-    const totalCost = round2(mealCost + individualExtra + sharedExtra);
-
-    const permanentFund = round2(fundByMember.get(m.id) ?? fundByName.get(nm) ?? 0);
-    const totalDeposit = round2(paymentsByMember.get(m.id) ?? paymentsByName.get(nm) ?? 0);
-    const selfPaidBazar = round2(selfPaidByMember.get(m.id) ?? 0);
-
-    /* ── Rule 9 — জের (আগের মাসের বাকি) সমন্বয় ──────────────
-     * 1. নিজের টাকার বাজার আগে জের মেটায় (jerAdjusted) —
-     *    শুধু বাড়তি অংশই চলতি মাসের পাওনা (selfPaidCredit) হয়।
-     * 2. তারপর নগদ জের-পরিশোধ (jer_payment) বাকি জের কমায়।
-     * 3. যা বাকি থাকে (remainingJer) লাস্ট ব্যালেন্স থেকে বাদ যায় —
-     *    তাই সমন্বয়কারী প্রতিটি বাজারে মূলধন আবার বাড়ে।
-     * বাজার-মোট ও মিল রেটে এর কোনো প্রভাব নেই। */
     const applySettlement = input.applySettlement !== false;
     const openingDue = applySettlement ? Math.max(0, round2(toNumber((m as MemberDTO).openingDue))) : 0;
-    const jerAdjusted = round2(Math.min(openingDue, selfPaidBazar));
-    const jerCashTotal = round2(jerCashByMember.get(m.id) ?? jerCashByName.get(nm) ?? 0);
-    const jerCashPaid = applySettlement ? round2(Math.min(Math.max(0, openingDue - jerAdjusted), Math.max(0, jerCashTotal))) : 0;
-    const remainingJer = round2(openingDue - jerAdjusted - jerCashPaid);
-    const selfPaidCredit = round2(selfPaidBazar - jerAdjusted);
 
-    // দেনা-পাওনা = জমা/সমন্বয় + নিজ-টাকার বাজার + নগদে জের-পরিশোধ
-    //            − চলতি মিল খরচ − গত মাসের জের (openingDue)
-    // জের সমন্বয় (বাজার/নগদ) হলেই এই ঘরে জের কমতে থাকে; জের না থাকলে
-    // পুরোনো সূত্রেই (জমা + নিজ-বাজার − খরচ) ফিরে যায়।
-    const denaPoana = round2(totalDeposit + selfPaidBazar + jerCashPaid - totalCost - openingDue);
+    // Rule 1/2 — মোট খরচে প্রারম্ভিক বকেয়া জের যোগ হয়; ফান্ড কখনো বাদ যায় না
+    const currentCost = round2(mealCost + individualExtra + sharedExtra);
+    const totalCost = round2(currentCost + openingDue);
+
+    const permanentFund = round2(fundByMember.get(m.id) ?? fundByName.get(nm) ?? 0);
+    const carryAdjust = round2(carryByMember.get(m.id) ?? carryByName.get(nm) ?? 0);
+    const cashTotal = round2(cashByMember.get(m.id) ?? cashByName.get(nm) ?? 0);
+    const selfPaidBazar = round2(selfPaidByMember.get(m.id) ?? 0);
+
+    // ১) নিজ টাকার বাজার আগে জের মেটায়
+    const jerAdjusted = round2(Math.min(openingDue, Math.max(0, selfPaidBazar)));
+    const selfPaidCredit = round2(Math.max(0, selfPaidBazar) - jerAdjusted); // “নিজ টাকার বাজার” ঘর
+
+    // ২) নগদ জমা বাকি জের মেটায় (দেনা-পাওনা জমা টেবিলের এন্ট্রিসহ যেকোনো নগদ)
+    const jerCashPaid = applySettlement
+      ? round2(Math.min(Math.max(0, openingDue - jerAdjusted), Math.max(0, cashTotal)))
+      : 0;
+    const cashCredit = round2(Math.max(0, cashTotal) - jerCashPaid);
+    const remainingJer = round2(Math.max(0, openingDue - jerAdjusted - jerCashPaid));
+
+    // চলতি মাসের জমা/সমন্বয় = জের-নগদ বাদে নগদ + গত মাসের বাকি/ফেরের ক্যারি-সমন্বয়
+    const totalDeposit = round2(cashCredit + carryAdjust);
+    // বকেয়া জের সমন্বয় (জমা-এন্ট্রি টাকা + নিজ টাকায় বাজার)
+    const jerSettled = round2(jerAdjusted + jerCashPaid);
+
+    // দেনা-পাওনা = −মোট খরচ + নিজ-বাজার ক্রেডিট + চলতি জমা + বকেয়া জের সমন্বয়
+    const denaPoana = round2(selfPaidCredit + cashCredit + carryAdjust + jerSettled - totalCost);
     const status: MemberCalculation["status"] =
       Math.abs(denaPoana) < 0.005 ? "সমান" : denaPoana < 0 ? "দিবে" : "পাবে";
     const statusEn: MemberCalculation["statusEn"] =
@@ -224,6 +249,8 @@ export function calculateMonth(input: CalcInput): MonthSummary {
       jerCashPaid,
       remainingJer,
       selfPaidCredit,
+      cashCredit,
+      jerSettled,
       permanentFund,
       denaPoana,
       balance: denaPoana,
@@ -237,6 +264,8 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   const totalJerAdjusted = round2(memberCalculations.reduce((s, c) => s + c.jerAdjusted, 0));
   const totalJerCashPaid = round2(memberCalculations.reduce((s, c) => s + c.jerCashPaid, 0));
   const totalRemainingJer = round2(memberCalculations.reduce((s, c) => s + c.remainingJer, 0));
+  /** নিজ টাকার বাজার — জের মিটিয়ে যে বাড়তি অংশ জমা/সমন্বয়ে বসে (KPI) */
+  const totalSelfPaidCredit = round2(memberCalculations.reduce((s, c) => s + c.selfPaidCredit, 0));
 
   /* ── last balance (spec §86) ─────────────────────────────
    *  লাস্ট ব্যালেন্স = হাতে থাকা প্রকৃত নগদ:
@@ -266,6 +295,7 @@ export function calculateMonth(input: CalcInput): MonthSummary {
     perMillRate,
     totalFund,
     totalSelfPaidBazar,
+    totalSelfPaidCredit,
     totalOpeningDue,
     totalJerAdjusted,
     totalJerCashPaid,

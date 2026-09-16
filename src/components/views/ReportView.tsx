@@ -394,11 +394,12 @@ export function ReportView() {
       if (!d.memberId) continue;
       if (d.type === "permanent_fund") continue;
       const entry = (map[d.memberId] ??= { cash: 0, carry: 0, items: [] });
+      const v = d.type === "refund" ? -Math.abs(Number(d.amount)) : Number(d.amount);
       if ((d.createdBy ?? "") === "system:carry-forward") {
-        entry.carry = round2(entry.carry + Number(d.amount));
+        entry.carry = round2(entry.carry + v);
         continue;
       }
-      entry.cash = round2(entry.cash + Number(d.amount));
+      entry.cash = round2(entry.cash + v);
       entry.items.push(d);
     }
     return map;
@@ -410,7 +411,6 @@ export function ReportView() {
   const totalDue = round2(calcs.filter((m) => m.statusEn === "Due").reduce((s, m) => s + Math.abs(m.denaPoana), 0));
   const totalReceive = round2(calcs.filter((m) => m.statusEn === "Receive").reduce((s, m) => s + m.denaPoana, 0));
   const totalCost = round2(calcs.reduce((s, m) => s + m.totalCost, 0));
-  const hasJer = (summary.totalOpeningDue ?? 0) > 0;
   // দেনা-পাওনা জমা টেবিল: প্রতি সদস্যের জমা-পূর্ব দেনা, নগদ জমা ও বাকি
   const cashOf = (m: MemberCalculation) =>
     round2(m.totalDeposit - (paymentMap[m.memberId]?.carry ?? 0) + (m.jerCashPaid ?? 0));
@@ -509,7 +509,7 @@ export function ReportView() {
             <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(summary.totalFund)}`} tone="warn" />
             <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(summary.totalSharedExtra)}`} />
             <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(summary.totalIndividualExtra)}`} />
-            <Kpi label="নগদ আদায় (জমা)" value={`৳ ${formatMoney(summary.totalCashCollected)}`} tone="brand" />
+            <Kpi label="নিজ টাকার বাজার" value={`৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}`} tone="brand" />
             <Kpi label="বাকি জের (সদস্য-দেনা)" value={`৳ ${formatMoney(summary.totalRemainingJer ?? 0)}`} tone="warn" />
             <Kpi label="লাস্ট ব্যালেন্স (হাত-নগদ)" value={`৳ ${formatMoney(summary.lastBalance)}`} tone={summary.lastBalance >= 0 ? "ok" : "danger"} />
           </div>
@@ -525,7 +525,7 @@ export function ReportView() {
               </div>
             ) : (
               <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
-                <table className="data report-table" style={{ minWidth: hasJer ? 820 : 600 }}>
+                <table className="data report-table" style={{ minWidth: 1040 }}>
                   <thead>
                     <tr>
                       <th>সদস্য</th>
@@ -534,25 +534,20 @@ export function ReportView() {
                       <th className="num vth">মিল<br/>খরচ</th>
                       <th className="num vth">ইন্ডি.<br/>অতিরিক্ত</th>
                       <th className="num vth">শেয়ার্ড<br/>অতিরিক্ত</th>
+                      <th className="num vth">প্রারম্ভিক<br/>বকেয়া জের</th>
                       <th className="num vth">মোট<br/>খরচ (−)</th>
-                      <th className="num vth">জমা/<br/>সমন্বয়</th>
-                      <th className="num vth">নিজ টাকায়<br/>বাজার</th>
-                      {hasJer ? (
-                        <>
-                          <th className="num vth">প্রারম্ভিক<br/>জের</th>
-                          <th className="num vth">জের<br/>সমন্বয়</th>
-                          <th className="num vth">বাকি<br/>জের</th>
-                        </>
-                      ) : null}
-                      <th className="num vth" title="জমা-সমন্বয়সহ চূড়ান্ত হিসাব; বিস্তারিত নিচের “দেনা-পাওনা জমা” টেবিলে">
+                      <th className="num vth" title="ফান্ড থেকে টাকা না নিয়ে নিজের পকেটে বাজার — জের মিটিয়ে বাড়তি অংশ">নিজ টাকার<br/>বাজার</th>
+                      <th className="num vth" title="জমা-এন্ট্রি টাকা + নিজ টাকায় বাজার (যতটুকু জের মিটেছে)">বকেয়া জের<br/>সমন্বয়</th>
+                      <th className="num vth">অবশিষ্ট<br/>বকেয়া জের</th>
+                      <th className="num vth" title="সব জমা-সমন্বয়সহ চূড়ান্ত হিসাব; নগদ জমার বিস্তারিত নিচের “দেনা-পাওনা জমা” টেবিলে">
                         দেনা(−)/<br/>পাওনা(+)
                       </th>
-                      <th className="num vth">স্থায়ী<br/>ফান্ড</th>
                       <th className="vth text-center">স্ট্যাটাস</th>
                     </tr>
                   </thead>
                   <tbody>
                     {calcs.map((m) => {
+                      const jerSettled = round2((m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0));
                       return (
                       <tr key={m.memberId}>
                         <td>
@@ -568,44 +563,25 @@ export function ReportView() {
                         <td className="num tabular-nums">{formatMoney(m.mealCost)}</td>
                         <td className="num tabular-nums">{formatMoney(m.individualExtra)}</td>
                         <td className="num tabular-nums">{formatMoney(m.sharedExtra)}</td>
+                        <td className="num tabular-nums text-[var(--warn)]">
+                          {(m.openingDue ?? 0) > 0 ? `৳${formatMoney(m.openingDue ?? 0)}` : "—"}
+                        </td>
+                        {/* মোট খরচ = মিল খরচ + ইন্ডি + শেয়ার্ড + প্রারম্ভিক বকেয়া জের */}
                         <td className="num font-bold tabular-nums text-[var(--danger)]">−৳{formatMoney(m.totalCost)}</td>
-                        <td className="num tabular-nums">
-                          {/* ধনাত্মক = জমা/ফের (সবুজ); ঋণাত্মক = গত মাসের বাকির সমন্বয়-এন্ট্রি (লাল) */}
-                          <SignedMoney value={m.totalDeposit} />
-                        </td>
+                        {/* নিজ টাকার বাজার: জের থাকা অবস্থায় জের মিটে যায়, বাড়তিটাই এ ঘরে বসে */}
                         <td className="num tabular-nums text-[var(--ok)]">
-                          {m.selfPaidBazar > 0 ? (
-                            <>
-                              +৳{formatMoney(m.selfPaidBazar)}
-                              {(m.selfPaidCredit ?? m.selfPaidBazar) < m.selfPaidBazar - 0.005 ? (
-                                <span className="cell-sub muted block text-[10px]">
-                                  ক্রেডিট ৳{formatMoney(m.selfPaidCredit ?? 0)}
-                                </span>
-                              ) : null}
-                            </>
-                          ) : (
-                            "—"
-                          )}
+                          {(m.selfPaidCredit ?? 0) > 0 ? `+৳${formatMoney(m.selfPaidCredit ?? 0)}` : "—"}
                         </td>
-                        {hasJer ? (
-                          <>
-                            <td className="num tabular-nums">
-                              {(m.openingDue ?? 0) > 0 ? `৳${formatMoney(m.openingDue ?? 0)}` : "—"}
-                            </td>
-                            <td className="num tabular-nums text-[var(--ok)]" title={`বাজার থেকে ৳${formatMoney(m.jerAdjusted ?? 0)} + নগদে ৳${formatMoney(m.jerCashPaid ?? 0)}`}>
-                              {(m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0) > 0
-                                ? `৳${formatMoney((m.jerAdjusted ?? 0) + (m.jerCashPaid ?? 0))}`
-                                : "—"}
-                            </td>
-                            <td className="num font-bold tabular-nums text-[var(--warn)]">
-                              {(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}
-                            </td>
-                          </>
-                        ) : null}
+                        {/* বকেয়া জের সমন্বয় = জমা-এন্ট্রি টাকা + নিজ টাকায় বাজার */}
+                        <td className="num tabular-nums text-[var(--ok)]" title={`বাজার থেকে ৳${formatMoney(m.jerAdjusted ?? 0)} + নগদ জমা থেকে ৳${formatMoney(m.jerCashPaid ?? 0)}`}>
+                          {jerSettled > 0 ? `৳${formatMoney(jerSettled)}` : "—"}
+                        </td>
+                        <td className="num font-bold tabular-nums text-[var(--warn)]">
+                          {(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}
+                        </td>
                         <td className="num tabular-nums" style={{ background: "var(--brand-soft)" }}>
                           <SignedMoney value={m.denaPoana} bold />
                         </td>
-                        <td className="num tabular-nums text-[var(--brand)]">৳{formatMoney(m.permanentFund)}</td>
                         <td className="text-center">
                           <Badge tone={m.statusEn === "Due" ? "danger" : m.statusEn === "Receive" ? "ok" : "muted"}>
                             {m.statusEn}
@@ -623,24 +599,18 @@ export function ReportView() {
                       <td className="num tabular-nums">{formatMoney(round2(calcs.reduce((s, m) => s + m.mealCost, 0)))}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalIndividualExtra)}</td>
                       <td className="num tabular-nums">{formatMoney(summary.totalSharedExtra)}</td>
-                      <td className="num tabular-nums">−৳{formatMoney(totalCost)}</td>
-                      <td className="num tabular-nums">৳{formatMoney(calcs.reduce((s, m) => s + m.totalDeposit, 0))}</td>
-                      <td className="num tabular-nums">৳{formatMoney(summary.totalSelfPaidBazar)}</td>
-                      {hasJer ? (
-                        <>
-                          <td className="num tabular-nums">৳{formatMoney(summary.totalOpeningDue ?? 0)}</td>
-                          <td className="num tabular-nums">
-                            ৳{formatMoney((summary.totalJerAdjusted ?? 0) + (summary.totalJerCashPaid ?? 0))}
-                          </td>
-                          <td className="num tabular-nums">৳{formatMoney(summary.totalRemainingJer ?? 0)}</td>
-                        </>
-                      ) : null}
+                      <td className="num tabular-nums">৳{formatMoney(summary.totalOpeningDue ?? 0)}</td>
+                      <td className="num tabular-nums text-[var(--danger)]">−৳{formatMoney(totalCost)}</td>
+                      <td className="num tabular-nums text-[var(--ok)]">৳{formatMoney(summary.totalSelfPaidCredit ?? 0)}</td>
+                      <td className="num tabular-nums text-[var(--ok)]">
+                        ৳{formatMoney((summary.totalJerAdjusted ?? 0) + (summary.totalJerCashPaid ?? 0))}
+                      </td>
+                      <td className="num tabular-nums text-[var(--warn)]">৳{formatMoney(summary.totalRemainingJer ?? 0)}</td>
                       <td className="num font-extrabold tabular-nums" style={{ background: "var(--brand-soft)" }}>
                         দিবে ৳{formatMoney(totalDue)}
                         <br />
                         পাবে ৳{formatMoney(totalReceive)}
                       </td>
-                      <td className="num tabular-nums">৳{formatMoney(summary.totalFund)}</td>
                       <td />
                     </tr>
                   </tfoot>
