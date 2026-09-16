@@ -227,7 +227,12 @@ const handlers: Record<string, ActionHandler> = {
       .where(eq(messMonths.officeId, office.id))
       .orderBy(desc(messMonths.year), desc(messMonths.month));
 
-    const current = months.find((m) => m.year === now.year && m.month === now.month) ?? months[0];
+    // ডিফল্ট মাস: আজকের চলতি মাস (খোলা থাকলে); বন্ধ থাকলে সবচেয়ে নতুন খোলা মাস
+    const current =
+      months.find((m) => m.year === now.year && m.month === now.month && !m.isClosed) ??
+      months.find((m) => !m.isClosed) ??
+      months.find((m) => m.year === now.year && m.month === now.month) ??
+      months[0];
 
     if (!current) {
       const created = await ensureCurrentMonth(office.id);
@@ -281,7 +286,17 @@ const handlers: Record<string, ActionHandler> = {
     const office = need(await getOffice(officeId), "অফিস পাওয়া যায়নি");
     await ensureCurrentMonth(office.id);
     const now = dhakaNow();
-    const month = (await getMonthFor(office.id, now.year, now.month)) ?? (await ensureCurrentMonth(office.id));
+    const todays = await getMonthFor(office.id, now.year, now.month);
+    // আজকের মাস বন্ধ থাকলে সবচেয়ে নতুন খোলা মাসে যাই
+    const month =
+      todays && !todays.isClosed
+        ? todays
+        : ((await db
+            .select()
+            .from(messMonths)
+            .where(and(eq(messMonths.officeId, office.id), eq(messMonths.isClosed, false)))
+            .orderBy(desc(messMonths.year), desc(messMonths.month))
+            .limit(1))[0] ?? todays ?? (await ensureCurrentMonth(office.id)));
     const { data, summary } = await getMonthSummary(office.id, month.id);
     const months = await db.select().from(messMonths).where(eq(messMonths.officeId, office.id)).orderBy(desc(messMonths.year), desc(messMonths.month));
     return { activeOfficeId: office.id, office: officeDTO(office), month: monthDTO(month), months: months.map(monthDTO), data, summary };
@@ -368,9 +383,15 @@ const handlers: Record<string, ActionHandler> = {
       month.id,
       `${month.monthName} মাস বন্ধ ও ${result.nextMonth.monthName} স্বয়ংক্রিয় খোলা হয়েছে (নগদ ক্যারি ৳${result.lastBalance}${result.carriedDues ? `, ${result.carriedDues} জনের জের` : ""}${result.carriedBalances ? `, ${result.carriedBalances} জনের পাওনা` : ""})`,
     );
+    // ডিফল্ট ফোকাস: আজকের চলতি মাস খোলা থাকলে সেটাই (পুরনো মাস বন্ধ করলেও
+    // অ্যাপ চলতি মাসে ফেরত আসবে); আজকের মাসটাই এইমাত্র বন্ধ হলে নতুন খোলা মাস।
+    const now = dhakaNow();
+    let focusRow = await getMonthFor(officeId, now.year, now.month);
+    if (!focusRow || focusRow.isClosed) focusRow = result.nextMonth;
     return {
       closedMonth: monthDTO(result.closedMonth),
       nextMonth: monthDTO(result.nextMonth),
+      focusMonth: monthDTO(focusRow),
       copiedMembers: result.copiedMembers,
       carriedBalances: result.carriedBalances,
       carriedDues: result.carriedDues,

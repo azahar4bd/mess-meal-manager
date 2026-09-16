@@ -304,12 +304,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
     const res = await call<{
       nextMonth: MonthDTO;
+      focusMonth: MonthDTO;
       copiedMembers: number;
       carriedBalances: number;
       carriedDues: number;
       lastBalance: number;
     }>("month.closeAndOpen", { monthId: current.id });
     if (!res) return null;
+    const focus = res.focusMonth ?? res.nextMonth;
     toast(
       `${current.monthName} ক্লোজ হয়েছে — নতুন মাস ${res.nextMonth.monthName} শুরু হয়েছে (${res.copiedMembers} জন সদস্য • নগদ ক্যারি ৳${res.lastBalance}${
         res.carriedDues ? ` • ${res.carriedDues} জনের জের` : ""
@@ -318,8 +320,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     const monthsList = await mess<MonthDTO[]>("months.list").catch(() => null);
     if (monthsList) setMonths(monthsList);
-    await selectMonth(res.nextMonth.id);
-    return res.nextMonth;
+    // ডিফল্টভাবে চলতি (আজকের) মাসে ফেরত আসে; পুরোনো মাস দরকার হলে ড্রপডাউন
+    // থেকে বেছে নিলে সেই মাসই দেখায় (selectMonth ম্যানুয়াল সিলেকশন ধরে রাখে)।
+    await selectMonth(focus.id);
+    return focus;
   }, [call, toast, selectMonth, month]);
 
   const reopenMonth = useCallback(
