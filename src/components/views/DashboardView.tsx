@@ -76,25 +76,13 @@ export function DashboardView() {
         />
       </div>
 
-      {/* ── dena paona snapshot ─────────────────────── */}
-      <div className={`grid gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
-        <Card className="border-l-4 border-l-[var(--danger)]" bodyClass="p-2.5 sm:p-3">
-          <div className="kpi-k">মোট দিবে</div>
-          <div className="kpi-v text-[var(--danger)]">৳ {formatMoney(due)}</div>
-        </Card>
-        <Card className="border-l-4 border-l-[var(--ok)]" bodyClass="p-2.5 sm:p-3">
-          <div className="kpi-k">মোট পাবে</div>
-          <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(receive)}</div>
-        </Card>
-        <Card className="border-l-4 border-l-[var(--brand)]" bodyClass="p-2.5 sm:p-3">
-          <div className="kpi-k">সমান</div>
-          <div className="kpi-v">{s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন</div>
-        </Card>
+      {/* ── dena paona snapshot — উপরের KPI কার্ডের সাথে একই স্টাইল/গ্রিড ── */}
+      <div className={`grid grid-cols-2 gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+        <Kpi label="মোট দিবে" value={`৳ ${formatMoney(due)}`} tone="danger" />
+        <Kpi label="মোট পাবে" value={`৳ ${formatMoney(receive)}`} tone="ok" />
+        <Kpi label="সমান" value={`${s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন`} tone="brand" />
         {(s.totalRemainingJer ?? 0) > 0 ? (
-          <Card className="border-l-4 border-l-[var(--warn)]" bodyClass="p-2.5 sm:p-3">
-            <div className="kpi-k">বাকি জের</div>
-            <div className="kpi-v text-[var(--warn)]">৳ {formatMoney(s.totalRemainingJer ?? 0)}</div>
-          </Card>
+          <Kpi label="বাকি জের" value={`৳ ${formatMoney(s.totalRemainingJer ?? 0)}`} tone="warn" />
         ) : null}
       </div>
 

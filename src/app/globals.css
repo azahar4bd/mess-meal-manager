@@ -50,6 +50,10 @@
 html,
 body {
   height: 100%;
+  /* মোবাইলে left-right স্ক্রল বন্ধ — কোনো কনটেন্ট ভিউপোর্টের বাইরে গেলেও পেজ পাশে সরবে না */
+  overflow-x: hidden;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 body {

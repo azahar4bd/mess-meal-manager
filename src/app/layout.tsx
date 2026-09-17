@@ -8,6 +8,10 @@ const bengali = Noto_Sans_Bengali({
   display: "swap",
   variable: "--font-bengali",
   fallback: ["Hind Siliguri", "SolaimanLipi", "system-ui", "sans-serif"],
+  // Arial-ভিত্তিক অটো-fallback বাংলা যুক্তাক্ষর shaping পারে না → লেখা ভেঙে
+  // যায় (যেমন "হিসাব" → "হ্সিাব")। তাই অটো-fallback বন্ধ; আসল ফন্ট লোড
+  // পর্যন্ত সিস্টেমের বাংলা-সক্ষম ফন্টই ব্যবহৃত হবে।
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
