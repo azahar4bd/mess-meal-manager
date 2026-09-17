@@ -131,7 +131,7 @@ export function AuthScreen({
         {app.lang === "bn" ? "বাং | EN" : "EN | বাং"}
       </button>
       <NoticeTicker notices={notices} label={texts.marqueeLabel} />
-      <div className="mx-auto grid min-h-screen w-full max-w-6xl items-stretch gap-0 lg:grid-cols-[1.05fr_1fr]">
+      <div className="mx-auto grid min-h-screen w-full max-w-5xl items-stretch gap-0 lg:grid-cols-[1.05fr_1fr]">
         {/* ── brand panel ─────────────────────────────── */}
         <aside
           className="relative hidden flex-col justify-between overflow-hidden bg-[var(--brand)] p-8 text-white lg:flex"

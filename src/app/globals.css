@@ -67,6 +67,13 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* PC/ল্যাপটপ: পুরো UI একটু ছোট — ফুল-পেজ ছড়ানো নয়, দেখা ও খোঁজা সহজ */
+@media (min-width: 1024px) {
+  body {
+    zoom: 0.9;
+  }
+}
+
 @layer components {
   .card {
     @apply rounded-xl border bg-[var(--card)] shadow-[var(--shadow)];

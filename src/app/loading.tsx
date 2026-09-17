@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-6xl p-4">
+    <div className="mx-auto max-w-5xl p-4">
       <div className="skeleton mb-3 h-14 w-full rounded-xl" />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {Array.from({ length: 10 }).map((_, i) => (

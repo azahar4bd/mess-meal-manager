@@ -69,7 +69,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
   if (app.loading && !app.user) {
     return (
       <div className="min-h-screen">
-        <div className="mx-auto max-w-6xl p-4">
+        <div className="mx-auto max-w-5xl p-4">
           <Loader label="Loading office…" />
         </div>
       </div>
@@ -126,7 +126,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <ContextBar />
       <CurrentPageBar />
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4">
+      <main className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-4">
         {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
         <TabRouter />
       </main>
@@ -150,7 +150,7 @@ function FooterBar() {
   const main = texts.footerText?.trim() || texts.appName || "Mess Meal Manager";
   const sub = texts.footerSubText?.trim() || "";
   return (
-    <footer className="mx-auto mt-6 w-full max-w-6xl px-3 pb-24 text-center no-print sm:px-4 sm:pb-6">
+    <footer className="mx-auto mt-6 w-full max-w-5xl px-3 pb-24 text-center no-print sm:px-4 sm:pb-6">
       <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-3">
         <div className="text-[12.5px] font-extrabold">{main}</div>
         {sub ? <div className="muted mt-0.5 text-[11px]">{sub}</div> : null}
@@ -233,7 +233,7 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)]/95 backdrop-blur no-print">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-3 py-2 sm:px-4">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-2 px-3 py-2 sm:px-4">
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
@@ -332,7 +332,7 @@ function ContextBar() {
 
   return (
     <div className="border-b border-[var(--border)] bg-[var(--brand-soft)]/60 no-print">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
         {app.user?.canSwitchOffice ? (
           <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px]">
             <span className="muted shrink-0 font-semibold">অফিস:</span>
@@ -475,7 +475,7 @@ function CurrentPageBar() {
   const label = app.lang === "bn" ? current.bn : current.en;
   return (
     <div className="border-b border-[var(--border)] bg-[var(--card)] no-print">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-1.5 px-3 py-1.5 sm:px-4">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-1.5 px-3 py-1.5 sm:px-4">
         <span aria-hidden className="shrink-0 text-[14px]">
           {current.icon}
         </span>
