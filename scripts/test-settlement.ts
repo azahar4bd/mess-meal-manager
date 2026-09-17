@@ -380,7 +380,7 @@ console.log("13) অতিরিক্ত খরচ নিজ টাকায়
   check("করিম দেবে ৬০", eq(karim.denaPoana, -60), String(karim.denaPoana));
   check("KPI নিজ টাকার বাজারে ১২০ দেখায়", eq(s.totalSelfPaidCredit, 120), String(s.totalSelfPaidCredit));
   check("ফান্ড নগদ ৩০০০ অক্ষত (গ্যাসের টাকা ফান্ড থেকে যায়নি)", eq(s.cashBalance, 3000), String(s.cashBalance));
-  check("লাস্ট ব্যালেন্স ৩১২০ (ফান্ড ৩০০০ + নিজ-পরিশোধ ১২০)", eq(s.lastBalance, 3120), String(s.lastBalance));
+  check("লাস্ট ব্যালেন্স ৩০০০ অপরিবর্তিত (নিজ টাকার এক্সট্রা LB বদলায় না)", eq(s.lastBalance, 3000), String(s.lastBalance));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

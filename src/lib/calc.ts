@@ -300,7 +300,12 @@ export function calculateMonth(input: CalcInput): MonthSummary {
   // ফান্ড-নির্ভর বাজারই বাদ থাকে। নগদ জমা/মাস-শেষ পরিশোধ এখানে যোগ হয় না —
   // সেগুলো চলতি দেনা মেটায়; ক্লোজের পর বকেয়া জের হলে পরের মাসে LB-তে আসে।
   // জের নগদ/নিজ-বাজারে মিটলে অবশিষ্ট জের কমে → LB বাড়ে।
-  const lastBalance = round2(totalFund - totalRemainingJer - netCost + totalSelfPaidBazar);
+  // নিজ-পকেটে দেওয়া অতিরিক্ত খরচ LB বদলায় না — মেসের টাকা নেওয়াও হয়নি,
+  // দেওয়াও হয়নি (netCost-এ এক্সট্রা নেই, তাই ফেরত-যোগেও থাকবে না);
+  // সদস্যের পাওনা শুধু দেনা-পাওনা ঘরে (selfPaidCredit) থাকে।
+  const lastBalance = round2(
+    totalFund - totalRemainingJer - netCost + (totalSelfPaidBazar - selfPaidExtras),
+  );
 
   return {
     totalMembers: members.length,
