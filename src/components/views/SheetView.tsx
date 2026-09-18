@@ -134,29 +134,23 @@ export function SheetView() {
 
       {/* ── status ─────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Card bodyClass="p-3">
+        <Card bodyClass="flex items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
           <div className="kpi-k">Apps Script</div>
-          <div className="mt-1">
-            <Badge tone={status?.scriptUrlConfigured ? "ok" : "warn"}>{status?.scriptUrlConfigured ? "configured" : "not configured"}</Badge>
-          </div>
+          <Badge tone={status?.scriptUrlConfigured ? "ok" : "warn"}>{status?.scriptUrlConfigured ? "configured" : "not configured"}</Badge>
         </Card>
-        <Card bodyClass="p-3">
+        <Card bodyClass="flex items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
           <div className="kpi-k">Google Sheet</div>
-          <div className="mt-1">
-            <Badge tone={status?.sheetUrl ? "ok" : "warn"}>{status?.sheetUrl ? "linked" : "not linked"}</Badge>
-          </div>
+          <Badge tone={status?.sheetUrl ? "ok" : "warn"}>{status?.sheetUrl ? "linked" : "not linked"}</Badge>
         </Card>
-        <Card bodyClass="p-3">
+        <Card bodyClass="flex items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
           <div className="kpi-k">Last Synced</div>
-          <div className="text-[13px] font-bold">{status?.lastSyncedAt ? toDisplayDateTime(status.lastSyncedAt) : "—"}</div>
+          <div className="shrink-0 text-[12px] font-bold">{status?.lastSyncedAt ? toDisplayDateTime(status.lastSyncedAt) : "—"}</div>
         </Card>
-        <Card bodyClass="p-3">
+        <Card bodyClass="flex items-center justify-between gap-2 px-2.5 py-2 sm:px-3">
           <div className="kpi-k">Auto Sync</div>
-          <div className="mt-1">
-            <Badge tone={status?.autoSync ? "ok" : "warn"}>
-              {status?.autoSync ? "স্বয়ংক্রিয় চালু" : "সার্ভারে বন্ধ"}
-            </Badge>
-          </div>
+          <Badge tone={status?.autoSync ? "ok" : "warn"}>
+            {status?.autoSync ? "স্বয়ংক্রিয় চালু" : "সার্ভারে বন্ধ"}
+          </Badge>
         </Card>
       </div>
 

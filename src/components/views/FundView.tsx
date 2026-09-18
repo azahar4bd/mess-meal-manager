@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { useApp } from "@/components/app-context";
 import { EntryPanel, type ColumnDef, type FieldDef, type FormState } from "@/components/ui/entry-panel";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, Kpi } from "@/components/ui";
 import { formatMoney, round2, toNumber } from "@/lib/format";
 import { isoOfDay, toDisplayDate, toIsoDate, todayIso } from "@/lib/date";
 import type { DepositDTO } from "@/lib/types";
@@ -185,24 +185,14 @@ export function FundView() {
       
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Card bodyClass="p-3">
-          <div className="kpi-k">মোট স্থায়ী তহবিল</div>
-          <div className="kpi-v text-[var(--brand)]">৳ {formatMoney(summary?.totalFund ?? 0)}</div>
-        </Card>
-        <Card bodyClass="p-3">
-          <div className="kpi-k">এই মাসে নগদ আদায়</div>
-          <div className="kpi-v">৳ {formatMoney(summary?.totalCashCollected ?? 0)}</div>
-        </Card>
-        <Card bodyClass="p-3">
-          <div className="kpi-k">জের নগদ সমন্বয়</div>
-          <div className="kpi-v text-[var(--ok)]">৳ {formatMoney(summary?.totalJerCashPaid ?? 0)}</div>
-        </Card>
-        <Card bodyClass="p-3">
-          <div className="kpi-k">লাস্ট ব্যালেন্স</div>
-          <div className="kpi-v" style={{ color: (summary?.lastBalance ?? 0) >= 0 ? "var(--ok)" : "var(--danger)" }}>
-            ৳ {formatMoney(summary?.lastBalance ?? 0)}
-          </div>
-        </Card>
+        <Kpi label="মোট স্থায়ী তহবিল" value={`৳ ${formatMoney(summary?.totalFund ?? 0)}`} tone="brand" />
+        <Kpi label="এই মাসে নগদ আদায়" value={`৳ ${formatMoney(summary?.totalCashCollected ?? 0)}`} />
+        <Kpi label="জের নগদ সমন্বয়" value={`৳ ${formatMoney(summary?.totalJerCashPaid ?? 0)}`} tone="ok" />
+        <Kpi
+          label="লাস্ট ব্যালেন্স"
+          value={`৳ ${formatMoney(summary?.lastBalance ?? 0)}`}
+          tone={(summary?.lastBalance ?? 0) >= 0 ? "ok" : "danger"}
+        />
       </div>
 
       <EntryPanel<DepositDTO>
