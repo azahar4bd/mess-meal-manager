@@ -18,6 +18,9 @@ export function MealsView() {
   const [saving, setSaving] = useState(false);
   const [gridDraft, setGridDraft] = useState<Record<string, Record<string, number>>>({});
   const [gridSaving, setGridSaving] = useState(false);
+  // কাস্টম কিবোর্ড: নির্বাচিত সদস্য-ঘর ও টাইপ-বাফার
+  const [selIdx, setSelIdx] = useState<number | null>(null);
+  const [buffer, setBuffer] = useState<string>("");
 
   const canWrite = app.can("meals.write") && !(month?.isClosed && app.role !== "admin");
 
@@ -51,6 +54,8 @@ export function MealsView() {
     const next: Record<string, number> = {};
     for (const r of dayRows) next[r.member.id] = r.meals;
     setDraft(next);
+    setSelIdx(null);
+    setBuffer("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, month?.id, data?.members.length]);
 
@@ -133,6 +138,55 @@ export function MealsView() {
   };
 
   const gridChanged = Object.values(gridDraft).some((row) => Object.keys(row).length > 0);
+
+  /* ── কাস্টম কিবোর্ড (দিন-এন্ট্রি) ─────────────────────
+   * ঘরে ট্যাপ → নেটিভ কিবোর্ড খোলে না; নিচের প্যাড থেকে সংখ্যা,
+   * ◀ ▶ দিয়ে সদস্য বদল, Save/Reset বাটন। */
+  const editableIdx = dayRows.map((r, i) => (r.member.isActive ? i : -1)).filter((i) => i >= 0);
+  const selectCell = (i: number) => {
+    if (!canWrite || !dayRows[i]?.member.isActive) return;
+    setSelIdx(i);
+    setBuffer("");
+  };
+  const applyBuffer = (buf: string) => {
+    if (selIdx == null) return;
+    const id = dayRows[selIdx]?.member.id;
+    if (!id) return;
+    const num = buf === "" || buf === "." ? 0 : Number(buf);
+    setDraft((p) => ({ ...p, [id]: Number.isFinite(num) ? num : 0 }));
+  };
+  const pressDigit = (ch: string) => {
+    if (selIdx == null) return;
+    let next = buffer + ch;
+    if (ch === "." && buffer.includes(".")) return;
+    if (next === ".") next = "0.";
+    if (next.length > 5) return;
+    setBuffer(next);
+    applyBuffer(next);
+  };
+  const pressBackspace = () => {
+    if (selIdx == null) return;
+    const next = buffer.slice(0, -1);
+    setBuffer(next);
+    applyBuffer(next);
+  };
+  const moveSel = (delta: number) => {
+    if (!editableIdx.length) return;
+    const pos = selIdx == null ? -1 : editableIdx.indexOf(selIdx);
+    let nextPos = pos + delta;
+    if (pos === -1) nextPos = delta > 0 ? 0 : editableIdx.length - 1;
+    if (nextPos < 0) nextPos = editableIdx.length - 1;
+    if (nextPos >= editableIdx.length) nextPos = 0;
+    setSelIdx(editableIdx[nextPos]);
+    setBuffer("");
+  };
+  const resetDay = () => {
+    const next: Record<string, number> = {};
+    for (const r of dayRows) next[r.member.id] = r.meals;
+    setDraft(next);
+    setBuffer("");
+    app.toast("এই দিনের অসংরক্ষিত পরিবর্তন বাতিল হয়েছে", "info");
+  };
 
   return (
     <div className="space-y-3">
@@ -221,22 +275,24 @@ export function MealsView() {
                 </thead>
                 <tbody>
                   <tr>
-                    {dayRows.map(({ member, meals }) => (
-                      <td key={member.id} className="p-1 text-center">
-                        <input
-                          type="number"
-                          step="0.5"
-                          min={0}
-                          inputMode="decimal"
-                          className={`meal-cell ${toNumber(draft[member.id] ?? meals) === 0 ? "zero" : ""}`}
-                          style={{ width: 56, minWidth: 56 }}
-                          value={toNumber(draft[member.id] ?? meals)}
-                          disabled={!canWrite || !member.isActive}
-                          onChange={(e) => setDraft((p) => ({ ...p, [member.id]: Number(e.target.value) }))}
-                          aria-label={`${member.name} মিল`}
-                        />
-                      </td>
-                    ))}
+                    {dayRows.map(({ member, meals }, i) => {
+                      const v = toNumber(draft[member.id] ?? meals);
+                      const selected = selIdx === i;
+                      return (
+                        <td key={member.id} className="p-1 text-center">
+                          <button
+                            type="button"
+                            className={`meal-cell ${v === 0 ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
+                            style={{ width: 56, minWidth: 56 }}
+                            disabled={!canWrite || !member.isActive}
+                            onClick={() => selectCell(i)}
+                            aria-label={`${member.name} মিল`}
+                          >
+                            {formatMeal(v)}
+                          </button>
+                        </td>
+                      );
+                    })}
                   </tr>
                   <tr>
                     {dayRows.map(({ member }) => (
@@ -248,6 +304,63 @@ export function MealsView() {
                 </tbody>
               </table>
             </div>
+
+            {/* ── কাস্টম কিবোর্ড ── */}
+            {canWrite ? (
+              <div className="meal-pad mt-2.5">
+                <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
+                  <span className="min-w-0 truncate font-bold">
+                    {selIdx != null && dayRows[selIdx] ? (
+                      <>
+                        ✏️ {dayRows[selIdx].member.name}
+                        <span className="muted font-semibold"> — মিল: </span>
+                        <span className="tabular-nums text-[var(--brand)]">
+                          {formatMeal(toNumber(draft[dayRows[selIdx].member.id] ?? dayRows[selIdx].meals))}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="muted font-semibold">👆 উপরের ঘরে ট্যাপ করে সদস্য বাছুন</span>
+                    )}
+                  </span>
+                  <span className="muted shrink-0 tabular-nums">দিনের মোট {formatMeal(dayTotal)}</span>
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {["1", "2", "3", "4", "5"].map((k) => (
+                    <button key={k} type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(k)}>
+                      {k}
+                    </button>
+                  ))}
+                  {["6", "7", "8", "9", "0"].map((k) => (
+                    <button key={k} type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(k)}>
+                      {k}
+                    </button>
+                  ))}
+                  <button type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(".")}>
+                    .
+                  </button>
+                  <button type="button" className="pad-key" disabled={selIdx == null} onClick={pressBackspace} aria-label="মুছুন">
+                    ⌫
+                  </button>
+                  <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
+                    ◀
+                  </button>
+                  <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
+                    ▶
+                  </button>
+                  <button type="button" className="pad-key pad-key-danger" onClick={resetDay}>
+                    ↺ Reset
+                  </button>
+                  <button
+                    type="button"
+                    className="pad-key pad-key-save col-span-5"
+                    disabled={saving}
+                    onClick={() => void saveDay()}
+                  >
+                    {saving ? "সংরক্ষণ হচ্ছে…" : "💾 Save — এই দিনের মিল সেভ করুন"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-2 text-[12.5px]">
               <span className="muted">দিনের মোট: </span>

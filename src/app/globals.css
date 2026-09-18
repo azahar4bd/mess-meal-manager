@@ -423,6 +423,53 @@ body {
   color: var(--muted);
   font-weight: 500;
 }
+.meal-cell-selected {
+  border-color: var(--brand) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent);
+  background: var(--brand-soft) !important;
+  color: var(--brand) !important;
+}
+
+/* ── দৈনিক মিলের কাস্টম কিবোর্ড ── */
+.meal-pad {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--brand-soft) 40%, var(--card));
+}
+.pad-key {
+  @apply rounded-lg py-2.5 text-[15px] font-extrabold tabular-nums;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  touch-action: manipulation;
+  user-select: none;
+  transition: transform 0.06s ease, background 0.12s ease;
+}
+.pad-key:active {
+  transform: scale(0.94);
+  background: var(--brand-soft);
+}
+.pad-key:disabled {
+  opacity: 0.45;
+}
+.pad-key-nav {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.pad-key-danger {
+  color: var(--danger);
+  font-size: 13px;
+}
+.pad-key-save {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  font-size: 14px;
+}
+.pad-key-save:active {
+  background: color-mix(in srgb, var(--brand) 85%, #000);
+}
 
 /* skeleton loader */
 .skeleton {
