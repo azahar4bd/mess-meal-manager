@@ -430,12 +430,41 @@ body {
   color: var(--brand) !important;
 }
 
-/* ── দৈনিক মিলের কাস্টম কিবোর্ড ── */
+/* ── দৈনিক মিলের কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভাসে ── */
+.meal-pad-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60; /* মোবাইল ট্যাব-বারের (z-40) উপরে */
+  display: flex;
+  justify-content: center;
+  padding: 0 8px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  pointer-events: none;
+  animation: pad-slide-up 0.18s ease-out;
+}
+.meal-pad-sheet .meal-pad {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 -6px 28px -8px rgba(14, 40, 34, 0.45);
+}
+@keyframes pad-slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
 .meal-pad {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 10px;
   background: color-mix(in srgb, var(--brand-soft) 40%, var(--card));
+  backdrop-filter: blur(6px);
 }
 .pad-key {
   @apply rounded-lg py-2.5 text-[15px] font-extrabold tabular-nums;

@@ -305,59 +305,70 @@ export function MealsView() {
               </table>
             </div>
 
-            {/* ── কাস্টম কিবোর্ড ── */}
-            {canWrite ? (
-              <div className="meal-pad mt-2.5">
-                <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
-                  <span className="min-w-0 truncate font-bold">
-                    {selIdx != null && dayRows[selIdx] ? (
-                      <>
-                        ✏️ {dayRows[selIdx].member.name}
-                        <span className="muted font-semibold"> — মিল: </span>
-                        <span className="tabular-nums text-[var(--brand)]">
-                          {formatMeal(toNumber(draft[dayRows[selIdx].member.id] ?? dayRows[selIdx].meals))}
-                        </span>
-                      </>
-                    ) : (
-                      <span className="muted font-semibold">👆 উপরের ঘরে ট্যাপ করে সদস্য বাছুন</span>
-                    )}
-                  </span>
-                  <span className="muted shrink-0 tabular-nums">দিনের মোট {formatMeal(dayTotal)}</span>
-                </div>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {["1", "2", "3", "4", "5"].map((k) => (
-                    <button key={k} type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(k)}>
-                      {k}
+            {/* ── কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভেসে ওঠে, ঘর বাছলে তবেই ── */}
+            {canWrite && selIdx != null ? (
+              <div className="meal-pad-sheet" role="dialog" aria-label="মিল কিবোর্ড">
+                <div className="meal-pad">
+                  <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
+                    <span className="min-w-0 truncate font-bold">
+                      {dayRows[selIdx] ? (
+                        <>
+                          ✏️ {dayRows[selIdx].member.name}
+                          <span className="muted font-semibold"> — মিল: </span>
+                          <span className="tabular-nums text-[var(--brand)]">
+                            {formatMeal(toNumber(draft[dayRows[selIdx].member.id] ?? dayRows[selIdx].meals))}
+                          </span>
+                        </>
+                      ) : null}
+                    </span>
+                    <span className="muted shrink-0 tabular-nums">মোট {formatMeal(dayTotal)}</span>
+                    <button
+                      type="button"
+                      className="pad-key pad-key-nav h-8 w-8 shrink-0 !py-0 text-[13px]"
+                      onClick={() => {
+                        setSelIdx(null);
+                        setBuffer("");
+                      }}
+                      aria-label="কিবোর্ড বন্ধ"
+                    >
+                      ✕
                     </button>
-                  ))}
-                  {["6", "7", "8", "9", "0"].map((k) => (
-                    <button key={k} type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(k)}>
-                      {k}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {["1", "2", "3", "4", "5"].map((k) => (
+                      <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
+                        {k}
+                      </button>
+                    ))}
+                    {["6", "7", "8", "9", "0"].map((k) => (
+                      <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
+                        {k}
+                      </button>
+                    ))}
+                    <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
+                      .
                     </button>
-                  ))}
-                  <button type="button" className="pad-key" disabled={selIdx == null} onClick={() => pressDigit(".")}>
-                    .
-                  </button>
-                  <button type="button" className="pad-key" disabled={selIdx == null} onClick={pressBackspace} aria-label="মুছুন">
-                    ⌫
-                  </button>
-                  <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
-                    ◀
-                  </button>
-                  <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
-                    ▶
-                  </button>
-                  <button type="button" className="pad-key pad-key-danger" onClick={resetDay}>
-                    ↺ Reset
-                  </button>
-                  <button
-                    type="button"
-                    className="pad-key pad-key-save col-span-5"
-                    disabled={saving}
-                    onClick={() => void saveDay()}
-                  >
-                    {saving ? "সংরক্ষণ হচ্ছে…" : "💾 Save — এই দিনের মিল সেভ করুন"}
-                  </button>
+                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
+                      ⌫
+                    </button>
+                    <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
+                      ◀
+                    </button>
+                    <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
+                      ▶
+                    </button>
+                    <button type="button" className="pad-key pad-key-danger" onClick={resetDay}>
+                      ↺ Reset
+                    </button>
+                    <button
+                      type="button"
+                      className="pad-key pad-key-save col-span-5"
+                      disabled={saving}
+                      onClick={() => void saveDay()}
+                    >
+                      {saving ? "সংরক্ষণ হচ্ছে…" : "💾 Save — এই দিনের মিল সেভ করুন"}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
