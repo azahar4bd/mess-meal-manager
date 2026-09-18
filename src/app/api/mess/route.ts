@@ -362,6 +362,8 @@ const handlers: Record<string, ActionHandler> = {
     if (!can(ctx.user.role, "month.write")) deny(ctx, "month.write");
     const { officeId, month } = await resolveMonth(ctx, body);
     const closed = body.closed === undefined ? true : Boolean(body.closed);
+    // বন্ধ মাস পুনরায় খোলা (reopen) শুধুই প্ল্যাটফর্ম অ্যাডমিন — UI-এর মতো সার্ভারেও একই নিয়ম
+    if (!closed && !can(ctx.user.role, "office.manage")) deny(ctx, "office.manage");
     const updated = need(await setMonthClosed(month.id, officeId, closed), "মাস হালনাগাদ করা যায়নি");
     await logAction(ctx, closed ? "month.close" : "month.reopen", "month", month.id, closed ? "মাস বন্ধ করা হয়েছে" : "মাস পুনরায় খোলা হয়েছে");
     return monthDTO(updated);

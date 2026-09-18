@@ -448,7 +448,8 @@ export function ReportView() {
   const fullMonth =
     fromDate === isoOfDay(month.year, month.month, 1) &&
     toDate === isoOfDay(month.year, month.month, month.totalDays);
-  const canWriteFund = app.can("fund.write") && fullMonth;
+  // বন্ধ (closed) মাসে শুধু অ্যাডমিন লিখতে পারবেন — অন্য সব পেজের মতো একই নিয়ম
+  const canWriteFund = app.can("fund.write") && fullMonth && !(month.isClosed && app.role !== "admin");
 
   return (
     <div className="space-y-3">
