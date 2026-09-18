@@ -102,11 +102,11 @@ export function DashboardView() {
         ) : null}
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {/* ── top members ─────────────────────────── */}
+      {/* ── মিল ও বাজার টেবিল — পূর্ণ প্রস্থ, ভেতরে দুই-দিকে স্ক্রল ── */}
+      <div className="space-y-3">
         {/* ── মিল টেবিল (মাসগ্রিড, রিড-ওনলি) — শুধু মিল-থাকা তারিখ ── */}
         <Card
-          title="মিল টেবিল"
+          title="🍚 মিল টেবিল"
           action={
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("meals")}>
               দৈনিক মিল
@@ -116,8 +116,8 @@ export function DashboardView() {
           {mealGrid.days.length === 0 ? (
             <EmptyState icon="🍚" title="এই মাসে কোনো মিল এন্ট্রি নেই" hint="দৈনিক ট্যাব থেকে মিল যোগ করুন।" />
           ) : (
-            <div className="table-wrap" style={{ maxHeight: "48vh" }}>
-              <table className="data" style={{ minWidth: 0 }}>
+            <div className="table-wrap" style={{ maxHeight: "60vh", overflow: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="data" style={{ minWidth: "max-content", width: "100%" }}>
                 <thead>
                   <tr>
                     <th className="sticky left-0 top-0 z-20 bg-[var(--brand-soft)]">সদস্য</th>
@@ -167,7 +167,7 @@ export function DashboardView() {
 
         {/* ── বাজার টেবিল (তারিখভিত্তিক, রিড-ওনলি) ── */}
         <Card
-          title="বাজার টেবিল"
+          title="🧺 বাজার টেবিল"
           action={
             app.can("bazar.view") ? (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("bazar")}>
@@ -179,8 +179,8 @@ export function DashboardView() {
           {bazarRows.length === 0 ? (
             <EmptyState icon="🧺" title="এই মাসে কোনো বাজার এন্ট্রি নেই" hint="বাজার ট্যাব থেকে খরচ যোগ করুন।" />
           ) : (
-            <div className="table-wrap" style={{ maxHeight: "48vh" }}>
-              <table className="data" style={{ minWidth: 0 }}>
+            <div className="table-wrap" style={{ maxHeight: "60vh", overflow: "auto", WebkitOverflowScrolling: "touch" }}>
+              <table className="data" style={{ minWidth: 480, width: "100%" }}>
                 <thead>
                   <tr>
                     <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ width: 36 }}>Sr</th>
@@ -199,7 +199,7 @@ export function DashboardView() {
                         <span className="block max-w-[90px] truncate text-[12.5px] font-semibold">{b.buyerName || "—"}</span>
                       </td>
                       <td>
-                        <span className="block max-w-[170px] truncate text-[12.5px]" title={b.items || b.category}>
+                        <span className="block max-w-[340px] truncate text-[12.5px] sm:max-w-[520px]" title={b.items || b.category}>
                           {b.items || b.category}
                         </span>
                       </td>
