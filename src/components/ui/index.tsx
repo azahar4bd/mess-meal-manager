@@ -318,7 +318,7 @@ export function Card({ title, action, children, className = "", bodyClass = "p-3
   );
 }
 
-export function Kpi({ label, value, tone = "default" }: { label: string; value: string; /** @deprecated বর্ণনা সরানো হয়েছে */ sub?: string; tone?: "default" | "ok" | "warn" | "danger" | "brand" }) {
+export function Kpi({ label, value, tone = "default", icon }: { label: string; value: string; /** @deprecated বর্ণনা সরানো হয়েছে */ sub?: string; tone?: "default" | "ok" | "warn" | "danger" | "brand"; icon?: string }) {
   const color =
     tone === "ok"
       ? "var(--ok)"
@@ -329,8 +329,14 @@ export function Kpi({ label, value, tone = "default" }: { label: string; value: 
           : tone === "brand"
             ? "var(--brand)"
             : "var(--text)";
+  const accent = tone === "default" ? "var(--border)" : color;
   return (
-    <div className="kpi">
+    <div className="kpi" style={{ borderLeft: `3px solid ${accent}` }}>
+      {icon ? (
+        <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--brand-soft)] text-[12px]">
+          {icon}
+        </span>
+      ) : null}
       <span className="kpi-k">{label}</span>
       <span className="kpi-v tabular-nums" style={{ color }}>
         {value}

@@ -329,6 +329,10 @@ body {
   .kpi {
     /* লেবেল ও মান পাশাপাশি — কার্ড ছোট/কমপ্যাক্ট (আগে উপর-নিচ ছিল) */
     @apply card flex flex-row items-center justify-between gap-2 px-2.5 py-2 sm:px-3;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .kpi:hover {
+    box-shadow: 0 4px 14px -6px rgba(16, 28, 46, 0.28);
   }
   :root:not(.dark) .kpi {
     background: linear-gradient(180deg, #ffffff 0%, #f3faf7 100%);

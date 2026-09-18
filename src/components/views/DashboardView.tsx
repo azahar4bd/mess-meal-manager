@@ -35,7 +35,6 @@ export function DashboardView() {
     () => (data ? [...data.bazarExpenses].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)) : []),
     [data],
   );
-  const recentDeposits = useMemo(() => (data ? [...data.deposits].slice(0, 4) : []), [data]);
 
   if (!s || !data || !app.month) return <Loader label="Loading dashboard…" />;
 
@@ -73,33 +72,41 @@ export function DashboardView() {
 
       {/* কন্টেন্ট এডিটর এখন সব পেজে একই ভাসমান ✏️ এডিট বাটন থেকে খোলে */}
 
-      {/* ── KPI grid (spec §39, §85) ─────────────────── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi label="সক্রিয় সদস্য" value={String(s.activeMembers)} tone="brand" />
-        <Kpi label="মোট মিল" value={formatMeal(s.totalMill)} />
-        <Kpi label="মিল রেট" value={`৳ ${formatRate(s.perMillRate)}`} tone="ok" />
-        <Kpi label="মোট বাজার" value={`৳ ${formatMoney(s.totalBazarCost)}`} />
-        <Kpi label="অন্যান্য আয়" value={`৳ ${formatMoney(s.totalOthersIncome)}`} tone="ok" />
-        <Kpi label="নেট মিল খরচ" value={`৳ ${formatMoney(s.netCost)}`} />
-        <Kpi label="স্থায়ী তহবিল" value={`৳ ${formatMoney(s.totalFund)}`} tone="warn" />
-        <Kpi label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(s.totalSharedExtra)}`} />
-        <Kpi label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} />
-        <Kpi label="নিজ টাকার বাজার" value={`৳ ${formatMoney(s.totalSelfPaidCredit ?? 0)}`} tone="brand" />
-        <Kpi
-          label="লাস্ট ব্যালেন্স"
-          value={`৳ ${formatMoney(s.lastBalance)}`}
-          tone={s.lastBalance >= 0 ? "ok" : "danger"}
-        />
-      </div>
+      {/* ── KPI — গ্রুপ করে সাজানো (spec §39, §85) ─────────────────── */}
+      <div className="space-y-2">
+        <div className="muted px-0.5 text-[11px] font-bold uppercase tracking-wide">🍚 মিল ও বাজার</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Kpi icon="👥" label="সক্রিয় সদস্য" value={String(s.activeMembers)} tone="brand" />
+          <Kpi icon="🍚" label="মোট মিল" value={formatMeal(s.totalMill)} tone="brand" />
+          <Kpi icon="⚖️" label="মিল রেট" value={`৳ ${formatRate(s.perMillRate)}`} tone="ok" />
+          <Kpi icon="🧺" label="মোট বাজার" value={`৳ ${formatMoney(s.totalBazarCost)}`} tone="warn" />
+          <Kpi icon="➕" label="অন্যান্য আয়" value={`৳ ${formatMoney(s.totalOthersIncome)}`} tone="ok" />
+          <Kpi icon="🧮" label="নেট মিল খরচ" value={`৳ ${formatMoney(s.netCost)}`} tone="warn" />
+        </div>
 
-      {/* ── dena paona snapshot — উপরের KPI কার্ডের সাথে একই স্টাইল/গ্রিড ── */}
-      <div className={`grid grid-cols-2 gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
-        <Kpi label="মোট দিবে" value={`৳ ${formatMoney(due)}`} tone="danger" />
-        <Kpi label="মোট পাবে" value={`৳ ${formatMoney(receive)}`} tone="ok" />
-        <Kpi label="সমান" value={`${s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন`} tone="brand" />
-        {(s.totalRemainingJer ?? 0) > 0 ? (
-          <Kpi label="বাকি জের" value={`৳ ${formatMoney(s.totalRemainingJer ?? 0)}`} tone="warn" />
-        ) : null}
+        <div className="muted px-0.5 pt-1 text-[11px] font-bold uppercase tracking-wide">💰 তহবিল ও অতিরিক্ত</div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <Kpi icon="🏦" label="স্থায়ী তহবিল" value={`৳ ${formatMoney(s.totalFund)}`} tone="brand" />
+          <Kpi icon="🤝" label="শেয়ার্ড অতিরিক্ত" value={`৳ ${formatMoney(s.totalSharedExtra)}`} />
+          <Kpi icon="👤" label="ইন্ডি. অতিরিক্ত" value={`৳ ${formatMoney(s.totalIndividualExtra)}`} />
+          <Kpi icon="👜" label="নিজ টাকার বাজার" value={`৳ ${formatMoney(s.totalSelfPaidCredit ?? 0)}`} tone="brand" />
+          <Kpi
+            icon="🏁"
+            label="লাস্ট ব্যালেন্স"
+            value={`৳ ${formatMoney(s.lastBalance)}`}
+            tone={s.lastBalance >= 0 ? "ok" : "danger"}
+          />
+        </div>
+
+        <div className="muted px-0.5 pt-1 text-[11px] font-bold uppercase tracking-wide">📒 দেনা-পাওনা</div>
+        <div className={`grid grid-cols-2 gap-2 ${(s.totalRemainingJer ?? 0) > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+          <Kpi icon="🔻" label="মোট দিবে" value={`৳ ${formatMoney(due)}`} tone="danger" />
+          <Kpi icon="🔺" label="মোট পাবে" value={`৳ ${formatMoney(receive)}`} tone="ok" />
+          <Kpi icon="✅" label="সমান" value={`${s.memberCalculations.filter((m) => m.statusEn === "Settled").length} জন`} tone="brand" />
+          {(s.totalRemainingJer ?? 0) > 0 ? (
+            <Kpi icon="⏳" label="বাকি জের" value={`৳ ${formatMoney(s.totalRemainingJer ?? 0)}`} tone="warn" />
+          ) : null}
+        </div>
       </div>
 
       {/* ── মিল ও বাজার টেবিল — পূর্ণ প্রস্থ, ভেতরে দুই-দিকে স্ক্রল ── */}
@@ -220,20 +227,26 @@ export function DashboardView() {
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <Card title="সাম্প্রতিক জমা / Recent Fund">
-          {recentDeposits.length === 0 ? (
-            <EmptyState icon="💰" title="কোনো জমা এন্ট্রি নেই" />
-          ) : (
-            <div className="space-y-1.5">
-              {recentDeposits.map((d) => (
-                <div key={d.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[12.5px]">
-                  <span className="min-w-0 truncate font-semibold">{d.memberName || "—"}</span>
-                  <span className="muted shrink-0 text-[11px]">{toDisplayDate(d.date)}</span>
-                  <span className="shrink-0 font-bold tabular-nums text-[var(--ok)]">৳ {formatMoney(d.amount)}</span>
-                </div>
-              ))}
+        <Card
+          title="💰 সদস্যের তহবিল / Fund"
+          action={
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("fund")}>
+              বিস্তারিত
+            </button>
+          }
+        >
+          <div className="space-y-1.5">
+            {s.memberCalculations.map((m) => (
+              <div key={m.memberId} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-[12.5px]">
+                <span className="min-w-0 truncate font-semibold">{m.name}</span>
+                <span className="shrink-0 font-bold tabular-nums text-[var(--ok)]">৳ {formatMoney(m.permanentFund)}</span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-[var(--brand-soft)] px-2.5 py-1.5 text-[12.5px]">
+              <span className="font-bold">মোট স্থায়ী তহবিল</span>
+              <span className="shrink-0 font-extrabold tabular-nums text-[var(--brand)]">৳ {formatMoney(s.totalFund)}</span>
             </div>
-          )}
+          </div>
         </Card>
 
         <Card title="গুগল শিট / Sync Status">
