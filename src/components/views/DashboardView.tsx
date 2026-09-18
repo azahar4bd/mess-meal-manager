@@ -13,12 +13,28 @@ export function DashboardView() {
   const data = app.data;
   const { texts } = useUiContent(app.office?.id ?? null);
 
-  const topMembers = useMemo(() => {
-    if (!s) return [];
-    return [...s.memberCalculations].sort((a, b) => b.totalMill - a.totalMill).slice(0, 5);
-  }, [s]);
+  // মাসগ্রিড (রিড-ওনলি): শুধু যে তারিখে মিল আছে সেই দিনগুলো, সদস্যভিত্তিক
+  const mealGrid = useMemo(() => {
+    if (!data) return { days: [] as number[], byDay: {} as Record<number, Record<string, number>>, memberTotals: {} as Record<string, number>, grand: 0 };
+    const byDay: Record<number, Record<string, number>> = {};
+    const memberTotals: Record<string, number> = {};
+    let grand = 0;
+    for (const r of data.dailyMeals) {
+      const v = round2(Number(r.meals) || 0);
+      if (v === 0) continue;
+      (byDay[r.day] ??= {})[r.memberId] = v;
+      memberTotals[r.memberId] = round2((memberTotals[r.memberId] ?? 0) + v);
+      grand = round2(grand + v);
+    }
+    const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+    return { days, byDay, memberTotals, grand };
+  }, [data]);
 
-  const recentBazar = useMemo(() => (data ? [...data.bazarExpenses].slice(0, 5) : []), [data]);
+  // বাজার টেবিল (রিড-ওনলি): তারিখ অনুযায়ী সাজানো
+  const bazarRows = useMemo(
+    () => (data ? [...data.bazarExpenses].sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id)) : []),
+    [data],
+  );
   const recentDeposits = useMemo(() => (data ? [...data.deposits].slice(0, 4) : []), [data]);
 
   if (!s || !data || !app.month) return <Loader label="Loading dashboard…" />;
@@ -88,44 +104,70 @@ export function DashboardView() {
 
       <div className="grid gap-3 lg:grid-cols-2">
         {/* ── top members ─────────────────────────── */}
+        {/* ── মিল টেবিল (মাসগ্রিড, রিড-ওনলি) — শুধু মিল-থাকা তারিখ ── */}
         <Card
-          title="সর্বোচ্চ মিল"
-          subtitle="এই মাসের হিসাব"
+          title="মিল টেবিল"
           action={
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("report")}>
-              পূর্ণ রিপোর্ট
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("meals")}>
+              দৈনিক মিল
             </button>
           }
         >
-          {topMembers.length === 0 ? (
-            <EmptyState icon="👥" title="কোনো সদস্য পাওয়া যায়নি" hint="সদস্য যোগ করুন" />
+          {mealGrid.days.length === 0 ? (
+            <EmptyState icon="🍚" title="এই মাসে কোনো মিল এন্ট্রি নেই" hint="দৈনিক ট্যাব থেকে মিল যোগ করুন।" />
           ) : (
-            <div className="space-y-1.5">
-              {topMembers.map((m, i) => (
-                <div key={m.memberId} className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--brand-soft)] text-[12px] font-bold text-[var(--brand)]">
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13.5px] font-bold">{m.name}</span>
-                    <span className="muted block text-[11px]">
-                      মিল খরচ ৳ {formatMoney(m.totalCost)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="block text-[14px] font-extrabold tabular-nums">{formatMeal(m.totalMill)}</span>
-                    <span className="muted block text-[10.5px]">মিল</span>
-                  </span>
-                  <Badge tone={m.statusEn === "Due" ? "danger" : m.statusEn === "Receive" ? "ok" : "muted"}>{m.status}</Badge>
-                </div>
-              ))}
+            <div className="table-wrap" style={{ maxHeight: "48vh" }}>
+              <table className="data" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 top-0 z-20 bg-[var(--brand-soft)]">সদস্য</th>
+                    {mealGrid.days.map((d) => (
+                      <th key={d} className="num sticky top-0 z-10 bg-[var(--brand-soft)] text-center" style={{ minWidth: 34 }}>
+                        {d}
+                      </th>
+                    ))}
+                    <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 46 }}>মোট</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.members
+                    .filter((m) => (mealGrid.memberTotals[m.id] ?? 0) > 0)
+                    .map((m) => (
+                      <tr key={m.id}>
+                        <td className="sticky left-0 z-10 bg-[var(--card)]">
+                          <span className="block max-w-[96px] truncate text-[12.5px] font-bold">{m.name}</span>
+                        </td>
+                        {mealGrid.days.map((d) => {
+                          const v = (mealGrid.byDay[d] ?? {})[m.id] ?? 0;
+                          return (
+                            <td key={d} className="num tabular-nums text-center">
+                              {v ? formatMeal(v) : <span className="muted">—</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="num font-bold tabular-nums">{formatMeal(mealGrid.memberTotals[m.id] ?? 0)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="sticky left-0 z-10 bg-[var(--card)] font-bold">মোট</td>
+                    {mealGrid.days.map((d) => (
+                      <td key={d} className="num font-bold tabular-nums text-center">
+                        {formatMeal(round2(Object.values(mealGrid.byDay[d] ?? {}).reduce((s2, v) => s2 + v, 0)))}
+                      </td>
+                    ))}
+                    <td className="num font-extrabold tabular-nums">{formatMeal(mealGrid.grand)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           )}
         </Card>
 
-        {/* ── recent bazar ────────────────────────── */}
+        {/* ── বাজার টেবিল (তারিখভিত্তিক, রিড-ওনলি) ── */}
         <Card
-          title="সাম্প্রতিক বাজার"
+          title="বাজার টেবিল"
           action={
             app.can("bazar.view") ? (
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => app.setTab("bazar")}>
@@ -134,22 +176,44 @@ export function DashboardView() {
             ) : null
           }
         >
-          {recentBazar.length === 0 ? (
+          {bazarRows.length === 0 ? (
             <EmptyState icon="🧺" title="এই মাসে কোনো বাজার এন্ট্রি নেই" hint="বাজার ট্যাব থেকে খরচ যোগ করুন।" />
           ) : (
-            <div className="space-y-1.5">
-              {recentBazar.map((b) => (
-                <div key={b.id} className="flex items-center gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2">
-                  <span className="muted w-[74px] shrink-0 text-[11.5px] tabular-nums">{toDisplayDate(b.date)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold">{b.items || b.category}</span>
-                    <span className="muted block truncate text-[11px]">
-                      {b.buyerName || "—"} • {b.category}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-[13.5px] font-bold tabular-nums">৳ {formatMoney(b.amount)}</span>
-                </div>
-              ))}
+            <div className="table-wrap" style={{ maxHeight: "48vh" }}>
+              <table className="data" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr>
+                    <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ width: 36 }}>Sr</th>
+                    <th className="sticky top-0 z-10 bg-[var(--brand-soft)]">তারিখ</th>
+                    <th className="sticky top-0 z-10 bg-[var(--brand-soft)]">বাজারকারী</th>
+                    <th className="sticky top-0 z-10 bg-[var(--brand-soft)]">আইটেম</th>
+                    <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]">টাকা</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bazarRows.map((b, i) => (
+                    <tr key={b.id}>
+                      <td className="num muted tabular-nums">{i + 1}</td>
+                      <td className="tabular-nums text-[12px]">{toDisplayDate(b.date)}</td>
+                      <td>
+                        <span className="block max-w-[90px] truncate text-[12.5px] font-semibold">{b.buyerName || "—"}</span>
+                      </td>
+                      <td>
+                        <span className="block max-w-[170px] truncate text-[12.5px]" title={b.items || b.category}>
+                          {b.items || b.category}
+                        </span>
+                      </td>
+                      <td className="num font-bold tabular-nums">৳ {formatMoney(b.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={4} className="font-bold">মোট</td>
+                    <td className="num font-extrabold tabular-nums">৳ {formatMoney(s.totalBazarCost)}</td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           )}
         </Card>
