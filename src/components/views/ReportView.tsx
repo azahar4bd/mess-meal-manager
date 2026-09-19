@@ -474,16 +474,17 @@ export function ReportView() {
       ) : null}
 
       <Card title="তারিখ ফিল্টার" bodyClass="p-2.5 sm:p-3">
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="block min-w-[150px] flex-1">
+        {/* মোবাইলেও এক লাইনে: nowrap + সংকুচনযোগ্য ইনপুট */}
+        <div className="flex flex-nowrap items-end gap-1.5 sm:gap-2">
+          <label className="block min-w-0 flex-1">
             <span className="label">শুরু</span>
-            <input type="date" className="input h-9" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            <input type="date" className="input h-9 w-full min-w-0 px-1.5 text-[12.5px] sm:px-3 sm:text-[13.5px]" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           </label>
-          <label className="block min-w-[150px] flex-1">
+          <label className="block min-w-0 flex-1">
             <span className="label">শেষ</span>
-            <input type="date" className="input h-9" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <input type="date" className="input h-9 w-full min-w-0 px-1.5 text-[12.5px] sm:px-3 sm:text-[13.5px]" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </label>
-          <button type="button" className="btn btn-ghost h-9" onClick={resetFullMonth}>
+          <button type="button" className="btn btn-ghost h-9 shrink-0 whitespace-nowrap px-2 text-[12px] sm:px-3 sm:text-[13px]" onClick={resetFullMonth}>
             পুরো মাস
           </button>
         </div>
