@@ -12,7 +12,7 @@
  * চালানোর নিয়ম:  npm run test:settlement
  */
 import { calculateMonth, type CalcInput } from "../src/lib/calc";
-import { computeTriad, triadReady, triadValues, type TriadField } from "../src/lib/triad";
+import { computeTriad, triadReady, triadValues, type Triad, type TriadField } from "../src/lib/triad";
 import type { BazarDTO, DepositDTO, MemberDTO } from "../src/lib/types";
 
 let passed = 0;
@@ -386,66 +386,97 @@ console.log("13) অতিরিক্ত খরচ নিজ টাকায়
 
 /* ══════════════════════════════════════════════════════════
  *  বাজার পপআপ — কোয়ান্টিটি / দাম / মোট (যেকোনো ২ → তৃতীয়টি অটো)
+ *  মূল বিষয়: টাইপিং এক-এক অক্ষরে হয়, তাই "অটো-ভরা" ঘর বারবার
+ *  নতুন করে হিসাব হবে — কখনো "হাতে লেখা" ধরা যাবে না।
  * ══════════════════════════════════════════════════════════ */
 console.log("14) বাজার আইটেম ত্রয়ী — যেকোনো দুটি ঘর দিলে তৃতীয়টি অটো");
 {
-  const T = (q = "", p = "", t = "") => ({ qty: q, price: p, total: t });
-  const run = (seq: Array<[TriadField, string]>) =>
-    seq.reduce((st, [f, v]) => computeTriad(st, f, v), T());
+  const T = (q = "", p = "", t = "", m: TriadField[] = []): Triad => ({ qty: q, price: p, total: t, manual: m });
+  /** অক্ষরে অক্ষরে টাইপিং সিমুলেশন — আসল ইউজার-অভিজ্ঞতা */
+  const type = (field: TriadField, text: string, from: Triad = T()) => {
+    let st = from;
+    for (let i = 1; i <= text.length; i++) st = computeTriad(st, field, text.slice(0, i));
+    return st;
+  };
 
   // ১. quantity + price → total
-  let r = run([["qty", "2"], ["price", "35"]]);
+  let r = computeTriad(computeTriad(T(), "qty", "2"), "price", "35");
   check("qty 2 × price 35 → total 70", r.total === "70", JSON.stringify(r));
 
   // ২. quantity + total → price
-  r = run([["qty", "2"], ["total", "70"]]);
+  r = computeTriad(computeTriad(T(), "qty", "2"), "total", "70");
   check("qty 2, total 70 → price 35", r.price === "35", JSON.stringify(r));
 
   // ৩. price + total → quantity
-  r = run([["price", "35"], ["total", "70"]]);
+  r = computeTriad(computeTriad(T(), "price", "35"), "total", "70");
   check("price 35, total 70 → qty 2", r.qty === "2", JSON.stringify(r));
 
   // ৪. উল্টো ক্রমেও কাজ করে (total আগে)
-  r = run([["total", "70"], ["qty", "2"]]);
+  r = computeTriad(computeTriad(T(), "total", "70"), "qty", "2");
   check("total 70 → qty 2 দিলে price 35", r.price === "35", JSON.stringify(r));
-  r = run([["total", "70"], ["price", "35"]]);
+  r = computeTriad(computeTriad(T(), "total", "70"), "price", "35");
   check("total 70 → price 35 দিলে qty 2", r.qty === "2", JSON.stringify(r));
 
-  // ৫. দশমিক — ০.৫ কেজি × ৮০ টাকা
-  r = run([["qty", "0.5"], ["price", "80"]]);
-  check("qty 0.5 × price 80 → total 40", r.total === "40", JSON.stringify(r));
+  // ৫. ★ ইউজার-রিপোর্টেড বাগ: মোট ৮০, মূল্য ২০ → qty ৪ (আগে ৪০/৮০০ হতো)
+  let st = type("total", "80");
+  check("মোট ঘরে 80 টাইপ → total 80", st.total === "80", JSON.stringify(st));
+  let mid = computeTriad(st, "price", "2"); // মাঝপথে "2" → qty 40 দেখাবে (স্বাভাবিক)
+  check("মূল্য '2' টাইপ মুহূর্তে qty 40 (মধ্যবর্তী)", mid.qty === "40", JSON.stringify(mid));
+  st = computeTriad(mid, "price", "20"); // এরপর "20" → শেষ মান
+  check("★ মোট 80 ÷ মূল্য 20 → qty 4", st.qty === "4", JSON.stringify(st));
+  check("★ মোট ঘর অটুট 80 (800 নয়)", st.total === "80", JSON.stringify(st));
 
-  // ৬. ভগ্নাংশ দাম — ১০০/৩ = ৩৩.৩৩
-  r = run([["qty", "3"], ["total", "100"]]);
-  check("qty 3, total 100 → price 33.33", r.price === "33.33", JSON.stringify(r));
+  // ৬. ★ একই বাগ অন্য ক্রমে: qty 12, মোট 60 → price 5
+  st = type("qty", "12");
+  st = type("total", "60", st);
+  check("★ qty 12, মোট 60 → price 5", st.price === "5" && st.qty === "12" && st.total === "60", JSON.stringify(st));
 
-  // ৭. সব ঘর ভরা থাকলে — যেটি এডিট করা হচ্ছে সেটি ধ্রুব
-  r = computeTriad(T("2", "35", "70"), "qty", "3");
+  // ৭. ★ তিন অঙ্কের দাম: মোট 600, মূল্য 150 → qty 4 (টাইপিং ধাপে ধাপে)
+  st = type("total", "600");
+  st = type("price", "150", st);
+  check("★ মোট 600 ÷ মূল্য 150 → qty 4", st.qty === "4" && st.total === "600", JSON.stringify(st));
+
+  // ৮. দশমিক — ০.৫ কেজি টাইপিং ধাপে ("0" → "0." → "0.5") × ৮০
+  st = type("qty", "0.5");
+  st = type("price", "80", st);
+  check("qty 0.5 × price 80 → total 40", st.total === "40" && st.qty === "0.5", JSON.stringify(st));
+
+  // ৯. ভগ্নাংশ দাম — ১০০/৩ = ৩৩.৩৩
+  st = computeTriad(computeTriad(T(), "qty", "3"), "total", "100");
+  check("qty 3, total 100 → price 33.33", st.price === "33.33", JSON.stringify(st));
+
+  // ১০. সব ঘর ভরা (qty+price হাতে লেখা) — যেটি এডিট করা হচ্ছে সেটি ধ্রুব
+  let base = T("2", "35", "70", ["qty", "price"]);
+  r = computeTriad(base, "qty", "3");
   check("qty বদলে 3 → total 105 (price অটুট)", r.total === "105" && r.price === "35", JSON.stringify(r));
-  r = computeTriad(T("2", "35", "70"), "price", "40");
+  r = computeTriad(base, "price", "40");
   check("price বদলে 40 → total 80 (qty অটুট)", r.total === "80" && r.qty === "2", JSON.stringify(r));
-  r = computeTriad(T("2", "35", "70"), "total", "100");
+  r = computeTriad(base, "total", "100");
   check("total বদলে 100 → price 50 (qty অটুট)", r.price === "50" && r.qty === "2", JSON.stringify(r));
 
-  // ৮. ঘর খালি করলে অন্য ঘর নষ্ট হয় না (পুরোনো বাগ)
-  r = computeTriad(T("2", "35", "70"), "total", "");
-  check("total খালি → qty/price অটুট 2/35", r.price === "35" && r.qty === "2" && r.total === "", JSON.stringify(r));
-  r = computeTriad(T("2", "35", "70"), "price", "");
-  check("price খালি → total অটুট 70", r.total === "70" && r.qty === "2" && r.price === "", JSON.stringify(r));
-  r = computeTriad(T("2", "35", "70"), "qty", "");
+  // ১১. ঘর খালি করলে অন্য ঘর নষ্ট হয় না
+  r = computeTriad(T("2", "35", "70", ["qty", "price"]), "total", "");
+  check("total খালি → qty/price অটুট 2/35", r.qty === "2" && r.price === "35" && r.total === "", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70", ["qty", "total"]), "price", "");
+  check("price খালি → qty/total অটুট 2/70", r.qty === "2" && r.total === "70" && r.price === "", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70", ["price", "total"]), "qty", "");
   check("qty খালি → price/total অটুট", r.price === "35" && r.total === "70" && r.qty === "", JSON.stringify(r));
 
-  // ৯. ০ দিয়ে ভাগ নেই
-  r = computeTriad(T("", "0", "70"), "total", "70");
-  check("price 0 → qty হিসাব এড়িয়ে যায় (NaN/Infinity নয়)", r.qty === "" && !/NaN|Infinity/.test(JSON.stringify(r)), JSON.stringify(r));
-  r = computeTriad(T("0", "", "70"), "total", "70");
+  // ১২. ০ দিয়ে ভাগ নেই (NaN/Infinity কখনো নয়)
+  r = computeTriad(T("", "0", "70", ["price", "total"]), "total", "70");
+  check("price 0 → qty হিসাব এড়িয়ে যায়", r.qty === "" && !/NaN|Infinity/.test(JSON.stringify(r)), JSON.stringify(r));
+  r = computeTriad(T("0", "", "70", ["qty", "total"]), "total", "70");
   check("qty 0 → price হিসাব এড়িয়ে যায়", r.price === "", JSON.stringify(r));
 
-  // ১০. আবর্জনা ইনপুট সহ্য করে
-  r = computeTriad(T("", "", ""), "qty", "2a.5b");
+  // ১৩. আবর্জনা ইনপুট সহ্য করে
+  r = computeTriad(T(), "qty", "2a.5b");
   check("আবর্জনা অক্ষর বাদ দিয়ে 2.5 নেয়", r.qty === "2.5", JSON.stringify(r));
 
-  // ১১. এড/আপডেটের শর্ত ও চূড়ান্ত মান
+  // ১৪. এডিট মোড (qty+price লোড) → total অটো বসে
+  r = computeTriad(T("3", "25", "", ["qty", "price"]), "price", "25");
+  check("এডিট: qty 3, price 25 → total 75", r.total === "75", JSON.stringify(r));
+
+  // ১৫. এড/আপডেটের শর্ত ও চূড়ান্ত মান
   check("দুটি ঘর থাকলে triadReady সত্য", triadReady(T("2", "", "70")));
   check("এক ঘর থাকলে triadReady মিথ্যা", !triadReady(T("2", "", "")));
   const v1 = triadValues(T("2", "", "70"));
@@ -454,6 +485,8 @@ console.log("14) বাজার আইটেম ত্রয়ী — যে�
   check("triadValues: price 35, total 70 → qty 2", eq(v2.qty, 2), JSON.stringify(v2));
   const v3 = triadValues(T("2", "35", ""));
   check("triadValues: qty 2, price 35 → total 70", eq(v3.total, 70), JSON.stringify(v3));
+  const v4 = triadValues(T("4", "20", "80"));
+  check("triadValues: qty 4, price 20, total 80 সামঞ্জস্যপূর্ণ", eq(v4.qty, 4) && eq(v4.price, 20) && eq(v4.total, 80), JSON.stringify(v4));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

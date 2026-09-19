@@ -43,6 +43,8 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [total, setTotal] = useState("");
+  // কোন ঘরগুলোতে হাতে লেখা হয়েছে (সর্বোচ্চ ২) — বাকিটা অটো-হিসাব হয়
+  const [manual, setManual] = useState<TriadField[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [focusItem, setFocusItem] = useState(false);
@@ -53,6 +55,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setQty("");
     setPrice("");
     setTotal("");
+    setManual([]);
     setEditing(null);
     setError("");
   }, [open]);
@@ -65,6 +68,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setQty("");
     setPrice("");
     setTotal("");
+    setManual([]);
     setEditing(null);
     setError("");
   };
@@ -74,17 +78,18 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
    * হিসাবের পুরো লজিক pure ফাংশনে (src/lib/triad.ts) — টেস্ট করা যায়।
    */
   const onField = (changed: TriadField, raw: string) => {
-    const next = computeTriad({ qty, price, total }, changed, raw);
+    const next = computeTriad({ qty, price, total, manual }, changed, raw);
     setQty(next.qty);
     setPrice(next.price);
     setTotal(next.total);
+    setManual(next.manual ?? []);
     setError("");
   };
 
   const addOrUpdate = () => {
     const name = item.trim();
     if (!name) return setError("আইটেমের নাম লিখুন বা সাজেশন থেকে নিন");
-    const tri: Triad = { qty, price, total };
+    const tri: Triad = { qty, price, total, manual };
     if (!triadReady(tri)) return setError("কোয়ান্টিটি, দাম, মোট — যেকোনো দুটি ঘর পূরণ করুন (তৃতীয়টি অটো হবে)");
 
     const v = triadValues(tri);
@@ -102,6 +107,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setQty(String(l.qty));
     setPrice(String(l.price));
     setTotal(String(round2(l.qty * l.price)));
+    setManual(["qty", "price"]); // হাতে লেখা = qty + price; total অটো-হিসাব
     setError("");
   };
 
