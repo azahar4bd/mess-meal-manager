@@ -12,6 +12,7 @@
  * চালানোর নিয়ম:  npm run test:settlement
  */
 import { calculateMonth, type CalcInput } from "../src/lib/calc";
+import { computeTriad, triadReady, triadValues, type TriadField } from "../src/lib/triad";
 import type { BazarDTO, DepositDTO, MemberDTO } from "../src/lib/types";
 
 let passed = 0;
@@ -381,6 +382,78 @@ console.log("13) অতিরিক্ত খরচ নিজ টাকায়
   check("KPI নিজ টাকার বাজারে ১২০ দেখায়", eq(s.totalSelfPaidCredit, 120), String(s.totalSelfPaidCredit));
   check("ফান্ড নগদ ৩০০০ অক্ষত (গ্যাসের টাকা ফান্ড থেকে যায়নি)", eq(s.cashBalance, 3000), String(s.cashBalance));
   check("লাস্ট ব্যালেন্স ৩০০০ অপরিবর্তিত (নিজ টাকার এক্সট্রা LB বদলায় না)", eq(s.lastBalance, 3000), String(s.lastBalance));
+}
+
+/* ══════════════════════════════════════════════════════════
+ *  বাজার পপআপ — কোয়ান্টিটি / দাম / মোট (যেকোনো ২ → তৃতীয়টি অটো)
+ * ══════════════════════════════════════════════════════════ */
+console.log("14) বাজার আইটেম ত্রয়ী — যেকোনো দুটি ঘর দিলে তৃতীয়টি অটো");
+{
+  const T = (q = "", p = "", t = "") => ({ qty: q, price: p, total: t });
+  const run = (seq: Array<[TriadField, string]>) =>
+    seq.reduce((st, [f, v]) => computeTriad(st, f, v), T());
+
+  // ১. quantity + price → total
+  let r = run([["qty", "2"], ["price", "35"]]);
+  check("qty 2 × price 35 → total 70", r.total === "70", JSON.stringify(r));
+
+  // ২. quantity + total → price
+  r = run([["qty", "2"], ["total", "70"]]);
+  check("qty 2, total 70 → price 35", r.price === "35", JSON.stringify(r));
+
+  // ৩. price + total → quantity
+  r = run([["price", "35"], ["total", "70"]]);
+  check("price 35, total 70 → qty 2", r.qty === "2", JSON.stringify(r));
+
+  // ৪. উল্টো ক্রমেও কাজ করে (total আগে)
+  r = run([["total", "70"], ["qty", "2"]]);
+  check("total 70 → qty 2 দিলে price 35", r.price === "35", JSON.stringify(r));
+  r = run([["total", "70"], ["price", "35"]]);
+  check("total 70 → price 35 দিলে qty 2", r.qty === "2", JSON.stringify(r));
+
+  // ৫. দশমিক — ০.৫ কেজি × ৮০ টাকা
+  r = run([["qty", "0.5"], ["price", "80"]]);
+  check("qty 0.5 × price 80 → total 40", r.total === "40", JSON.stringify(r));
+
+  // ৬. ভগ্নাংশ দাম — ১০০/৩ = ৩৩.৩৩
+  r = run([["qty", "3"], ["total", "100"]]);
+  check("qty 3, total 100 → price 33.33", r.price === "33.33", JSON.stringify(r));
+
+  // ৭. সব ঘর ভরা থাকলে — যেটি এডিট করা হচ্ছে সেটি ধ্রুব
+  r = computeTriad(T("2", "35", "70"), "qty", "3");
+  check("qty বদলে 3 → total 105 (price অটুট)", r.total === "105" && r.price === "35", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70"), "price", "40");
+  check("price বদলে 40 → total 80 (qty অটুট)", r.total === "80" && r.qty === "2", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70"), "total", "100");
+  check("total বদলে 100 → price 50 (qty অটুট)", r.price === "50" && r.qty === "2", JSON.stringify(r));
+
+  // ৮. ঘর খালি করলে অন্য ঘর নষ্ট হয় না (পুরোনো বাগ)
+  r = computeTriad(T("2", "35", "70"), "total", "");
+  check("total খালি → qty/price অটুট 2/35", r.price === "35" && r.qty === "2" && r.total === "", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70"), "price", "");
+  check("price খালি → total অটুট 70", r.total === "70" && r.qty === "2" && r.price === "", JSON.stringify(r));
+  r = computeTriad(T("2", "35", "70"), "qty", "");
+  check("qty খালি → price/total অটুট", r.price === "35" && r.total === "70" && r.qty === "", JSON.stringify(r));
+
+  // ৯. ০ দিয়ে ভাগ নেই
+  r = computeTriad(T("", "0", "70"), "total", "70");
+  check("price 0 → qty হিসাব এড়িয়ে যায় (NaN/Infinity নয়)", r.qty === "" && !/NaN|Infinity/.test(JSON.stringify(r)), JSON.stringify(r));
+  r = computeTriad(T("0", "", "70"), "total", "70");
+  check("qty 0 → price হিসাব এড়িয়ে যায়", r.price === "", JSON.stringify(r));
+
+  // ১০. আবর্জনা ইনপুট সহ্য করে
+  r = computeTriad(T("", "", ""), "qty", "2a.5b");
+  check("আবর্জনা অক্ষর বাদ দিয়ে 2.5 নেয়", r.qty === "2.5", JSON.stringify(r));
+
+  // ১১. এড/আপডেটের শর্ত ও চূড়ান্ত মান
+  check("দুটি ঘর থাকলে triadReady সত্য", triadReady(T("2", "", "70")));
+  check("এক ঘর থাকলে triadReady মিথ্যা", !triadReady(T("2", "", "")));
+  const v1 = triadValues(T("2", "", "70"));
+  check("triadValues: qty 2, total 70 → price 35", eq(v1.price, 35) && eq(v1.total, 70), JSON.stringify(v1));
+  const v2 = triadValues(T("", "35", "70"));
+  check("triadValues: price 35, total 70 → qty 2", eq(v2.qty, 2), JSON.stringify(v2));
+  const v3 = triadValues(T("2", "35", ""));
+  check("triadValues: qty 2, price 35 → total 70", eq(v3.total, 70), JSON.stringify(v3));
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

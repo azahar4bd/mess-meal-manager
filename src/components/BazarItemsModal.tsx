@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Modal } from "@/components/ui";
 import { formatMoney, round2, toNumber } from "@/lib/format";
 import { suggestBazarItems } from "@/lib/bazar-items";
+import { computeTriad, triadReady, triadValues, type Triad, type TriadField } from "@/lib/triad";
 import type { BazarLine } from "@/lib/types";
 
 /* ══════════════════════════════════════════════════════════
@@ -37,8 +38,6 @@ export function linesToText(lines: BazarLine[]): string {
     .slice(0, 300);
 }
 
-type FieldKey = "qty" | "price" | "total";
-
 export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disabled, historyItems = [] }: BazarItemsModalProps) {
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("");
@@ -70,75 +69,26 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setError("");
   };
 
-  /** যেকোনো দুটি ঘর পূরণ হলে তৃতীয়টি নিজে থেকে হিসাব হয়ে যায় — ২০০/০.২ বাগ ফিক্স */
-  const onField = (changed: FieldKey, raw: string) => {
-    const clean = raw.replace(/[^\d.]/g, "");
-    let q = qty;
-    let p = price;
-    let t = total;
-    if (changed === "qty") q = clean;
-    if (changed === "price") p = clean;
-    if (changed === "total") t = clean;
-
-    const qn = toNumber(q);
-    const pn = toNumber(p);
-    const tn = toNumber(t);
-
-    const qtyFilled = q.trim() !== "";
-    const priceFilled = p.trim() !== "";
-    const totalFilled = t.trim() !== "";
-
-    if (changed === "qty") {
-      if (priceFilled && qtyFilled) {
-        // qty + price => total
-        t = String(round2(qn * pn));
-      } else if (totalFilled && qtyFilled && qn !== 0) {
-        // qty + total => price
-        p = String(round2(tn / qn));
-      }
-    } else if (changed === "price") {
-      if (qtyFilled && toNumber(q) !== 0) {
-        // qty + price => total
-        t = String(round2(qn * pn));
-      } else if (totalFilled && pn !== 0) {
-        // price + total => qty = total / price  (e.g. 40 / 20 = 2)
-        q = String(round2(tn / pn));
-      }
-    } else {
-      // changed === "total"
-      if (qtyFilled && !priceFilled && qn !== 0) {
-        // qty + total => price
-        p = String(round2(tn / qn));
-      } else if (priceFilled && !qtyFilled && pn !== 0) {
-        // price + total => qty
-        q = String(round2(tn / pn));
-      } else if (qtyFilled && priceFilled) {
-        // all three filled - keep qty, recompute price from total/qty (more intuitive)
-        if (qn !== 0) p = String(round2(tn / qn));
-      }
-    }
-
-    setQty(q);
-    setPrice(p);
-    setTotal(t);
+  /**
+   * যেকোনো দুটি ঘর পূরণ হলে তৃতীয়টি নিজে থেকে হিসাব হয়ে যায়।
+   * হিসাবের পুরো লজিক pure ফাংশনে (src/lib/triad.ts) — টেস্ট করা যায়।
+   */
+  const onField = (changed: TriadField, raw: string) => {
+    const next = computeTriad({ qty, price, total }, changed, raw);
+    setQty(next.qty);
+    setPrice(next.price);
+    setTotal(next.total);
     setError("");
   };
 
   const addOrUpdate = () => {
     const name = item.trim();
-    const q = round2(toNumber(qty));
-    const p = round2(toNumber(price));
-    const t = round2(toNumber(total));
     if (!name) return setError("আইটেমের নাম লিখুন বা সাজেশন থেকে নিন");
-    const known = [q > 0, p > 0, t > 0].filter(Boolean).length;
-    if (known < 2) return setError("কোয়ান্টিটি, দাম, মোট — যেকোনো দুটি ঘর পূরণ করুন (তৃতীয়টি অটো হবে)");
+    const tri: Triad = { qty, price, total };
+    if (!triadReady(tri)) return setError("কোয়ান্টিটি, দাম, মোট — যেকোনো দুটি ঘর পূরণ করুন (তৃতীয়টি অটো হবে)");
 
-    let finalQty = q;
-    let finalPrice = p;
-    if (finalQty <= 0 && finalPrice > 0) finalQty = round2(t / finalPrice);
-    if (finalPrice <= 0 && finalQty > 0) finalPrice = round2(t / finalQty);
-
-    const line: BazarLine = { item: name.slice(0, 60), qty: Math.max(0, finalQty), price: Math.max(0, finalPrice) };
+    const v = triadValues(tri);
+    const line: BazarLine = { item: name.slice(0, 60), qty: v.qty, price: v.price };
     if (editing === null) onChange([...lines, line]);
     else onChange(lines.map((l, i) => (i === editing ? line : l)));
     clearInputs();
@@ -245,6 +195,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
               id="bz-qty"
               className="input tabular-nums"
               type="number"
+              inputMode="decimal"
               min={0}
               step="0.25"
               value={qty}
@@ -261,6 +212,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
               id="bz-price"
               className="input tabular-nums"
               type="number"
+              inputMode="decimal"
               min={0}
               step="0.01"
               value={price}
@@ -277,6 +229,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
               id="bz-total"
               className="input tabular-nums"
               type="number"
+              inputMode="decimal"
               min={0}
               step="0.01"
               value={total}
@@ -294,7 +247,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
           <button type="button" className="btn btn-ghost" onClick={clearInputs} disabled={disabled}>
             রিসেট
           </button>
-          <span className="muted ml-auto text-[11.5px]">যেকোনো দুটি ঘর দিলে তৃতীয়টি নিজে থেকে বসবে</span>
+          <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলে তৃতীয়টি নিজে থেকে বসবে — মোট = কোয়ান্টিটি × দাম</span>
         </div>
 
         {error ? <div className="pill pill-danger">{error}</div> : null}
