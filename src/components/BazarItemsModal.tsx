@@ -33,7 +33,11 @@ export function linesTotal(lines: BazarLine[]): number {
 /** আইটেমের লাইনগুলো থেকে এক লাইনের সারাংশ (বাজার এন্ট্রির আইটেম ঘরে বসে) */
 export function linesToText(lines: BazarLine[]): string {
   return lines
-    .map((l) => `${l.item} ${Number.isInteger(l.qty) ? l.qty : l.qty.toFixed(2)} × ৳${round2(l.price)}`)
+    .map((l) => {
+      // পরিমাণ/দাম না থাকলে এটি এখনো ড্রাফট আইটেম — মূল বাজার ঘরে দেখানোর মতো হিসাব নয়
+      if (!(l.qty > 0) || !(l.price > 0)) return l.item;
+      return `${l.item} ${Number.isInteger(l.qty) ? l.qty : l.qty.toFixed(2)} × ৳${round2(l.price)}`;
+    })
     .join(", ")
     .slice(0, 300);
 }
@@ -62,6 +66,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
 
   const suggestions = useMemo(() => (focusItem && item.trim() ? suggestBazarItems(item, 8, historyItems) : []), [item, focusItem, historyItems]);
   const grandTotal = useMemo(() => linesTotal(lines), [lines]);
+  const incompleteLines = useMemo(() => lines.filter((l) => !(l.qty > 0) || !(l.price > 0)), [lines]);
 
   const clearInputs = () => {
     setItem("");
@@ -90,7 +95,13 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     const name = item.trim();
     if (!name) return setError("আইটেমের নাম লিখুন বা সাজেশন থেকে নিন");
     const tri: Triad = { qty, price, total, manual };
-    if (!triadReady(tri)) return setError("কোয়ান্টিটি, দাম, মোট — যেকোনো দুটি ঘর পূরণ করুন (তৃতীয়টি অটো হবে)");
+    // শুধু নাম দিয়েও ড্রাফট আইটেম রাখা যাবে; পরে এডিট করে হিসাব পূরণ করা যাবে
+    if (!triadReady(tri)) {
+      if (editing === null) onChange([...lines, { item: name.slice(0, 60), qty: 0, price: 0 }]);
+      else onChange(lines.map((l, i) => (i === editing ? { ...l, item: name.slice(0, 60), qty: 0, price: 0 } : l)));
+      clearInputs();
+      return;
+    }
 
     const v = triadValues(tri);
     const line: BazarLine = { item: name.slice(0, 60), qty: v.qty, price: v.price };
@@ -137,12 +148,19 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
             <span className="muted">সর্বমোট: </span>
             <strong className="tabular-nums text-[16px]">৳ {formatMoney(grandTotal)}</strong>
             <span className="muted text-[12px]"> ({lines.length}টি আইটেম)</span>
+            {incompleteLines.length ? <span className="text-[11px] font-semibold text-[var(--warn)]"> • {incompleteLines.length}টি ড্রাফট</span> : null}
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               বন্ধ করুন
             </button>
-            <button type="button" className="btn btn-primary" disabled={disabled || lines.length === 0} onClick={() => onApply(lines, grandTotal)}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={disabled || lines.length === 0 || incompleteLines.length > 0 || grandTotal <= 0}
+              title={incompleteLines.length ? "সেভের আগে অসম্পূর্ণ আইটেম এডিট করে কোয়ান্টিটি ও দাম দিন" : undefined}
+              onClick={() => onApply(lines, grandTotal)}
+            >
               ✓ সেভ (৳ {formatMoney(grandTotal)})
             </button>
           </div>
@@ -253,7 +271,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
           <button type="button" className="btn btn-ghost" onClick={clearInputs} disabled={disabled}>
             রিসেট
           </button>
-          <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলে তৃতীয়টি নিজে থেকে বসবে — মোট = কোয়ান্টিটি × দাম</span>
+          <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলে তৃতীয়টি বসবে • শুধু আইটেম দিয়েও ড্রাফট এড করা যাবে</span>
         </div>
 
         {error ? <div className="pill pill-danger">{error}</div> : null}
@@ -280,9 +298,9 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
                   <tr key={`${l.item}-${i}`} className={editing === i ? "bg-[var(--brand-soft)]" : ""}>
                     <td className="muted tabular-nums">{i + 1}</td>
                     <td className="font-semibold">{l.item}</td>
-                    <td className="num tabular-nums">{Number.isInteger(l.qty) ? l.qty : l.qty.toFixed(2)}</td>
-                    <td className="num tabular-nums">৳ {formatMoney(l.price)}</td>
-                    <td className="num font-bold tabular-nums">৳ {formatMoney(round2(l.qty * l.price))}</td>
+                    <td className="num tabular-nums">{l.qty > 0 ? (Number.isInteger(l.qty) ? l.qty : l.qty.toFixed(2)) : "—"}</td>
+                    <td className="num tabular-nums">{l.price > 0 ? <>৳ {formatMoney(l.price)}</> : "—"}</td>
+                    <td className="num font-bold tabular-nums">{l.qty > 0 && l.price > 0 ? <>৳ {formatMoney(round2(l.qty * l.price))}</> : "—"}</td>
                     {!disabled ? (
                       <td className="text-center">
                         <div className="flex items-center justify-center gap-1">
