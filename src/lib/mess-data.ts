@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  auditMeals,
   bazarExpenses,
   dailyMeals,
   deposits,
@@ -12,6 +13,7 @@ import {
   syncLogs,
   users,
   cryptoId,
+  type AuditMeal,
   type BazarExpense,
   type DailyMeal,
   type Deposit,
@@ -571,6 +573,7 @@ export async function deleteMonth(officeId: string, monthId: string): Promise<{ 
 
   await Promise.all([
     db.delete(dailyMeals).where(and(eq(dailyMeals.monthId, monthId), eq(dailyMeals.officeId, officeId))),
+    db.delete(auditMeals).where(and(eq(auditMeals.monthId, monthId), eq(auditMeals.officeId, officeId))),
     db.delete(bazarExpenses).where(and(eq(bazarExpenses.monthId, monthId), eq(bazarExpenses.officeId, officeId))),
     db.delete(deposits).where(and(eq(deposits.monthId, monthId), eq(deposits.officeId, officeId))),
     db.delete(otherIncomes).where(and(eq(otherIncomes.monthId, monthId), eq(otherIncomes.officeId, officeId))),
@@ -991,6 +994,59 @@ export async function syncUserToRosters(user: User): Promise<number> {
 /* ══════════════════════════════════════════════════════════
  *  DAILY MEALS  (spec §24–§26)
  * ══════════════════════════════════════════════════════════ */
+
+/* ────────────────────────────────────────────────────────────
+ *  AM / AUDIT MEALS (শুধু রেকর্ড — হিসাবের বাইরে)
+ * ──────────────────────────────────────────────────────────── */
+
+export async function listAuditMeals(officeId: string, monthId: string): Promise<AuditMeal[]> {
+  return db
+    .select()
+    .from(auditMeals)
+    .where(and(eq(auditMeals.officeId, officeId), eq(auditMeals.monthId, monthId)))
+    .orderBy(asc(auditMeals.day));
+}
+
+/**
+ * AM / Audit মিল সংরক্ষণ — unique (monthId, day) তে upsert।
+ * ০ দিলে রো মুছে যায় (দৈনিক মিলের মতোই)। হিসাব/শিট সিংকে কোনো প্রভাব নেই।
+ */
+export async function saveAuditMeals(
+  officeId: string,
+  month: MessMonth,
+  entries: Array<{ day: number; count: number }>,
+  actor: string,
+): Promise<{ saved: number; total: number }> {
+  let saved = 0;
+  for (const entry of entries) {
+    const day = Math.trunc(toNumber(entry.day));
+    if (day < 1 || day > month.totalDays) continue;
+    const count = Math.max(0, Math.round(toNumber(entry.count) * 100) / 100);
+    const iso = isoOfDay(month.year, month.month, day);
+
+    if (count === 0) {
+      await db
+        .delete(auditMeals)
+        .where(and(eq(auditMeals.monthId, month.id), eq(auditMeals.day, day), eq(auditMeals.officeId, officeId)));
+      continue;
+    }
+
+    await db
+      .insert(auditMeals)
+      .values({ id: cryptoId("aud"), officeId, monthId: month.id, day, date: iso, count: String(count), createdBy: actor })
+      .onConflictDoUpdate({
+        target: [auditMeals.monthId, auditMeals.day],
+        set: { count: String(count), date: iso, updatedAt: new Date(), createdBy: actor },
+      });
+    saved += 1;
+  }
+
+  const rows = await db
+    .select({ total: sql<number>`coalesce(sum(${auditMeals.count}), 0)::numeric` })
+    .from(auditMeals)
+    .where(and(eq(auditMeals.monthId, month.id), eq(auditMeals.officeId, officeId)));
+  return { saved, total: toNumber(rows[0]?.total) };
+}
 
 export async function listMeals(officeId: string, monthId: string): Promise<DailyMeal[]> {
   return db
@@ -1419,9 +1475,10 @@ export async function getMonthData(officeId: string, monthId: string): Promise<M
   const month = monthRow[0];
   if (!month) throw new ValidationError("মাস পাওয়া যায়নি", {}, 404);
 
-  const [memberRows, mealRows, bazarRows, depositRows, incomeRows, extraRows] = await Promise.all([
+  const [memberRows, mealRows, auditRows, bazarRows, depositRows, incomeRows, extraRows] = await Promise.all([
     listMembers(officeId, monthId),
     listMeals(officeId, monthId),
+    listAuditMeals(officeId, monthId),
     listBazar(officeId, monthId),
     listDeposits(officeId, monthId),
     listIncomes(officeId, monthId),
@@ -1441,6 +1498,8 @@ export async function getMonthData(officeId: string, monthId: string): Promise<M
     carryForwardBalance: toNumber(month.carryForwardBalance),
     members: memberRows.map(memberDTO),
     dailyMeals: mealRows.map((r) => mealDTO(r, nameById.get(r.memberId) ?? "")),
+    // AM / Audit মিল — শুধু প্রদর্শনের জন্য; calculateMonth()-এ কখনো যায় না
+    auditMeals: auditRows.map((r) => ({ day: r.day, date: r.date, count: toNumber(r.count) })),
     bazarExpenses: bazarRows.map(bazarDTO),
     deposits: depositRows.map(depositDTO),
     otherIncomes: incomeRows.map(incomeDTO),

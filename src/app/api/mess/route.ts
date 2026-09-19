@@ -25,6 +25,7 @@ import {
   toIsoDate,
 } from "@/lib/date";
 import { num, str } from "@/lib/validate";
+import { toNumber } from "@/lib/format";
 import {
   bazarDTO,
   copyRoster,
@@ -55,6 +56,8 @@ import {
   listIncomes,
   backfillCarryIfMissing,
   closeMonthAndOpenNext,
+  listAuditMeals,
+  saveAuditMeals,
   deleteMonth,
   listMembers,
   reorderMembers,
@@ -610,6 +613,52 @@ const handlers: Record<string, ActionHandler> = {
 
     const result = await saveDayMeals(officeId, month, date, entries, ctx.user.name);
     await logAction(ctx, "meals.saveDay", "meal", date, `${date} তারিখের মিল সংরক্ষণ (${entries.length} জন)`, month.id);
+    return result;
+  },
+
+  /**
+   * AM / Audit মিল — শুধু রেকর্ড। হিসাব (মোট মিল/রেট/খরচ/জের), ক্যারি-ফরোয়ার্ড
+   * ও গুগল শিট সিংকের সাথে কোনো সম্পর্ক নেই (SHEET_SYNC_ACTIONS-এ নেই)।
+   */
+  "auditMeals.list": async (ctx, body) => {
+    if (!can(ctx.user.role, "meals.view")) deny(ctx, "meals.view");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    const rows = await listAuditMeals(officeId, month.id);
+    return rows.map((r) => ({ day: r.day, date: r.date, count: toNumber(r.count) }));
+  },
+
+  "auditMeals.save": async (ctx, body) => {
+    if (!can(ctx.user.role, "meals.write")) deny(ctx, "meals.write");
+    const { officeId, month } = await resolveMonth(ctx, body);
+    assertWritable(ctx, month);
+
+    const rawEntries = Array.isArray(body.entries) ? (body.entries as unknown[]) : [];
+    const parsed = rawEntries
+      .map((e) => {
+        const item = (e ?? {}) as Record<string, unknown>;
+        return { day: Math.trunc(num(item.day, NaN)), count: num(item.count, 0) };
+      })
+      .concat(
+        body.day !== undefined
+          ? [{ day: Math.trunc(num(body.day, NaN)), count: num(body.count, 0) }]
+          : [],
+      )
+      .filter((e) => Number.isFinite(e.day));
+
+    const entries = parsed.map((e) => ({
+      day: e.day,
+      count: Number.isFinite(e.count) ? Math.max(0, e.count) : 0,
+    }));
+
+    for (const e of entries) {
+      if (e.day < 1 || e.day > month.totalDays) throw new AuthError("bad-request", `দিন ১–${month.totalDays} এর মধ্যে হতে হবে`, 400);
+      if (!Number.isFinite(e.count)) throw new AuthError("bad-request", "মিল সংখ্যা সঠিক নয়", 400);
+      if (e.count > 100) throw new AuthError("bad-request", "একদিনে ১০০ এর বেশি মিল হতে পারবে না", 400);
+    }
+    if (!entries.length) throw new AuthError("bad-request", "কোনো তারিখ দেওয়া হয়নি", 400);
+
+    const result = await saveAuditMeals(officeId, month, entries, ctx.user.name);
+    await logAction(ctx, "auditMeals.save", "audit_meal", month.id, `AM/Audit মিল সংরক্ষণ (${entries.length} দিন, মোট ${result.total})`, month.id);
     return result;
   },
 
@@ -1420,6 +1469,7 @@ async function emptyMonthData(month: { id: string; officeId: string; year: numbe
     carryForwardBalance: 0,
     members: [],
     dailyMeals: [],
+    auditMeals: [],
     bazarExpenses: [],
     deposits: [],
     otherIncomes: [],

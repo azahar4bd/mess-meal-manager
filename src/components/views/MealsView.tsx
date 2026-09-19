@@ -21,6 +21,9 @@ export function MealsView() {
   // কাস্টম কিবোর্ড: নির্বাচিত সদস্য-ঘর ও টাইপ-বাফার
   const [selIdx, setSelIdx] = useState<number | null>(null);
   const [buffer, setBuffer] = useState<string>("");
+  // AM / Audit মিল (হিসাবের বাইরে) — দিন-ভিত্তিক খসড়া; সেভ করলে খালি হয়
+  const [auditDraft, setAuditDraft] = useState<Record<number, number>>({});
+  const [auditSaving, setAuditSaving] = useState(false);
 
   const canWrite = app.can("meals.write") && !(month?.isClosed && app.role !== "admin");
 
@@ -59,6 +62,19 @@ export function MealsView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, month?.id, data?.members.length]);
 
+  /* ── AM / Audit মিল (হিসাবের বাইরে) ─────────────────
+   * data.auditMeals কখনো calculateMonth()-এ যায় না — এখানে শুধু দেখা/এন্ট্রি। */
+  const auditByDay = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const r of data?.auditMeals ?? []) map.set(r.day, round2(toNumber(r.count)));
+    return map;
+  }, [data]);
+
+  const auditVal = (d: number) => (auditDraft[d] !== undefined ? round2(toNumber(auditDraft[d])) : (auditByDay.get(d) ?? 0));
+  const setAuditVal = (d: number, v: number) => {
+    setAuditDraft((prev) => ({ ...prev, [d]: Math.max(0, v) }));
+  };
+
   const dayTotal = round2(Object.values(draft).reduce((s, v) => s + toNumber(v), 0));
   const memberTotals = useMemo(() => {
     const map = new Map<string, number>();
@@ -67,6 +83,11 @@ export function MealsView() {
   }, [summary]);
 
   if (!data || !month) return <Loader label="Loading meals…" />;
+
+  /** মাসের মোট AM / Audit মিল — কেবল প্রদর্শনের জন্য (কোনো হিসাবে নেই) */
+  const auditMonthTotal = round2(
+    Array.from({ length: month.totalDays }).reduce<number>((sum, _, i) => sum + toNumber(auditVal(i + 1)), 0),
+  );
 
   const shiftDate = (delta: number) => {
     const d = new Date(`${iso}T00:00:00`);
@@ -93,6 +114,24 @@ export function MealsView() {
     const res = await app.call<{ saved: number; total: number }>("meals.saveDay", { date: iso, entries });
     setSaving(false);
     if (res) app.toast(`${toDisplayDate(iso)} তারিখের মিল সংরক্ষিত হয়েছে ✓ (মোট ${formatMeal(res.total)} মিল)`, "success");
+  };
+
+  /* AM / Audit মিল — শুধু এই দিনটি সংরক্ষণ (মোট মিল/খরচে কোনো প্রভাব নেই) */
+  const saveAuditDay = async () => {
+    if (!canWrite) return;
+    setAuditSaving(true);
+    const res = await app.call<{ saved: number; total: number }>("auditMeals.save", {
+      entries: [{ day, count: round2(toNumber(auditVal(day))) }],
+    });
+    setAuditSaving(false);
+    if (res) {
+      setAuditDraft((prev) => {
+        const next = { ...prev };
+        delete next[day];
+        return next;
+      });
+      app.toast(`${toDisplayDate(iso)} — AM/Audit মিল সংরক্ষিত ✓ (মাসের মোট ${formatMeal(res.total)})`, "success");
+    }
   };
 
   /* ── month grid ───────────────────────────────────── */
@@ -123,6 +162,7 @@ export function MealsView() {
     if (!canWrite) return;
     setGridSaving(true);
     let savedDays = 0;
+    let auditSaved = 0;
     for (const [dStr, row] of Object.entries(gridDraft)) {
       const entries = Object.entries(row).map(([memberId, meals]) => ({ memberId, meals: round2(toNumber(meals)) }));
       if (!entries.length) continue;
@@ -132,12 +172,23 @@ export function MealsView() {
       });
       if (res) savedDays += 1;
     }
+    // AM / Audit মিলের খসড়া (হিসাবের বাইরে) — একই বাটনে সেভ
+    const auditEntries = Object.entries(auditDraft).map(([d, count]) => ({ day: Number(d), count: round2(toNumber(count)) }));
+    if (auditEntries.length) {
+      const res = await app.call<{ saved: number }>("auditMeals.save", { entries: auditEntries });
+      if (res) auditSaved = auditEntries.length;
+    }
     setGridDraft({});
+    setAuditDraft({});
     setGridSaving(false);
-    app.toast(`${savedDays} দিনের মিল সংরক্ষিত হয়েছে ✓`, "success");
+    app.toast(
+      `${savedDays} দিনের মিল সংরক্ষিত হয়েছে ✓${auditSaved ? ` • AM/Audit ${auditSaved} দিন ✓` : ""}`,
+      "success",
+    );
   };
 
-  const gridChanged = Object.values(gridDraft).some((row) => Object.keys(row).length > 0);
+  const gridChanged =
+    Object.values(gridDraft).some((row) => Object.keys(row).length > 0) || Object.keys(auditDraft).length > 0;
 
   /* ── কাস্টম কিবোর্ড (দিন-এন্ট্রি) ─────────────────────
    * ঘরে ট্যাপ → নেটিভ কিবোর্ড খোলে না; নিচের প্যাড থেকে সংখ্যা,
@@ -305,6 +356,43 @@ export function MealsView() {
               </table>
             </div>
 
+            {/* ── AM / Audit মিল — শুধু রেকর্ড; কোনো হিসাবেই যুক্ত নয় ── */}
+            <div
+              className="mt-2.5 rounded-xl border border-dashed p-2.5"
+              style={{ borderColor: "var(--warn)", background: "var(--warn-soft)" }}
+            >
+              <div className="flex flex-nowrap items-end gap-2">
+                <label className="block min-w-0 flex-1">
+                  <span className="label block">
+                    AM / Audit মিল <span className="muted font-medium">(হিসাবের বাইরে)</span>
+                  </span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min={0}
+                    inputMode="decimal"
+                    className="input h-9 w-full min-w-0 text-center"
+                    value={auditVal(day)}
+                    disabled={!canWrite}
+                    onChange={(e) => setAuditVal(day, Number(e.target.value))}
+                    aria-label={`${toDisplayDate(iso)} AM/Audit মিল`}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-ghost h-9 shrink-0 whitespace-nowrap"
+                  disabled={!canWrite || auditSaving}
+                  onClick={() => void saveAuditDay()}
+                >
+                  {auditSaving ? "…" : "💾 Save"}
+                </button>
+              </div>
+              <p className="muted mt-1.5 text-[11px] leading-snug">
+                শুধু রেকর্ডের জন্য — <strong>মোট মিল, মিল-রেট, মিল খরচ বা মোট খরচে কোথাও যুক্ত হবে না।</strong> মাসের মোট AM/Audit মিল:{" "}
+                <strong className="tabular-nums">{formatMeal(auditMonthTotal)}</strong>
+              </p>
+            </div>
+
             {/* ── কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভেসে ওঠে, ঘর বাছলে তবেই ── */}
             {canWrite && selIdx != null ? (
               <div className="meal-pad-sheet" role="dialog" aria-label="মিল কিবোর্ড">
@@ -386,7 +474,7 @@ export function MealsView() {
           {/* ── মাস গ্রিড — নিচে ── */}
           <Card
             title="মাস গ্রিড"
-            subtitle="উপরের সারিতে তারিখ, বাম পাশের কলমে সদস্যের নাম"
+            subtitle="উপরের সারিতে তারিখ, বাম পাশের কলমে সদস্যের নাম • নিচের AM/Audit সারি শুধু রেকর্ড"
             action={
               canWrite ? (
                 <button type="button" className="btn btn-primary btn-sm" disabled={!gridChanged || gridSaving} onClick={() => void saveGrid()}>
@@ -453,6 +541,36 @@ export function MealsView() {
                     </tr>
                   );
                 })}
+                  {/* AM / Audit মিল — শুধু রেকর্ডের জন্য; দৈনিক/মাসিক কোনো হিসাবেই নেই */}
+                  <tr>
+                    <td className="sticky left-0 z-10 bg-[var(--warn-soft)]">
+                      <span className="block max-w-[116px] truncate text-[12px] font-bold" style={{ color: "var(--warn)" }}>
+                        AM / Audit
+                      </span>
+                      <span className="muted block text-[10px]">হিসাবের বাইরে</span>
+                    </td>
+                    {Array.from({ length: month.totalDays }).map((_, i) => {
+                      const d = i + 1;
+                      return (
+                        <td key={d} className="num p-1">
+                          <input
+                            type="number"
+                            step="0.5"
+                            min={0}
+                            className={`meal-cell meal-cell-audit ${toNumber(auditVal(d)) === 0 ? "zero" : ""}`}
+                            style={{ width: 46, minWidth: 46 }}
+                            value={auditVal(d)}
+                            disabled={!canWrite}
+                            onChange={(e) => setAuditVal(d, Number(e.target.value))}
+                            aria-label={`AM/Audit মিল দিন ${d}`}
+                          />
+                        </td>
+                      );
+                    })}
+                    <td className="num font-bold tabular-nums" style={{ color: "var(--warn)" }}>
+                      {formatMeal(auditMonthTotal)}
+                    </td>
+                  </tr>
               </tbody>
               <tfoot>
                 <tr>

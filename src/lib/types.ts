@@ -127,6 +127,17 @@ export interface MealRowDTO {
   note: string;
 }
 
+/**
+ * AM / Audit মিল — শুধু রেকর্ড (দেখা + এন্ট্রি)।
+ * এটি calc.ts-এর CalcInput-এ যায় না, তাই মোট মিল / মিল-রেট / মিল খরচ /
+ * মোট খরচ / জের / ক্যারি-ফরোয়ার্ড / শিট সিংক — কোথাও কোনো প্রভাব নেই।
+ */
+export interface AuditMealDTO {
+  day: number;
+  date: string;
+  count: number;
+}
+
 /** বাজারের আইটেম-ভিত্তিক হিসাবের এক লাইন (আইটেম পপআপ থেকে যোগ করা) */
 export interface BazarLine {
   item: string;
@@ -278,6 +289,8 @@ export interface MessData {
   carryForwardBalance: number;
   members: MemberDTO[];
   dailyMeals: MealRowDTO[];
+  /** AM / Audit মিল — শুধু প্রদর্শনের জন্য, কোনো হিসাবে ব্যবহৃত হয় না */
+  auditMeals: AuditMealDTO[];
   bazarExpenses: BazarDTO[];
   deposits: DepositDTO[];
   otherIncomes: IncomeDTO[];

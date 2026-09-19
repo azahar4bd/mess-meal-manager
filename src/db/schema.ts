@@ -234,6 +234,38 @@ export const dailyMeals = pgTable(
 );
 
 /* ────────────────────────────────────────────────────────────
+ *  AM / AUDIT MEALS  — শুধু রেকর্ডের জন্য, কোনো হিসাবে নয়
+ *  সব অফিসের জন্য (officeId) — কিন্তু:
+ *    • calc.ts-এর CalcInput-এ এই টেবিল নেই → মোট মিল/মিল-রেট/
+ *      মিল খরচ/মোট খরচ/জের/ক্যারি-ফরোয়ার্ড/শিট সিংক — কোথাও প্রভাব নেই।
+ *    • শুধু মিল পেজে দেখা ও এন্ট্রি করা যায়।
+ * ──────────────────────────────────────────────────────────── */
+export const auditMeals = pgTable(
+  "audit_meals",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => cryptoId("aud")),
+    officeId: text("office_id")
+      .notNull()
+      .references((): AnyPgColumn => offices.id, { onDelete: "cascade" }),
+    monthId: text("month_id")
+      .notNull()
+      .references((): AnyPgColumn => messMonths.id, { onDelete: "cascade" }),
+    day: integer("day").notNull(), // 1..31
+    date: date("date").notNull(), // YYYY-MM-DD
+    count: numeric("count", { precision: 10, scale: 2 }).notNull().default("0"),
+    createdBy: text("created_by").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("audit_meals_month_day_uq").on(t.monthId, t.day),
+    index("audit_meals_office_idx").on(t.officeId),
+  ],
+);
+
+/* ────────────────────────────────────────────────────────────
  *  BAZAR / MARKET EXPENSES
  * ──────────────────────────────────────────────────────────── */
 
@@ -486,6 +518,7 @@ export type MessMonth = typeof messMonths.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type MemberInsert = typeof members.$inferInsert;
 export type DailyMeal = typeof dailyMeals.$inferSelect;
+export type AuditMeal = typeof auditMeals.$inferSelect;
 export type BazarExpense = typeof bazarExpenses.$inferSelect;
 export type Deposit = typeof deposits.$inferSelect;
 export type OtherIncome = typeof otherIncomes.$inferSelect;

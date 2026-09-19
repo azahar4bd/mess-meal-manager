@@ -423,6 +423,19 @@ body {
   color: var(--muted);
   font-weight: 500;
 }
+/* AM / Audit মিল — হিসাবের বাইরে (শুধু রেকর্ড): ড্যাশ-বর্ডার + আলাদা রঙ */
+.meal-cell-audit {
+  border-style: dashed;
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.meal-cell-audit:focus {
+  border-color: var(--brand);
+}
+.meal-cell-audit.zero {
+  color: var(--muted);
+  font-weight: 500;
+}
 .meal-cell-selected {
   border-color: var(--brand) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent);
