@@ -423,7 +423,8 @@ export function MealsView() {
                     </button>
                   </div>
                   <div className="grid grid-cols-5 gap-1.5">
-                    {/* ১ম সারি: Reset একেবারে উপরের ডান কোণায় */}
+                    {/* ঠিক ৩টি পূর্ণ সারি — কোনো ফাঁকা ঘর নেই: Reset উপরে ডানে,
+                        Backspace মাঝের ডানে, Arrow নিচের ডানে */}
                     {["1", "2", "3", "4"].map((k) => (
                       <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
                         {k}
@@ -432,24 +433,23 @@ export function MealsView() {
                     <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
                       ↺ Reset
                     </button>
-                    {["5", "6", "7", "8", "9"].map((k) => (
+                    {["5", "6", "7", "8"].map((k) => (
                       <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
                         {k}
                       </button>
                     ))}
+                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
+                      ⌫
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("9")}>
+                      9
+                    </button>
                     <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
                       0
                     </button>
                     <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
                       .
                     </button>
-                    <span className="col-span-2" aria-hidden="true" />
-                    {/* ৩য় সারির 맨 오른쪽: Backspace */}
-                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
-                      ⌫
-                    </button>
-                    <span className="col-span-3" aria-hidden="true" />
-                    {/* নিচের ডান কোণায় আগের/পরের সদস্যের Arrow key */}
                     <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
                       ◀
                     </button>
