@@ -197,7 +197,10 @@ export function BazarView() {
       key: "items",
       header: "আইটেম / Items",
       render: (r) => (
-        <span className="max-w-[260px] truncate" title={r.items || undefined}>
+        <span
+          className="block max-w-[230px] whitespace-normal break-words text-[11px] leading-snug"
+          title={r.items || undefined}
+        >
           {r.items || "—"}
         </span>
       ),
