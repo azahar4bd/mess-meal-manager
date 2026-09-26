@@ -67,6 +67,21 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
   const suggestions = useMemo(() => (focusItem && item.trim() ? suggestBazarItems(item, 8, historyItems) : []), [item, focusItem, historyItems]);
   const grandTotal = useMemo(() => linesTotal(lines), [lines]);
   const incompleteLines = useMemo(() => lines.filter((l) => !(l.qty > 0) || !(l.price > 0)), [lines]);
+  const hasCurrentInput = Boolean(item.trim() || qty.trim() || price.trim() || total.trim());
+
+  /** ফুটারের সেভে এড না চাপলেও বর্তমান আইটেমটি আগে লাইনে যোগ হয়। */
+  const linesForSave = (): BazarLine[] => {
+    if (!item.trim()) return lines;
+    const tri: Triad = { qty, price, total, manual };
+    const nextLine = triadReady(tri)
+      ? (() => {
+          const v = triadValues(tri);
+          return { item: item.trim().slice(0, 60), qty: v.qty, price: v.price };
+        })()
+      : { item: item.trim().slice(0, 60), qty: 0, price: 0 };
+    if (editing === null) return [...lines, nextLine];
+    return lines.map((l, i) => (i === editing ? nextLine : l));
+  };
 
   const clearInputs = () => {
     setItem("");
@@ -157,9 +172,12 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
             <button
               type="button"
               className="btn btn-primary"
-              disabled={disabled || lines.length === 0 || incompleteLines.length > 0 || grandTotal <= 0}
+              disabled={disabled || (!lines.length && !hasCurrentInput) || linesForSave().some((l) => !(l.qty > 0) || !(l.price > 0)) || linesTotal(linesForSave()) <= 0}
               title={incompleteLines.length ? "সেভের আগে অসম্পূর্ণ আইটেম এডিট করে কোয়ান্টিটি ও দাম দিন" : undefined}
-              onClick={() => onApply(lines, grandTotal)}
+              onClick={() => {
+                const next = linesForSave();
+                onApply(next, linesTotal(next));
+              }}
             >
               ✓ সেভ (৳ {formatMoney(grandTotal)})
             </button>
@@ -271,7 +289,7 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
           <button type="button" className="btn btn-ghost" onClick={clearInputs} disabled={disabled}>
             রিসেট
           </button>
-          <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলে তৃতীয়টি বসবে • শুধু আইটেম দিয়েও ড্রাফট এড করা যাবে</span>
+          <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলেই সেভ হবে • Quantity না দিলে Total ÷ Unit price থেকে অটো হবে</span>
         </div>
 
         {error ? <div className="pill pill-danger">{error}</div> : null}
