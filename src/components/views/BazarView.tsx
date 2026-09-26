@@ -56,7 +56,6 @@ export function BazarView() {
     },
     { key: "amount", label: "পরিমাণ / Amount (৳)", type: "money", required: true, placeholder: "500", half: true },
     { key: "items", label: "আইটেম / Items", type: "text", placeholder: "আলু, পেঁয়াজ", half: true },
-    { key: "note", label: "নোট / Note", type: "textarea", placeholder: "সকালের বাজার" },
   ];
 
   const initialValues = (): FormState => ({
