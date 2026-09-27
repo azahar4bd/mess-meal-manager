@@ -422,38 +422,66 @@ export function MealsView() {
                       ✕
                     </button>
                   </div>
-                  {/* ফোনের মতো: 123 / 456 / 789 / . 0 ⌫ */}
-                  <div className="grid grid-cols-3 gap-1.5">
-                      {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => (
-                        <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
-                          {k}
-                        </button>
-                      ))}
-                      <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
-                        .
-                      </button>
-                      <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
-                        0
-                      </button>
-                      <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
-                        ⌫
-                      </button>
-                    </div>
-                    {/* Reset + Navigation */}
-                    <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                      <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
-                        ↺ Reset
-                      </button>
-                      <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
+                  {/* নিচ থেকে 1 2 3 4 — 4 সারি: ডানে Reset / Backspace / Arrow */}
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {/* Row 1 — top */}
+                    <button type="button" className="pad-key" onClick={() => pressDigit("9")}>
+                      9
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
+                      0
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
+                      .
+                    </button>
+                    <div />
+                    <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
+                      ↺ Reset
+                    </button>
+
+                    {/* Row 2 */}
+                    <button type="button" className="pad-key" onClick={() => pressDigit("5")}>
+                      5
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("6")}>
+                      6
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("7")}>
+                      7
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("8")}>
+                      8
+                    </button>
+                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
+                      ⌫
+                    </button>
+
+                    {/* Row 3 — bottom, 1 2 3 4 */}
+                    <button type="button" className="pad-key" onClick={() => pressDigit("1")}>
+                      1
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("2")}>
+                      2
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("3")}>
+                      3
+                    </button>
+                    <button type="button" className="pad-key" onClick={() => pressDigit("4")}>
+                      4
+                    </button>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button type="button" className="pad-key pad-key-nav !px-0" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
                         ◀
                       </button>
-                      <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
+                      <button type="button" className="pad-key pad-key-nav !px-0" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
                         ▶
                       </button>
                     </div>
-                    <button
-                      type="button"
-                      className="pad-key pad-key-save mt-1.5 w-full"
+                  </div>
+                  <button
+                    type="button"
+                    className="pad-key pad-key-save mt-1.5 w-full"
+
 
                       disabled={saving}
                       onClick={() => void saveDay()}
