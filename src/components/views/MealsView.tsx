@@ -422,24 +422,26 @@ export function MealsView() {
                       ✕
                     </button>
                   </div>
-                  {/* নিচ থেকে 1 2 3 4 — 4 সারি: ডানে Reset / Backspace / Arrow */}
+                  {/* নিচ থেকে 1 2 3 4 — 0 এবং . 8,4 এর জায়গায়, Backspace ফাঁকা জায়গায়, Arrow বড় */}
                   <div className="grid grid-cols-5 gap-1.5">
-                    {/* Row 1 — top */}
+                    {/* Row 1 — top: 9 8 4 Backspace Reset */}
                     <button type="button" className="pad-key" onClick={() => pressDigit("9")}>
                       9
                     </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
-                      0
+                    <button type="button" className="pad-key" onClick={() => pressDigit("8")}>
+                      8
                     </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
-                      .
+                    <button type="button" className="pad-key" onClick={() => pressDigit("4")}>
+                      4
                     </button>
-                    <div />
+                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
+                      ⌫
+                    </button>
                     <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
                       ↺ Reset
                     </button>
 
-                    {/* Row 2 */}
+                    {/* Row 2 — 5 6 7 0 (0 in place of 8) */}
                     <button type="button" className="pad-key" onClick={() => pressDigit("5")}>
                       5
                     </button>
@@ -449,14 +451,12 @@ export function MealsView() {
                     <button type="button" className="pad-key" onClick={() => pressDigit("7")}>
                       7
                     </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit("8")}>
-                      8
+                    <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
+                      0
                     </button>
-                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
-                      ⌫
-                    </button>
+                    <div />
 
-                    {/* Row 3 — bottom, 1 2 3 4 */}
+                    {/* Row 3 — bottom: 1 2 3 . (. in place of 4) + Arrow big */}
                     <button type="button" className="pad-key" onClick={() => pressDigit("1")}>
                       1
                     </button>
@@ -466,14 +466,14 @@ export function MealsView() {
                     <button type="button" className="pad-key" onClick={() => pressDigit("3")}>
                       3
                     </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit("4")}>
-                      4
+                    <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
+                      .
                     </button>
                     <div className="grid grid-cols-2 gap-1">
-                      <button type="button" className="pad-key pad-key-nav !px-0" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
+                      <button type="button" className="pad-key pad-key-nav !py-3 text-[16px]" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
                         ◀
                       </button>
-                      <button type="button" className="pad-key pad-key-nav !px-0" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
+                      <button type="button" className="pad-key pad-key-nav !py-3 text-[16px]" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
                         ▶
                       </button>
                     </div>
@@ -481,6 +481,7 @@ export function MealsView() {
                   <button
                     type="button"
                     className="pad-key pad-key-save mt-1.5 w-full"
+
 
 
                       disabled={saving}
