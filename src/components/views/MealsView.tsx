@@ -423,42 +423,35 @@ export function MealsView() {
                     </button>
                   </div>
                   <div className="grid grid-cols-5 gap-1.5">
-                    {/* ঠিক ৩টি পূর্ণ সারি — কোনো ফাঁকা ঘর নেই: Reset উপরে ডানে,
-                        Backspace মাঝের ডানে, Arrow নিচের ডানে */}
-                    {["1", "2", "3", "4"].map((k) => (
-                      <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
-                        {k}
+                    {/* ফোনের মতো সংখ্যা: 123 / 456 / 789 / 0 */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((k) => (
+                        <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
+                          {k}
+                        </button>
+                      ))}
+                      <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
+                        ↺ Reset
                       </button>
-                    ))}
-                    <button type="button" className="pad-key pad-key-danger" onClick={resetDay} aria-label="রিসেট">
-                      ↺ Reset
-                    </button>
-                    {["5", "6", "7", "8"].map((k) => (
-                      <button key={k} type="button" className="pad-key" onClick={() => pressDigit(k)}>
-                        {k}
+                      <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
+                        0
                       </button>
-                    ))}
-                    <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
-                      ⌫
-                    </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit("9")}>
-                      9
-                    </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit("0")}>
-                      0
-                    </button>
-                    <button type="button" className="pad-key" onClick={() => pressDigit(".")}>
-                      .
-                    </button>
-                    <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
-                      ◀
-                    </button>
-                    <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
-                      ▶
-                    </button>
+                      <button type="button" className="pad-key" onClick={pressBackspace} aria-label="মুছুন">
+                        ⌫
+                      </button>
+                    </div>
+                    {/* নিচে ডান পাশে Arrow key */}
+                    <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                      <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(-1)} aria-label="আগের সদস্য">
+                        ◀ আগের
+                      </button>
+                      <button type="button" className="pad-key pad-key-nav" onClick={() => moveSel(1)} aria-label="পরের সদস্য">
+                        পরের ▶
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      className="pad-key pad-key-save col-span-5"
+                      className="pad-key pad-key-save mt-1.5 w-full"
                       disabled={saving}
                       onClick={() => void saveDay()}
                     >
