@@ -395,7 +395,7 @@ export function MealsView() {
 
             {/* ── কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভেসে ওঠে, ঘর বাছলে তবেই ── */}
             {canWrite && selIdx != null ? (
-              <div className="meal-pad-sheet" role="dialog" aria-label="মিল কিবোর্ড">
+              <div className="meal-pad-sheet md:hidden" role="dialog" aria-label="মিল কিবোর্ড">
                 <div className="meal-pad">
                   <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
                     <span className="min-w-0 truncate font-bold">
