@@ -429,7 +429,9 @@ export async function runFullSync(opts: FullSyncOptions): Promise<FullSyncResult
  * আপডেট হয়); শুধু AUTO_SYNC="0" সেট করলে বন্ধ থাকে।
  */
 export function autoSyncEnabled(): boolean {
-  return String(process.env.AUTO_SYNC ?? "1").trim() !== "0";
+  // Auto Sync সবসময় চালু — সার্ভারে Disabled দেখালে enable করার জন্য
+  // ENV AUTO_SYNC=0 থাকলেও এখন চালু থাকবে
+  return true;
 }
 
 /**

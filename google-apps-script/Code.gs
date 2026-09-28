@@ -1,53 +1,49 @@
 /**
  * ══════════════════════════════════════════════════════════════════════════
- *  Mess Meal Manager — Google Apps Script sync endpoint
+ *  Mess Meal Manager — Google Apps Script (Empty Sheet Ready)
+ *  এই কোডটি সম্পূর্ণ ফাঁকা Google Sheet-এর জন্য তৈরি
  * ══════════════════════════════════════════════════════════════════════════
+ * 
+ *  ব্যবহারের নিয়ম (ফাঁকা শিটের জন্য):
+ *  1. https://sheets.google.com এ গিয়ে নতুন ফাঁকা Spreadsheet তৈরি করুন
+ *     নাম দিন: "Mess Meal Manager - Gobra" (বা আপনার অফিসের নাম)
+ *  2. Extensions → Apps Script → Code.gs খুলুন
+ *  3. নিচের পুরো কোডটি কপি করে Code.gs-এ পেস্ট করুন (পুরোনো কোড মুছে)
+ *  4. CONFIG.SPREADSHEET_ID = '' রাখুন — তাহলে যে শিট থেকে Apps Script খুলেছেন
+ *     সেটাই auto-bind হবে (ফাঁকা শিটের জন্য এটাই সঠিক)
+ *  5. Save (Ctrl+S)
+ *  6. Run → setupTabs() একবার চালান — 8টি বাংলা ট্যাব তৈরি হবে:
+ *     00_অফিস_ইনফো, 01_সদস্য_তালিকা, 02_দৈনিক_মিল_খাতা, 03_বাজার_খরচ,
+ *     04_জমা_ও_তহবিল, 05_অন্যান্য_আয়, 06_হিসাব_সামারি, 07_দেনা_পাওনা
+ *  7. Deploy → New deployment → Web app
+ *     - Description: Mess Meal Manager Sync
+ *     - Execute as: Me
+ *     - Who has access: Anyone
+ *     - Deploy → Authorize → Allow
+ *  8. Deploy থেকে /exec URL কপি করুন
+ *  9. Mess Meal Manager App → Admin → Office Management → আপনার অফিস Edit →
+ *     Google Sheet URL এবং Apps Script Web App URL পেস্ট করুন → Save
+ *  10. App থেকে Google Sheet ট্যাবে গিয়ে "Full Sheet Sync" চাপুন — ফাঁকা শিটে
+ *      সব ডেটা চলে আসবে
  *
- *  Next.js application ──POST JSON──▶ Apps Script Web App ──▶ Google Spreadsheet
- *
- *  Deploy:
- *    1. Open (or create) the spreadsheet for one office, e.g.
- *       "Mess Meal Manager - Gobra".
- *    2. Extensions → Apps Script → paste this whole file into Code.gs.
- *    3. Set SPREADSHEET_ID below (or leave "" to auto-bind to the container
- *       spreadsheet), or run setupCreateSpreadsheet() once to create a new one.
- *    4. Deploy → New deployment → Web app
- *         Execute as : Me
- *         Who has access : Anyone
- *    5. Copy the /exec URL into the app:
- *         Office → Google Sheet tab → "Apps Script Web App URL", or
- *         .env → GOOGLE_SCRIPT_WEB_APP_URL
- *
- *  Supported actions (spec §56):
- *    GET  ?action=ping
- *    GET  ?action=pull&sheetName=Meals
- *    POST {action:"sync", office:{...}, month:{...}, sheets:[{name,headers,rows}]}
- *    POST {action:"pushRows",    sheetName, rows, headers?}
- *    POST {action:"replaceSheet",sheetName, headers, rows}
- *    POST {action:"upsertById",  sheetName, idColumn, row}
- *    POST {action:"deleteById",  sheetName, idColumn, id}
- *
- *  Data priority (spec §65): PostgreSQL is the primary database. This script
- *  only ever rewrites the reporting copy — a failure here can never lose data.
+ *  PostgreSQL = মূল ডেটাবেস, Google Sheet = শুধু রিপোর্ট/ব্যাকআপ কপি
+ *  Sheet ফেল করলেও DB ডেটা নিরাপদ থাকবে
  * ══════════════════════════════════════════════════════════════════════════
  */
 
 /* ───────────────────────── configuration ───────────────────────── */
 
 var CONFIG = {
-  /** Spreadsheet id (from the /d/<ID>/ part of the sheet URL). "" = the container sheet. */
+  /** ফাঁকা শিটের জন্য "" রাখুন — container spreadsheet auto-bind হবে */
   SPREADSHEET_ID: '',
-  /** Optional shared secret. When set, every request must send {token:"…"} or ?token=… */
+  /** Optional shared secret — খালি রাখলে token চেক হবে না */
   API_TOKEN: '',
-  /** Freeze the header row after writing */
   FREEZE_HEADER: true,
-  /** Write a "99_সিংক_লগ" tab with one row per sync */
   WRITE_SYNC_LOG: true,
-  /** Maximum rows accepted in a single request (safety valve) */
   MAX_ROWS: 60000,
 };
 
-/** Exact tab names — must match src/lib/sheet-structure.ts (spec §46) */
+/** ট্যাবের নাম — src/lib/sheet-structure.ts এর সাথে মিলতে হবে */
 var TABS = {
   OFFICE_INFO: '00_অফিস_ইনফো',
   MEMBERS: '01_সদস্য_তালিকা',
@@ -71,7 +67,6 @@ var TAB_ORDER = [
   TABS.DENA_PAONA,
 ];
 
-/** Logical name → real tab name (for ?action=pull&sheetName=Meals) */
 var ALIASES = {
   office: TABS.OFFICE_INFO, officeinfo: TABS.OFFICE_INFO, '00': TABS.OFFICE_INFO,
   members: TABS.MEMBERS, member: TABS.MEMBERS, '01': TABS.MEMBERS,
@@ -84,11 +79,34 @@ var ALIASES = {
   synclog: TABS.SYNC_LOG, '99': TABS.SYNC_LOG,
 };
 
-/** Headers that must ALWAYS stay text — ids, phones and dates must not be mangled */
 var TEXT_COLUMNS = /^(.*ID|.*Id|Phone|OfficeCode|Date|SyncedAt|Status|Active|MemberName|Name|Role|ItemName|Items|Buyer|BuyerName|Category|Note|Source|Type|Scope|Key|Value|MonthName|OfficeName|Branch|Address|Email|CreatedAt|UpdatedAt|PaidBy|ReceivedBy|Purpose)$/;
-
-/** Headers that should be written as real numbers so Google Sheets can total them */
 var NUMERIC_COLUMNS = /^(Year|Month|Day|Days|Meals|Amount|Total.*|.*Rate|.*Cost|.*Extra|.*Balance|DenaPoana|PermanentFund|OtherIncome|NetMealCost|Value|Rows|DurationMs|OpeningDue|JerAdjusted|RemainingJer)$/;
+
+/* ───────────────────────── ফাঁকা শিটের জন্য মেনু ───────────────────────── */
+
+function onOpen() {
+  try {
+    SpreadsheetApp.getUi()
+      .createMenu('🍚 Mess Manager')
+      .addItem('1. Setup Tabs (ফাঁকা শিটে 8টি ট্যাব তৈরি)', 'setupTabs')
+      .addItem('2. Ping Test (Apps Script চলছে কি না)', 'pingFromEditor')
+      .addSeparator()
+      .addItem('Create New Spreadsheet', 'setupCreateSpreadsheet')
+      .addToUi();
+  } catch (e) {
+    // Ui not available in web app context - ignore
+  }
+}
+
+function pingFromEditor() {
+  var result = doPing();
+  var content = result.getContent();
+  Logger.log(content);
+  try {
+    SpreadsheetApp.getUi().alert('Ping OK:\\n' + content.substring(0, 800));
+  } catch (ignored) {}
+  return content;
+}
 
 /* ───────────────────────── HTTP entry points ───────────────────────── */
 
@@ -106,7 +124,6 @@ function doPost(e) {
   return guard(e, function () {
     var payload = parseBody(e);
     var action = (payload && payload.action) || param(e, 'action') || 'sync';
-
     if (action === 'ping') return doPing();
     if (action === 'sync') return doSync(payload);
     if (action === 'pushRows') return doPushRows(payload);
@@ -120,7 +137,6 @@ function doPost(e) {
 
 /* ───────────────────────── actions ───────────────────────── */
 
-/** action=ping — system status check (spec §56) */
 function doPing() {
   var ss = getSpreadsheet();
   var tabs = ss.getSheets().map(function (s) { return s.getName(); });
@@ -136,7 +152,6 @@ function doPing() {
   });
 }
 
-/** action=pull&sheetName=Meals — read a tab back (spec §56) */
 function doPull(sheetName) {
   var ss = getSpreadsheet();
   var sheet = getOrCreateSheet(ss, resolveTabName(sheetName));
@@ -161,20 +176,10 @@ function doListTabs() {
   });
 }
 
-/**
- * action=sync — FULL SYNC (spec §57–§59)
- *
- *   Receive payload → identify office → identify month → build sheets →
- *   write headers → write data → freeze header → return success
- *
- * Every target tab is completely rewritten (clearContents + setValues) so the
- * spreadsheet is always an exact snapshot of PostgreSQL.
- */
 function doSync(payload) {
   if (!payload || !payload.sheets || !payload.sheets.length) {
     return fail('Payload has no sheets[] to write');
   }
-
   var ss = getSpreadsheet();
   var lock = LockService.getScriptLock();
   try {
@@ -182,18 +187,12 @@ function doSync(payload) {
   } catch (err) {
     return fail('Another sync is running, please retry: ' + err.message);
   }
-
   var started = new Date();
   var written = [];
   var totalRows = 0;
-
   try {
     ss.setSpreadsheetLocale('en_US');
-
-    // 1) make sure every required tab exists, in the canonical order
     TAB_ORDER.forEach(function (name) { getOrCreateSheet(ss, name); });
-
-    // 2) rewrite each tab from the payload
     payload.sheets.forEach(function (block) {
       var name = block.name;
       if (!name) return;
@@ -206,15 +205,10 @@ function doSync(payload) {
       written.push({ name: name, rows: rows.length });
       totalRows += rows.length;
     });
-
-    // 3) remove tabs that are not part of the structure (keep the log tab)
     removeUnknownTabs(ss, payload.sheets.map(function (b) { return b.name; }));
-
-    // 4) sync log
     if (CONFIG.WRITE_SYNC_LOG) {
       appendSyncLog(ss, payload, totalRows, new Date().getTime() - started.getTime(), true, 'OK');
     }
-
     return ok({
       message: 'Google Sheets full sync OK',
       sheetUrl: ss.getUrl(),
@@ -236,7 +230,6 @@ function doSync(payload) {
   }
 }
 
-/** action=replaceSheet — rewrite one tab */
 function doReplaceSheet(payload) {
   var name = resolveTabName(payload.sheetName || payload.name);
   var ss = getSpreadsheet();
@@ -245,24 +238,20 @@ function doReplaceSheet(payload) {
   return ok({ message: 'Sheet replaced', sheetName: name, rows: rows.length, sheetUrl: ss.getUrl(), sheetId: ss.getId(), syncedAt: new Date().toISOString() });
 }
 
-/** action=pushRows — append rows to a tab (creates the header when empty) */
 function doPushRows(payload) {
   var name = resolveTabName(payload.sheetName || payload.name);
   var ss = getSpreadsheet();
   var sheet = getOrCreateSheet(ss, name);
   var rows = normalizeRows(payload.rows || []);
   if (!rows.length) return fail('No rows to push');
-
   if (sheet.getLastRow() === 0 && payload.headers && payload.headers.length) {
     sheet.getRange(1, 1, 1, payload.headers.length).setValues([payload.headers]);
     if (CONFIG.FREEZE_HEADER) sheet.setFrozenRows(1);
   }
-  var startCol = 1;
-  sheet.getRange(sheet.getLastRow() + 1, startCol, rows.length, rows[0].length).setValues(rows);
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
   return ok({ message: 'Rows pushed', sheetName: name, appended: rows.length, totalRows: Math.max(0, sheet.getLastRow() - 1), sheetUrl: ss.getUrl(), syncedAt: new Date().toISOString() });
 }
 
-/** action=upsertById — update the row whose idColumn matches, else append */
 function doUpsertById(payload) {
   var name = resolveTabName(payload.sheetName || payload.name);
   var idColumn = payload.idColumn || 'EntryID';
@@ -271,45 +260,36 @@ function doUpsertById(payload) {
   var sheet = getOrCreateSheet(ss, name);
   var values = sheet.getDataRange().getValues();
   var headers = values.length ? values[0] : Object.keys(row);
-
   if (!values.length) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     if (CONFIG.FREEZE_HEADER) sheet.setFrozenRows(1);
     values = [headers];
   }
-
   var idx = headers.indexOf(idColumn);
   if (idx === -1) return fail('idColumn "' + idColumn + '" not found in ' + name);
-
   var newRow = headers.map(function (h) { return row.hasOwnProperty(h) ? row[h] : ''; });
   var targetId = String(row[idColumn] || '');
-
   for (var r = 1; r < values.length; r++) {
     if (String(values[r][idx]) === targetId) {
       sheet.getRange(r + 1, 1, 1, headers.length).setValues([newRow]);
       return ok({ message: 'Row updated', sheetName: name, id: targetId, rowIndex: r + 1, syncedAt: new Date().toISOString() });
     }
   }
-
   sheet.getRange(values.length + 1, 1, 1, headers.length).setValues([newRow]);
   return ok({ message: 'Row inserted', sheetName: name, id: targetId, rowIndex: values.length + 1, syncedAt: new Date().toISOString() });
 }
 
-/** action=deleteById — delete the row whose idColumn matches */
 function doDeleteById(payload) {
   var name = resolveTabName(payload.sheetName || payload.name);
   var idColumn = payload.idColumn || 'EntryID';
   var targetId = String(payload.id || '');
   if (!targetId) return fail('Missing id');
-
   var ss = getSpreadsheet();
   var sheet = getOrCreateSheet(ss, name);
   var values = sheet.getDataRange().getValues();
   if (!values.length) return ok({ message: 'Sheet empty, nothing to delete', deleted: 0 });
-
   var idx = values[0].indexOf(idColumn);
   if (idx === -1) return fail('idColumn "' + idColumn + '" not found in ' + name);
-
   var deleted = 0;
   for (var r = values.length - 1; r >= 1; r--) {
     if (String(values[r][idx]) === targetId) {
@@ -334,17 +314,15 @@ function resolveTabName(input) {
   if (!key) throw new Error('sheetName is required');
   var lower = key.toLowerCase();
   if (ALIASES[lower]) return ALIASES[lower];
-  // allow the exact Bangla tab name too
   for (var i = 0; i < TAB_ORDER.length; i++) if (TAB_ORDER[i] === key) return TAB_ORDER[i];
   if (key === TABS.SYNC_LOG) return TABS.SYNC_LOG;
-  return key; // custom tab names are allowed
+  return key;
 }
 
 function getOrCreateSheet(ss, name) {
   var sheet = ss.getSheetByName(name);
   if (sheet) return sheet;
   sheet = ss.insertSheet(name);
-  // keep the canonical tab order
   var wanted = TAB_ORDER.indexOf(name);
   if (wanted > -1) {
     try { ss.setActiveSheet(sheet); ss.moveActiveSheetTo(wanted + 1); } catch (ignored) {}
@@ -357,14 +335,12 @@ function removeUnknownTabs(ss, keepNames) {
   ss.getSheets().forEach(function (sheet) {
     var name = sheet.getName();
     if (allowed.indexOf(name) > -1) return;
-    // never delete the last sheet, and never delete sheets that hold data
     if (ss.getSheets().length <= 1) return;
     if (sheet.getLastRow() > 1) return;
     try { ss.deleteSheet(sheet); } catch (ignored) {}
   });
 }
 
-/** Full rewrite of one tab: clearContents → headers → rows → freeze (spec §59) */
 function writeSheet(ss, name, headers, rows) {
   var sheet = getOrCreateSheet(ss, name);
   var headerRow = headers && headers.length ? headers : (rows.length ? rows[0].map(function (_, i) { return 'Column' + (i + 1); }) : []);
@@ -373,16 +349,13 @@ function writeSheet(ss, name, headers, rows) {
     sheet.clearContents();
     return sheet;
   }
-
   sheet.clear();
   var paddedHeader = pad(headerRow, width, '');
   sheet.getRange(1, 1, 1, width).setValues([paddedHeader]).setFontWeight('bold');
-
   if (rows.length) {
     var padded = rows.map(function (r) { return pad(normalizeTypes(paddedHeader, r), width, ''); });
     sheet.getRange(2, 1, padded.length, width).setValues(padded);
   }
-
   if (CONFIG.FREEZE_HEADER) sheet.setFrozenRows(1);
   formatNumberColumns(sheet, paddedHeader);
   sheet.autoResizeColumns(1, width);
@@ -395,11 +368,6 @@ function pad(arr, width, fill) {
   return out;
 }
 
-/**
- * Store numbers as numbers and TRUE/FALSE as booleans so Google Sheets can
- * total them — but ids, phones and dates are ALWAYS kept as text so
- * "01711111111" never turns into 1711111111.
- */
 function normalizeTypes(headers, row) {
   return row.map(function (value, i) {
     var header = String(headers[i] || '');
@@ -420,7 +388,6 @@ function normalizeTypes(headers, row) {
   });
 }
 
-/** TRUE/হ্যাঁ/yes/1 → boolean true (Sheets shows ✓/TRUE and formulas work) */
 function isTruthy(value) {
   if (value === true) return true;
   var text = String(value === null || value === undefined ? '' : value).trim().toLowerCase();
@@ -433,7 +400,6 @@ function isFalsy(value) {
   return text === 'false' || text === 'no' || text === '0' || text === 'না' || text === 'নিষ্ক্রিয়' || text === 'inactive';
 }
 
-/** Apply a 2-decimal number format to money / meal columns (keeps raw precision) */
 function formatNumberColumns(sheet, headers) {
   for (var c = 0; c < headers.length; c++) {
     var header = String(headers[c] || '');
@@ -479,8 +445,6 @@ function appendSyncLog(ss, payload, totalRows, durationMs, success, message) {
   ]);
 }
 
-/* ───────────────────────── request / response plumbing ───────────────────────── */
-
 function param(e, name) {
   try {
     if (e && e.parameter && e.parameter[name] !== undefined) return e.parameter[name];
@@ -495,10 +459,6 @@ function parseBody(e) {
   try { return JSON.parse(text); } catch (err) { throw new Error('Invalid JSON body: ' + err.message); }
 }
 
-/**
- * Wraps every request: optional shared-secret check, JSON output and a
- * top-level error handler so the app always receives parseable JSON.
- */
 function guard(e, fn) {
   var started = new Date().getTime();
   try {
@@ -514,7 +474,6 @@ function guard(e, fn) {
   }
 }
 
-/** The app sends {token:"…"} in the body (or ?token=… on GET). */
 function tokenMatches(e) {
   var fromQuery = param(e, 'token');
   if (fromQuery && fromQuery === CONFIG.API_TOKEN) return true;
@@ -541,17 +500,11 @@ function json(body) {
   return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
 }
 
-/* ───────────────────────── one-time setup helpers ───────────────────────── */
+/* ───────────────────────── one-time setup for empty sheet ───────────────────────── */
 
-/**
- * Run once from the Apps Script editor to create a dedicated spreadsheet for
- * one office. It logs the id + url — paste the id into CONFIG.SPREADSHEET_ID
- * (or into the app's office settings as the Google Sheet URL).
- */
 function setupCreateSpreadsheet() {
   var name = 'Mess Meal Manager - Gobra';
   var ss = SpreadsheetApp.create(name);
-  // a brand new spreadsheet ships with one default sheet — reuse it
   var existing = ss.getSheets();
   TAB_ORDER.forEach(function (tab, i) {
     if (i === 0 && existing.length) {
@@ -561,22 +514,22 @@ function setupCreateSpreadsheet() {
     getOrCreateSheet(ss, tab);
   });
   ss.setSpreadsheetLocale('en_US');
-  Logger.log('Created: %s\nID: %s\nURL: %s', name, ss.getId(), ss.getUrl());
+  Logger.log('Created: %s\\nID: %s\\nURL: %s', name, ss.getId(), ss.getUrl());
   return { id: ss.getId(), url: ss.getUrl(), name: name };
 }
 
-/** Run once to (re)create the empty tab structure in the bound spreadsheet. */
+/** ফাঁকা শিটে 8টি ট্যাব তৈরি করুন — Apps Script এডিটর থেকে একবার চালান বা Sheet মেনু থেকে */
 function setupTabs() {
   var ss = getSpreadsheet();
   TAB_ORDER.forEach(function (name) { getOrCreateSheet(ss, name); });
-  Logger.log('Tabs ready: %s', ss.getSheets().map(function (s) { return s.getName(); }).join(' | '));
+  var tabs = ss.getSheets().map(function (s) { return s.getName(); }).join(' | ');
+  Logger.log('Tabs ready: %s', tabs);
+  try {
+    SpreadsheetApp.getUi().alert('✅ Tabs তৈরি হয়েছে:\\n' + tabs + '\\n\\nএখন Deploy → New deployment → Web app করুন');
+  } catch (ignored) {}
   return ss.getUrl();
 }
 
-/**
- * Local test — paste the JSON copied from the app's
- * "Google Sheet → { } Payload দেখুন → কপি করুন" into TEST_PAYLOAD and run.
- */
 function testRunSync() {
   var TEST_PAYLOAD = { action: 'sync', office: { id: 'office_test', name: 'Test Office', code: 'TEST01' }, month: { id: 'office_test-2026-09', name: 'September 2026' }, sheets: [] };
   if (!TEST_PAYLOAD.sheets.length) {
