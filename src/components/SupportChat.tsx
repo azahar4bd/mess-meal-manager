@@ -53,6 +53,16 @@ export function SupportChatButton() {
     return () => clearInterval(t);
   }, [app.role, refreshUnread]);
 
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("open-support-chat", handler as any);
+    (window as any).openSupportChat = () => setOpen(true);
+    return () => {
+      window.removeEventListener("open-support-chat", handler as any);
+      delete (window as any).openSupportChat;
+    };
+  }, []);
+
   if (app.role === "admin") return null;
 
   return (

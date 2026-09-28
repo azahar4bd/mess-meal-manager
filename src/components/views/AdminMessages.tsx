@@ -57,6 +57,30 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
     [loadThreads],
   );
 
+  // Listen for message button from VoiceUsersList — open chat thread
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e.detail || {};
+      const uid = detail.userId || detail.id;
+      if (uid) {
+        setViewMode("chats");
+        setActiveId(uid);
+        void openThread(uid);
+      }
+    };
+    window.addEventListener("open-admin-chat", handler as any);
+    // Expose global for direct call
+    (window as any).openAdminChatThread = (uid: string) => {
+      setViewMode("chats");
+      setActiveId(uid);
+      void openThread(uid);
+    };
+    return () => {
+      window.removeEventListener("open-admin-chat", handler as any);
+      delete (window as any).openAdminChatThread;
+    };
+  }, [openThread]);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, activeId]);

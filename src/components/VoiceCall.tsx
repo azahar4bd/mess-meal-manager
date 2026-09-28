@@ -534,6 +534,25 @@ export function VoiceUsersList() {
     }
   };
 
+  const messageUser = (u: any) => {
+    if (app.user?.role === "admin") {
+      // Tell AdminMessages to open chat thread for this user
+      window.dispatchEvent(new CustomEvent("open-admin-chat", { detail: { userId: u.userId, id: u.id, name: u.name } }));
+      // Also try direct global
+      if ((window as any).openAdminChatThread) {
+        (window as any).openAdminChatThread(u.userId);
+      }
+    } else {
+      // For member/manager — open support chat
+      window.dispatchEvent(new CustomEvent("open-support-chat", { detail: { userId: u.id, name: u.name } }));
+      if ((window as any).openSupportChat) {
+        (window as any).openSupportChat();
+      } else {
+        app.toast("নিচের 💬 বাটনে চাপ দিয়ে মেসেজ করুন", "info");
+      }
+    }
+  };
+
   if (loading) return <div className="muted p-3 text-[12px]">লোড হচ্ছে...</div>;
 
   const filtered = users.filter((u) => {
@@ -585,9 +604,14 @@ export function VoiceUsersList() {
               </span>
               {u.lastLogin ? <span className="muted block text-[10px]">শেষ লগইন: {new Date(u.lastLogin).toLocaleString('bn-BD')}</span> : null}
             </span>
-            <button type="button" className={`btn btn-sm shrink-0 ${u.online ? 'btn-primary' : 'btn-soft'}`} onClick={() => callUser(u)}>
-              📞 কল
-            </button>
+            <span className="flex shrink-0 items-center gap-1">
+              <button type="button" className="btn btn-ghost btn-sm border border-[var(--border)] px-2" onClick={() => messageUser(u)} title="মেসেজ">
+                💬
+              </button>
+              <button type="button" className={`btn btn-sm shrink-0 ${u.online ? 'btn-primary' : 'btn-soft'}`} onClick={() => callUser(u)}>
+                📞
+              </button>
+            </span>
           </div>
         ))}
         {filtered.length === 0 ? <div className="muted p-2 text-[11px]">কোনো ইউজার পাওয়া যায়নি</div> : null}
