@@ -23,6 +23,7 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const [viewMode, setViewMode] = useState<"chats" | "all">("chats");
+  const [newChatUser, setNewChatUser] = useState<{ userId: string; name: string; officeName?: string; role?: string } | null>(null);
 
   const loadThreads = useCallback(async () => {
     try {
@@ -43,8 +44,11 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
   }, [loadThreads]);
 
   const openThread = useCallback(
-    async (userId: string) => {
+    async (userId: string, userInfo?: { name?: string; officeName?: string; role?: string }) => {
       setActiveId(userId);
+      if (userInfo?.name) {
+        setNewChatUser({ userId, name: userInfo.name, officeName: userInfo.officeName, role: userInfo.role });
+      }
       setMessages([]);
       try {
         const res = await mess<SupportMessageDTO[]>("support.thread", { userId });
@@ -57,7 +61,7 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
     [loadThreads],
   );
 
-  // Listen for message button from VoiceUsersList — open chat thread
+  // Listen for message button from VoiceUsersList — open chat thread (even for new users like mohsin)
   useEffect(() => {
     const handler = (e: any) => {
       const detail = e.detail || {};
@@ -65,15 +69,17 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
       if (uid) {
         setViewMode("chats");
         setActiveId(uid);
-        void openThread(uid);
+        setNewChatUser({ userId: uid, name: detail.name || uid, officeName: detail.officeName, role: detail.role });
+        void openThread(uid, { name: detail.name, officeName: detail.officeName, role: detail.role });
       }
     };
     window.addEventListener("open-admin-chat", handler as any);
     // Expose global for direct call
-    (window as any).openAdminChatThread = (uid: string) => {
+    (window as any).openAdminChatThread = (uid: string, info?: any) => {
       setViewMode("chats");
       setActiveId(uid);
-      void openThread(uid);
+      if (info?.name) setNewChatUser({ userId: uid, name: info.name, officeName: info.officeName, role: info.role });
+      void openThread(uid, info);
     };
     return () => {
       window.removeEventListener("open-admin-chat", handler as any);
@@ -103,7 +109,19 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
 
   if (!threads) return <Loader label="বার্তা লোড হচ্ছে…" />;
 
-  const active = threads.find((t) => t.userId === activeId);
+  // Active thread from existing chats, or synthetic from newChatUser (like mohsin who never chatted)
+  const foundActive = threads.find((t) => t.userId === activeId);
+  const active = foundActive || (activeId && newChatUser ? {
+    userId: newChatUser.userId,
+    userName: newChatUser.name,
+    officeName: newChatUser.officeName || "",
+    role: newChatUser.role || "member",
+    lastAt: new Date().toISOString(),
+    lastBody: "",
+    lastSender: "user" as const,
+    unread: 0,
+    total: 0,
+  } : null);
 
   return (
     <div className="space-y-3">
@@ -129,7 +147,7 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
         <Card title="📞 সকল ইউজার — ভয়েস কল" subtitle="যে কাউকে কল করুন, অনলাইন স্ট্যাটাস দেখুন" bodyClass="p-3">
           <VoiceUsersList />
         </Card>
-      ) : threads.length === 0 ? (
+      ) : threads.length === 0 && !activeId ? (
         <EmptyState icon="💬" title="কোনো বার্তা নেই" hint="কোনো ম্যানেজার বা সদস্য বার্তা পাঠালে এখানে দেখা যাবে। সকল ইউজার ট্যাবে গিয়ে সবাইকে কল করতে পারবেন।" />
       ) : (
         <div className="grid gap-3 lg:grid-cols-[320px_1fr]">
