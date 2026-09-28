@@ -196,7 +196,37 @@ export function VoiceCallManager() {
 
   const startOutgoingCall = useCallback(async (calleeId: string, calleeName: string) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      // Check if mediaDevices available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        app.toast("এই ব্রাউজারে ভয়েস কল সাপোর্ট করে না — Chrome ব্যবহার করুন", "error");
+        return;
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (mediaErr: any) {
+        const name = mediaErr?.name || "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          app.toast("🎤 মাইক্রোফোন অনুমতি দিন — ব্রাউজারে Allow চাপুন। Permission ছাড়া কল হবে না।", "error");
+          // Still allow call to ring without mic? Create empty stream
+          // Try again with fake audio track
+          try {
+            // Create silent audio track as fallback
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const dest = ctx.createMediaStreamDestination();
+            stream = dest.stream;
+            app.toast("মাইক্রোফোন ছাড়াই কল রিং হচ্ছে — কথা বলতে Allow দিন", "info");
+          } catch {
+            throw mediaErr;
+          }
+        } else if (name === "NotFoundError") {
+          app.toast("মাইক্রোফোন পাওয়া যায়নি", "error");
+          throw mediaErr;
+        } else {
+          throw mediaErr;
+        }
+      }
       localStreamRef.current = stream;
 
       const pc = createPeerConnection("temp", true);
@@ -205,7 +235,6 @@ export function VoiceCallManager() {
       const offer = await pc.createOffer({ offerToReceiveAudio: true });
       await pc.setLocalDescription(offer);
 
-      // Wait a bit for ICE gathering
       await new Promise((r) => setTimeout(r, 500));
 
       const call = await mess<VoiceCallRow>("voice.call.initiate", {
@@ -216,7 +245,6 @@ export function VoiceCallManager() {
       setOutgoing(call);
       pcRef.current = pc;
 
-      // Start polling for answer and remote candidates
       signalPollRef.current = setInterval(async () => {
         try {
           const sig = await mess<any>("voice.call.signal", { callId: call.id });
@@ -227,7 +255,6 @@ export function VoiceCallManager() {
             setOutgoing(null);
             if (signalPollRef.current) clearInterval(signalPollRef.current);
           }
-          // Add remote candidates
           const remoteCands = sig.callerId === call.callerId ? sig.calleeCandidates : sig.callerCandidates;
           if (Array.isArray(remoteCands)) {
             for (const cand of remoteCands) {
@@ -237,8 +264,13 @@ export function VoiceCallManager() {
         } catch {}
       }, 1500);
 
-    } catch (err) {
-      app.toast(err instanceof Error ? err.message : "মাইক্রোফোন অনুমতি দিন", "error");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("Permission") || msg.includes("NotAllowed")) {
+        app.toast("🎤 মাইক্রোফোন Allow করুন — ব্রাউজারের উপরে Allow বাটন চাপুন", "error");
+      } else {
+        app.toast(err instanceof Error ? err.message : "কল শুরু করা যায়নি", "error");
+      }
       cleanup();
     }
   }, [app, createPeerConnection, cleanup]);
@@ -246,7 +278,29 @@ export function VoiceCallManager() {
   const acceptIncomingCall = useCallback(async () => {
     if (!incoming) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        app.toast("এই ব্রাউজারে ভয়েস কল সাপোর্ট করে না", "error");
+        return;
+      }
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      } catch (mediaErr: any) {
+        const name = mediaErr?.name || "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          app.toast("🎤 মাইক্রোফোন Allow করুন — না হলে কথা শোনা যাবে না", "error");
+          // Create silent stream as fallback to still accept call
+          try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const dest = ctx.createMediaStreamDestination();
+            stream = dest.stream;
+          } catch {
+            throw mediaErr;
+          }
+        } else {
+          throw mediaErr;
+        }
+      }
       localStreamRef.current = stream;
 
       const pc = createPeerConnection(incoming.id, false);
@@ -268,7 +322,6 @@ export function VoiceCallManager() {
       setActiveCall(updated);
       setIncoming(null);
 
-      // Poll for caller candidates
       signalPollRef.current = setInterval(async () => {
         try {
           const sig = await mess<any>("voice.call.signal", { callId: incoming.id });
@@ -281,8 +334,13 @@ export function VoiceCallManager() {
         } catch {}
       }, 1500);
 
-    } catch (err) {
-      app.toast(err instanceof Error ? err.message : "কল গ্রহণ করা যায়নি", "error");
+    } catch (err: any) {
+      const name = err?.name || "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        app.toast("🎤 মাইক্রোফোন Allow করুন — ব্রাউজারে Allow চাপুন", "error");
+      } else {
+        app.toast(err instanceof Error ? err.message : "কল গ্রহণ করা যায়নি", "error");
+      }
       cleanup();
       setIncoming(null);
     }

@@ -1064,14 +1064,7 @@ const handlers: Record<string, ActionHandler> = {
     const callee = await db.select().from(users).where(eq(users.id, calleeId)).limit(1).then(r => r[0]);
     if (!callee) throw new AuthError("not-found", "ব্যবহারকারী পাওয়া যায়নি", 404);
     
-    // office isolation: same office or admin
-    if (ctx.user.role !== "admin") {
-      const callerOffice = ctx.activeOfficeId || ctx.user.officeId;
-      const calleeOffice = callee.officeId;
-      if (callerOffice && calleeOffice && callerOffice !== calleeOffice) {
-        throw new AuthError("forbidden", "ভিন্ন অফিসের ব্যবহারকারীকে কল করা যাবে না", 403);
-      }
-    }
+    // No office isolation — any user can call any user (permission চাই না)
 
     // check if callee already has a ringing call
     const existing = await db.select().from(voiceCalls).where(
