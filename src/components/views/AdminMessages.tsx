@@ -13,7 +13,7 @@ import type { SupportMessageDTO, SupportThread } from "@/lib/types";
 /**
  * অ্যাডমিন ইনবক্স — ম্যানেজার/সদস্য/অফিস থেকে আসা বার্তা দেখা ও উত্তর দেওয়া।
  */
-export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number) => void }) {
+export function AdminMessages({ onUnreadChange, initialUserId }: { onUnreadChange?: (n: number) => void; initialUserId?: string | null }) {
   const app = useApp();
   const [threads, setThreads] = useState<SupportThread[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -42,6 +42,22 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
     const t = setInterval(() => void loadThreads(), 30000);
     return () => clearInterval(t);
   }, [loadThreads]);
+
+  // If initialUserId provided (from AdminChatButton pending), open that thread
+  useEffect(() => {
+    if (initialUserId) {
+      setViewMode("chats");
+      setActiveId(initialUserId);
+      // Try to find user info from window pending
+      const pending = (window as any).pendingAdminChatUser as any;
+      if (pending && pending.userId === initialUserId) {
+        setNewChatUser({ userId: pending.userId, name: pending.name || pending.userId, officeName: pending.officeName, role: pending.role });
+        void openThread(initialUserId, { name: pending.name, officeName: pending.officeName, role: pending.role });
+      } else {
+        void openThread(initialUserId);
+      }
+    }
+  }, [initialUserId]);
 
   const openThread = useCallback(
     async (userId: string, userInfo?: { name?: string; officeName?: string; role?: string }) => {
@@ -274,6 +290,7 @@ export function AdminChatButton() {
   const app = useApp();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [pendingUser, setPendingUser] = useState<{ userId: string; name?: string; officeName?: string; role?: string } | null>(null);
 
   const refresh = useCallback(async () => {
     if (app.role !== "admin") return;
@@ -291,6 +308,21 @@ export function AdminChatButton() {
     const t = setInterval(() => void refresh(), 45000);
     return () => clearInterval(t);
   }, [app.role, refresh]);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const detail = e.detail || {};
+      const uid = detail.userId || detail.id;
+      if (uid) {
+        const info = { userId: uid, name: detail.name || uid, officeName: detail.officeName, role: detail.role };
+        (window as any).pendingAdminChatUser = info;
+        setPendingUser(info);
+        setOpen(true);
+      }
+    };
+    window.addEventListener("open-admin-chat", handler as any);
+    return () => window.removeEventListener("open-admin-chat", handler as any);
+  }, []);
 
   if (app.role !== "admin") return null;
 
@@ -313,8 +345,8 @@ export function AdminChatButton() {
           </span>
         ) : null}
       </button>
-      <Modal open={open} title="💬 বার্তা ইনবক্স" onClose={() => setOpen(false)} wide>
-        <AdminMessages key={open ? "open" : "closed"} />
+      <Modal open={open} title="💬 বার্তা ইনবক্স" onClose={() => { setOpen(false); setPendingUser(null); (window as any).pendingAdminChatUser = null; }} wide>
+        <AdminMessages key={open ? "open" : "closed"} initialUserId={pendingUser?.userId || null} />
       </Modal>
     </>
   );
