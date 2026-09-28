@@ -196,7 +196,6 @@ export function VoiceCallManager() {
 
   const startOutgoingCall = useCallback(async (calleeId: string, calleeName: string) => {
     try {
-      // Check if mediaDevices available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         app.toast("এই ব্রাউজারে ভয়েস কল সাপোর্ট করে না — Chrome ব্যবহার করুন", "error");
         return;
@@ -208,21 +207,15 @@ export function VoiceCallManager() {
       } catch (mediaErr: any) {
         const name = mediaErr?.name || "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          app.toast("🎤 মাইক্রোফোন অনুমতি দিন — ব্রাউজারে Allow চাপুন। Permission ছাড়া কল হবে না।", "error");
-          // Still allow call to ring without mic? Create empty stream
-          // Try again with fake audio track
+          app.toast("🎤 মাইক্রোফোন Allow করুন — ব্রাউজারে Allow চাপুন", "error");
           try {
-            // Create silent audio track as fallback
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
             const dest = ctx.createMediaStreamDestination();
             stream = dest.stream;
-            app.toast("মাইক্রোফোন ছাড়াই কল রিং হচ্ছে — কথা বলতে Allow দিন", "info");
+            app.toast("মাইক্রোফোন ছাড়াই কল রিং হচ্ছে", "info");
           } catch {
             throw mediaErr;
           }
-        } else if (name === "NotFoundError") {
-          app.toast("মাইক্রোফোন পাওয়া যায়নি", "error");
-          throw mediaErr;
         } else {
           throw mediaErr;
         }
@@ -232,42 +225,90 @@ export function VoiceCallManager() {
       const pc = createPeerConnection("temp", true);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-      const offer = await pc.createOffer({ offerToReceiveAudio: true });
+      const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: false });
       await pc.setLocalDescription(offer);
 
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 800));
 
       const call = await mess<VoiceCallRow>("voice.call.initiate", {
         calleeId,
         offer: JSON.stringify(pc.localDescription),
       });
 
+      (pc as any)._actualCallId = call.id;
+      if (localCandidatesRef.current.length > 0) {
+        try {
+          await mess("voice.call.candidates", {
+            callId: call.id,
+            candidates: localCandidatesRef.current,
+            role: "caller",
+          });
+        } catch {}
+      }
+
       setOutgoing(call);
       pcRef.current = pc;
 
+      // Poll for answer
       signalPollRef.current = setInterval(async () => {
         try {
           const sig = await mess<any>("voice.call.signal", { callId: call.id });
-          if (sig.answer && pc.remoteDescription === null) {
-            const answerDesc = JSON.parse(sig.answer);
-            await pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
-            setActiveCall(sig);
+          // Check if rejected/ended
+          if (sig.status === "rejected") {
+            app.toast("কল প্রত্যাখ্যান করা হয়েছে", "error");
+            cleanup();
             setOutgoing(null);
             if (signalPollRef.current) clearInterval(signalPollRef.current);
+            return;
           }
-          const remoteCands = sig.callerId === call.callerId ? sig.calleeCandidates : sig.callerCandidates;
-          if (Array.isArray(remoteCands)) {
-            for (const cand of remoteCands) {
+          if (sig.status === "ended" || sig.status === "missed") {
+            app.toast("কল শেষ হয়েছে", "info");
+            cleanup();
+            setOutgoing(null);
+            if (signalPollRef.current) clearInterval(signalPollRef.current);
+            return;
+          }
+          if (sig.answer && pc.signalingState !== "stable") {
+            try {
+              const answerDesc = JSON.parse(sig.answer);
+              await pc.setRemoteDescription(new RTCSessionDescription(answerDesc));
+              setActiveCall(sig);
+              setOutgoing(null);
+              // Now poll for ICE candidates
+              if (signalPollRef.current) clearInterval(signalPollRef.current);
+              signalPollRef.current = setInterval(async () => {
+                try {
+                  const sig2 = await mess<any>("voice.call.signal", { callId: call.id });
+                  if (sig2.calleeCandidates && Array.isArray(sig2.calleeCandidates)) {
+                    for (const cand of sig2.calleeCandidates) {
+                      try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
+                    }
+                  }
+                  if (sig2.status === "ended" || sig2.status === "rejected") {
+                    app.toast("কল শেষ হয়েছে", "info");
+                    cleanup();
+                    setActiveCall(null);
+                    if (signalPollRef.current) clearInterval(signalPollRef.current);
+                  }
+                } catch {}
+              }, 1000);
+            } catch (e) {
+              console.log("setRemoteDescription error", e);
+            }
+          }
+          // Try to add candidates even before answer
+          if (sig.calleeCandidates && Array.isArray(sig.calleeCandidates) && pc.remoteDescription) {
+            for (const cand of sig.calleeCandidates) {
               try { await pc.addIceCandidate(new RTCIceCandidate(cand)); } catch {}
             }
           }
         } catch {}
-      }, 1500);
+      }, 1000);
 
     } catch (err: any) {
-      const msg = err?.message || "";
-      if (msg.includes("Permission") || msg.includes("NotAllowed")) {
-        app.toast("🎤 মাইক্রোফোন Allow করুন — ব্রাউজারের উপরে Allow বাটন চাপুন", "error");
+      const name = err?.name || "";
+      if (name === "NotAllowedError") {
+        app.toast("🎤 মাইক্রোফোন Allow করুন", "error");
       } else {
         app.toast(err instanceof Error ? err.message : "কল শুরু করা যায়নি", "error");
       }

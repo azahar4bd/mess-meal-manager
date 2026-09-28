@@ -1110,6 +1110,12 @@ const handlers: Record<string, ActionHandler> = {
   },
 
   "voice.call.list": async (ctx) => {
+    // cleanup old ringing (>2 min) — only old calls, not current
+    try {
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`UPDATE voice_calls SET status = 'missed', updated_at = NOW() WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '2 minutes'`);
+    } catch {}
+
     // incoming ringing calls for current user + outgoing ringing
     const incoming = await db.select().from(voiceCalls).where(
       and(eq(voiceCalls.calleeId, ctx.user.id), eq(voiceCalls.status, "ringing"))
@@ -1120,25 +1126,9 @@ const handlers: Record<string, ActionHandler> = {
     ).orderBy(desc(voiceCalls.createdAt)).limit(5);
 
     const active = await db.select().from(voiceCalls).where(
-      and(
-        eq(voiceCalls.status, "accepted"),
-        // caller or callee is current user
-      )
+      eq(voiceCalls.status, "accepted")
     ).then(rows => rows.filter(r => r.callerId === ctx.user.id || r.calleeId === ctx.user.id))
     .then(rows => rows.slice(0, 3));
-
-    // cleanup old ringing (>2 min)
-    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000);
-    await db.update(voiceCalls).set({ status: "missed", updatedAt: new Date() })
-      .where(and(eq(voiceCalls.status, "ringing"), eq(voiceCalls.calleeId, ctx.user.id)))
-      .returning().then(async (old) => {
-        // actually need to filter by createdAt < twoMinAgo, but drizzle doesn't support < easily here, do manual
-      });
-    // manual cleanup via sql
-    try {
-      const { sql } = await import("drizzle-orm");
-      await db.execute(sql`UPDATE voice_calls SET status = 'missed', updated_at = NOW() WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '2 minutes'`);
-    } catch {}
 
     return { incoming, outgoing, active };
   },
