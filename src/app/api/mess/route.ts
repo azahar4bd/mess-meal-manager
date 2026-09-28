@@ -1255,23 +1255,42 @@ const handlers: Record<string, ActionHandler> = {
   },
 
   "voice.users.online": async (ctx) => {
-    const officeId = ctx.activeOfficeId || ctx.user.officeId;
-    if (!officeId) return [];
-    const recentSessions = await db.select().from(sessions).where(eq(sessions.officeId, officeId)).limit(100);
-    const activeUserIds = new Set(recentSessions.filter(s => s.expiresAt > new Date()).map(s => s.userId));
-    
-    const officeUsers = await db.select().from(users).where(eq(users.officeId, officeId)).limit(100);
+    const isAdmin = ctx.user.role === "admin";
+    let officeUsers: any[] = [];
+    let activeUserIds = new Set<string>();
+
+    if (isAdmin) {
+      // Admin sees all users across all offices with online status
+      const allSessions = await db.select().from(sessions).limit(200);
+      activeUserIds = new Set(allSessions.filter(s => s.expiresAt > new Date()).map(s => s.userId));
+      const allUsers = await db.select().from(users).limit(200);
+      officeUsers = allUsers as any;
+    } else {
+      const officeId = ctx.activeOfficeId || ctx.user.officeId;
+      if (!officeId) return [];
+      const recentSessions = await db.select().from(sessions).where(eq(sessions.officeId, officeId)).limit(100);
+      activeUserIds = new Set(recentSessions.filter(s => s.expiresAt > new Date()).map(s => s.userId));
+      const officeRows = await db.select().from(users).where(eq(users.officeId, officeId)).limit(100);
+      officeUsers = officeRows as any;
+    }
+
+    const officeRows = await db.select().from(offices).limit(100);
+    const officeNameMap = new Map(officeRows.map((o: any) => [o.id, o.name]));
+
     return officeUsers
-      .filter(u => u.id !== ctx.user.id && u.status === "active")
-      .map(u => ({
+      .filter((u: any) => u.id !== ctx.user.id && u.status === "active")
+      .map((u: any) => ({
         id: u.id,
         userId: u.userId,
         name: u.name,
         role: u.role,
+        officeId: u.officeId,
+        officeName: u.officeId ? officeNameMap.get(u.officeId) ?? "" : "— platform —",
         online: activeUserIds.has(u.id),
         lastLogin: u.lastLogin ? u.lastLogin.toISOString() : null,
       }))
-      .slice(0, 50);
+      .sort((a: any, b: any) => (a.online === b.online ? 0 : a.online ? -1 : 1))
+      .slice(0, isAdmin ? 100 : 50);
   },
 
   "voice.call.history": async (ctx) => {

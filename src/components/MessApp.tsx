@@ -121,24 +121,32 @@ function Shell({ initialTab }: { initialTab?: string }) {
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen">
       <I18nWatcher />
       <AppNoticeTicker />
-      <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-      <ContextBar />
-      <CurrentPageBar />
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <main className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-4">
-        {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
-        <TabRouter />
-      </main>
-      <FooterBar />
-      <MobileTabBar />
-      <GlobalEditButton />
-      <SupportChatButton />
-      <AdminChatButton />
-      <VoiceCallManager />
-      <ToastStack toasts={app.toasts} onClose={app.closeToast} />
+      {/* Desktop permanent sidebar — visible on PC */}
+      <div className="hidden md:block">
+        <DesktopSidebar />
+      </div>
+      {/* Main wrapper — with left margin on PC for permanent sidebar */}
+      <div className="md:ml-[280px] min-h-screen pb-24 flex flex-col">
+        <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+        <ContextBar />
+        <CurrentPageBar />
+        {/* Mobile overlay sidebar — only on mobile when open */}
+        <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+        <main className="mx-auto w-full max-w-5xl px-3 py-3 sm:px-4 flex-1">
+          {app.user.role === "admin" && !app.office ? <NoOfficeNotice /> : null}
+          <TabRouter />
+        </main>
+        <FooterBar />
+        <MobileTabBar />
+        <GlobalEditButton />
+        <SupportChatButton />
+        <AdminChatButton />
+        <VoiceCallManager />
+        <ToastStack toasts={app.toasts} onClose={app.closeToast} />
+      </div>
     </div>
   );
 }
@@ -242,7 +250,7 @@ function Header({ menuOpen, setMenuOpen }: { menuOpen: boolean; setMenuOpen: (v:
         <button
           type="button"
           onClick={() => setMenuOpen(!menuOpen)}
-          className="btn btn-ghost btn-sm h-10 w-10 px-0 text-[19px]"
+          className="btn btn-ghost btn-sm h-10 w-10 px-0 text-[19px] md:hidden"
           aria-label="☰ মেনু"
           aria-expanded={menuOpen}
         >
@@ -497,21 +505,82 @@ function CurrentPageBar() {
  *  Sidebar menu — role based (spec §68–§70)
  * ══════════════════════════════════════════════════════════ */
 
+/* Desktop permanent sidebar — always visible on PC */
+function DesktopSidebar() {
+  const app = useApp();
+  const { texts } = useUiContent(app.office?.id ?? null);
+  return (
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-[280px] flex-col border-r border-[var(--border)] bg-[var(--card)] shadow-sm md:flex">
+      <div className="flex h-[56px] items-center justify-between border-b border-[var(--border)] px-3">
+        <div className="flex items-center gap-2">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[var(--brand)] text-[14px] font-black text-white">
+            {(texts.appName || "M").trim().charAt(0).toUpperCase()}
+          </span>
+          <span className="text-[13.5px] font-extrabold truncate max-w-[160px]">{texts.appName || "Mess Manager"}</span>
+        </div>
+      </div>
+
+      <div className="border-b border-[var(--border)] px-3 py-2.5 text-[12px]">
+        <div className="truncate font-bold">{app.user?.name}</div>
+        <div className="muted truncate">
+          {app.user?.userId} • {app.role ? ROLE_LABEL[app.role].bn : ""}
+        </div>
+        <div className="muted mt-1 truncate">
+          {app.office?.name} {app.month ? `• ${app.month.monthName}` : ""}
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5 text-[11px]">
+          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+          <span className="muted">অনলাইন</span>
+        </div>
+      </div>
+
+      <nav className="flex-1 overflow-y-auto p-2">
+        {app.menu.map((m) => (
+          <button
+            key={m.tab}
+            type="button"
+            onClick={() => app.setTab(m.tab)}
+            className={`mb-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-semibold transition ${
+              app.tab === m.tab ? "bg-[var(--brand)] text-white shadow" : "hover:bg-[var(--brand-soft)]"
+            }`}
+          >
+            <span className="w-5 text-center" aria-hidden>
+              {m.icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{app.lang === "bn" ? m.bn : m.en}</span>
+            {app.tab === m.tab ? <span aria-hidden>›</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      <div className="border-t border-[var(--border)] p-2">
+        <button
+          type="button"
+          onClick={() => void app.logout()}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-semibold text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        >
+          <span className="w-5 text-center" aria-hidden>⎋</span>
+          Logout
+        </button>
+        <p className="px-3 pt-2 text-[11px] font-bold">{texts.footerText?.trim() || texts.appName || "Mess Meal Manager"}</p>
+        {texts.footerSubText?.trim() ? <p className="muted px-3 text-[10px]">{texts.footerSubText}</p> : null}
+      </div>
+    </aside>
+  );
+}
+
+/* Mobile overlay sidebar — only on mobile */
 function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const app = useApp();
   const { texts } = useUiContent(app.office?.id ?? null);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 no-print">
+    <div className="fixed inset-0 z-50 no-print md:hidden">
       <button type="button" aria-label="মেনু বন্ধ করুন" className="absolute inset-0 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
-      {/* Mobile: full-height drawer from left corner | PC: panel from near ☰ button, not corner */}
       <aside
         className="
-          flex flex-col border border-[var(--border)] bg-[var(--card)] shadow-2xl
-          /* mobile — full height left drawer */
+          flex flex-col border-r border-[var(--border)] bg-[var(--card)] shadow-2xl
           slide-in absolute inset-y-0 left-0 w-[86%] max-w-[300px]
-          /* PC — panel anchored to header container left, just under ☰ button */
-          md:inset-y-auto md:top-[56px] md:bottom-auto md:left-[max(12px,calc(50%-512px+12px))] md:right-auto md:w-[340px] md:max-h-[calc(100vh-72px)] md:rounded-2xl md:overflow-hidden md:animate-[fadeIn_0.18s_ease-out] md:origin-top-left md:shadow-[0_12px_40px_rgba(0,0,0,0.18)]
         "
       >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2.5">

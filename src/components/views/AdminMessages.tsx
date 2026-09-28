@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { Card, EmptyState, Loader, Modal } from "@/components/ui";
 import { MessageBubble } from "@/components/SupportChat";
+import { VoiceUsersList } from "@/components/VoiceCall";
 import { mess } from "@/lib/client";
 import { toDisplayDateTime } from "@/lib/date";
 import { ROLE_LABEL } from "@/lib/permissions";
@@ -20,6 +21,8 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  const [viewMode, setViewMode] = useState<"chats" | "all">("chats");
 
   const loadThreads = useCallback(async () => {
     try {
@@ -82,7 +85,31 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
   const active = threads.find((t) => t.userId === activeId);
 
   return (
-    <div className="grid gap-3 lg:grid-cols-[320px_1fr]">
+    <div className="space-y-3">
+      {/* Top tabs for admin — Chats vs All Users with online status */}
+      <div className="flex gap-1.5 rounded-lg bg-[var(--bg)] p-1">
+        <button
+          type="button"
+          onClick={() => setViewMode("chats")}
+          className={`flex-1 rounded-md px-3 py-2 text-[12px] font-bold transition ${viewMode === "chats" ? "bg-[var(--card)] shadow border border-[var(--border)]" : "text-[var(--muted)]"}`}
+        >
+          💬 চ্যাট ({threads.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode("all")}
+          className={`flex-1 rounded-md px-3 py-2 text-[12px] font-bold transition ${viewMode === "all" ? "bg-[var(--card)] shadow border border-[var(--border)]" : "text-[var(--muted)]"}`}
+        >
+          📞 সকল ইউজার — কল + অনলাইন
+        </button>
+      </div>
+
+      {viewMode === "all" ? (
+        <Card title="📞 সকল ইউজার — ভয়েস কল" subtitle="যে কাউকে কল করুন, অনলাইন স্ট্যাটাস দেখুন" bodyClass="p-3">
+          <VoiceUsersList />
+        </Card>
+      ) : (
+        <div className="grid gap-3 lg:grid-cols-[320px_1fr]">
       {/* ── থ্রেড তালিকা ── */}
       <Card bodyClass="p-0" className={activeId ? "hidden lg:block" : ""}>
         <div className="max-h-[70vh] divide-y divide-[var(--border)] overflow-y-auto">
@@ -146,7 +173,6 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
                 className="btn btn-primary btn-sm"
                 onClick={async () => {
                   try {
-                    // Find internal user id from userId (login)
                     const allUsers = await mess<any[]>("admin.users.list").catch(() => []);
                     const target = Array.isArray(allUsers) ? allUsers.find((u: any) => u.userId === active.userId || u.id === active.userId) : null;
                     if (!target) {
@@ -193,6 +219,8 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
           </div>
         )}
       </Card>
+        </div>
+      )}
     </div>
   );
 }

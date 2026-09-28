@@ -509,6 +509,7 @@ export function VoiceUsersList() {
   const app = useApp();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -523,7 +524,7 @@ export function VoiceUsersList() {
 
   useEffect(() => {
     void load();
-    const t = setInterval(load, 10000);
+    const t = setInterval(load, 5000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -534,25 +535,63 @@ export function VoiceUsersList() {
   };
 
   if (loading) return <div className="muted p-3 text-[12px]">লোড হচ্ছে...</div>;
+
+  const filtered = users.filter((u) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      u.name?.toLowerCase().includes(q) ||
+      u.userId?.toLowerCase().includes(q) ||
+      u.officeName?.toLowerCase().includes(q) ||
+      u.role?.toLowerCase().includes(q)
+    );
+  });
+
+  const onlineCount = users.filter((u) => u.online).length;
+  const isAdmin = app.user?.role === "admin";
+
   if (!users.length) return <div className="muted p-3 text-[12px]">একই অফিসে কোনো সক্রিয় ইউজার নেই — অন্য ব্রাউজারে লগইন করুন</div>;
 
   return (
-    <div className="space-y-1.5">
-      {users.map((u) => (
-        <div key={u.id} className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] px-2.5 py-2">
-          <span className="min-w-0">
-            <span className="flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-full ${u.online ? 'bg-green-500' : 'bg-gray-300'}`} />
-              <span className="truncate text-[13px] font-bold">{u.name}</span>
-              <span className="text-[10px]">{u.online ? '🟢' : '⚪'}</span>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2 text-[11px]">
+        <span className="muted">
+          মোট {users.length} জন • <span className="text-green-600 font-bold">{onlineCount} অনলাইন</span> • {users.length - onlineCount} অফলাইন
+        </span>
+        <button type="button" className="btn btn-ghost btn-xs" onClick={() => void load()}>↻ রিফ্রেশ</button>
+      </div>
+
+      <input
+        type="text"
+        placeholder={isAdmin ? "নাম / ID / অফিস দিয়ে খুঁজুন..." : "নাম দিয়ে খুঁজুন..."}
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="input input-sm w-full text-[12px]"
+      />
+
+      <div className="max-h-[380px] space-y-1.5 overflow-y-auto pr-1">
+        {filtered.map((u) => (
+          <div key={u.id} className={`flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 ${u.online ? 'border-green-200 bg-green-50/50 dark:bg-green-900/10' : 'border-[var(--border)]'}`}>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span className={`h-2.5 w-2.5 rounded-full ${u.online ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+                <span className="truncate text-[13px] font-bold">{u.name}</span>
+                {u.online ? <span className="rounded bg-green-100 px-1 py-0 text-[9px] font-bold text-green-700">LIVE</span> : null}
+              </span>
+              <span className="muted block truncate text-[11px]">
+                {u.userId} • {u.role}
+                {isAdmin && u.officeName ? ` • ${u.officeName}` : ""}
+                {u.online ? " • 🟢 অনলাইন" : " • ⚪ অফলাইন"}
+              </span>
+              {u.lastLogin ? <span className="muted block text-[10px]">শেষ লগইন: {new Date(u.lastLogin).toLocaleString('bn-BD')}</span> : null}
             </span>
-            <span className="muted block truncate text-[11px]">{u.userId} • {u.role} {u.online ? '• অনলাইন' : '• অফলাইন'}</span>
-          </span>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => callUser(u)}>
-            📞 কল
-          </button>
-        </div>
-      ))}
+            <button type="button" className={`btn btn-sm shrink-0 ${u.online ? 'btn-primary' : 'btn-soft'}`} onClick={() => callUser(u)}>
+              📞 কল
+            </button>
+          </div>
+        ))}
+        {filtered.length === 0 ? <div className="muted p-2 text-[11px]">কোনো ইউজার পাওয়া যায়নি</div> : null}
+      </div>
     </div>
   );
 }
