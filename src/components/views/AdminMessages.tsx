@@ -78,9 +78,6 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
   };
 
   if (!threads) return <Loader label="বার্তা লোড হচ্ছে…" />;
-  if (threads.length === 0) {
-    return <EmptyState icon="💬" title="কোনো বার্তা নেই" hint="কোনো ম্যানেজার বা সদস্য বার্তা পাঠালে এখানে দেখা যাবে।" />;
-  }
 
   const active = threads.find((t) => t.userId === activeId);
 
@@ -108,6 +105,8 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
         <Card title="📞 সকল ইউজার — ভয়েস কল" subtitle="যে কাউকে কল করুন, অনলাইন স্ট্যাটাস দেখুন" bodyClass="p-3">
           <VoiceUsersList />
         </Card>
+      ) : threads.length === 0 ? (
+        <EmptyState icon="💬" title="কোনো বার্তা নেই" hint="কোনো ম্যানেজার বা সদস্য বার্তা পাঠালে এখানে দেখা যাবে। সকল ইউজার ট্যাবে গিয়ে সবাইকে কল করতে পারবেন।" />
       ) : (
         <div className="grid gap-3 lg:grid-cols-[320px_1fr]">
       {/* ── থ্রেড তালিকা ── */}
