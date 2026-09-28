@@ -564,6 +564,7 @@ const emptyUserForm = {
   password: "",
 };
 
+
 function UsersPanel() {
   const app = useApp();
   const [rows, setRows] = useState<UserRow[]>([]);
@@ -578,9 +579,12 @@ function UsersPanel() {
   const [pwUser, setPwUser] = useState<UserRow | null>(null);
   const [pw, setPw] = useState("");
   const [pwBusy, setPwBusy] = useState(false);
+  const [showPwInput, setShowPwInput] = useState(false);
   const [deleting, setDeleting] = useState<UserRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [showPasswordCol, setShowPasswordCol] = useState(false);
+  const [showPasswordCol, setShowPasswordCol] = useState(true);
+  const [lastReset, setLastReset] = useState<{ name: string; userId: string; password: string } | null>(null);
+  const [revealMap, setRevealMap] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -661,6 +665,9 @@ function UsersPanel() {
     const res = await app.call<{ id: string }>(editing ? "admin.user.update" : "admin.user.create", payload);
     setBusy(false);
     if (res) {
+      if (!editing && form.password) {
+        setLastReset({ name: form.name, userId: form.userId, password: form.password });
+      }
       app.toast(editing ? "ইউজার হালনাগাদ হয়েছে ✓" : "নতুন ইউজার তৈরি হয়েছে ✓", "success");
       setFormOpen(false);
       await load();
@@ -685,10 +692,19 @@ function UsersPanel() {
     const res = await app.call<{ ok: boolean }>("admin.user.resetPassword", { id: pwUser.id, password: pw.trim() });
     setPwBusy(false);
     if (res?.ok) {
-      app.toast(`${pwUser.name}-এর পাসওয়ার্ড রিসেট হয়েছে ✓ (সব পুরনো সেশন বাতিল হয়েছে)`, "success");
+      setLastReset({ name: pwUser.name, userId: pwUser.userId, password: pw.trim() });
+      app.toast(`${pwUser.name}-এর পাসওয়ার্ড রিসেট হয়েছে ✓`, "success");
       setPwUser(null);
       setPw("");
     }
+  };
+
+  const genRandomPw = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    let s = "";
+    for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+    setPw(s);
+    setShowPwInput(true);
   };
 
   const runDelete = async () => {
@@ -707,6 +723,7 @@ function UsersPanel() {
     setForm((p) => ({ ...p, [k]: e.target.value }));
 
   const hasPlain = rows.some((r) => r.passwordPlain !== undefined);
+  const toggleReveal = (id: string) => setRevealMap((m) => ({ ...m, [id]: !m[id] }));
 
   return (
     <div className="space-y-3">
@@ -723,21 +740,44 @@ function UsersPanel() {
             <option value="__none__">প্ল্যাটফর্ম (কোনো অফিস নেই)</option>
           </Select>
         ) : null}
-        {hasPlain ? (
-          <label className="flex items-center gap-1.5 text-[12px] font-semibold">
-            <input type="checkbox" className="h-4 w-4" checked={showPasswordCol} onChange={(e) => setShowPasswordCol(e.target.checked)} />
-            পাসওয়ার্ড দেখান
-          </label>
-        ) : null}
+        <label className="flex items-center gap-1.5 text-[12px] font-semibold">
+          <input type="checkbox" className="h-4 w-4" checked={showPasswordCol} onChange={(e) => setShowPasswordCol(e.target.checked)} />
+          পাসওয়ার্ড কলাম
+        </label>
         <button type="button" className="btn btn-primary btn-sm ml-auto" onClick={openCreate}>
           + নতুন ইউজার
         </button>
       </div>
 
-      <div className="rounded-lg border border-[var(--warn)] bg-[var(--warn-soft)] px-3 py-2 text-[11.5px] font-semibold text-[var(--warn)]">
-        🔒 প্রোডাকশন সিকিউরিটির জন্য পাসওয়ার্ড কখনো প্লেইন টেক্সটে দেখানো হয় না — সব পাসওয়ার্ড bcrypt হ্যাশ হিসেবে সংরক্ষিত।
-        প্রয়োজনে <strong>Reset Password</strong> ব্যবহার করুন।
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2.5 text-[12px] leading-snug">
+        <div className="font-bold text-[13px]">🔐 পাসওয়ার্ড ম্যানেজমেন্ট — Admin</div>
+        <ul className="mt-1 list-disc pl-5 text-[11.5px] text-[var(--muted)]">
+          <li>সব পাসওয়ার্ড <strong>bcrypt hash</strong> হিসেবে সংরক্ষিত — পুরোনো পাসওয়ার্ড plain text-এ দেখা যায় না।</li>
+          <li>প্রতিটি ইউজারের পাসওয়ার্ড <strong>Reset</strong> করতে পারবেন। Reset-এর পর নতুন পাসওয়ার্ড একবার দেখাবে, কপি করে ইউজারকে দিতে পারবেন।</li>
+          <li>Office-এর আলাদা পাসওয়ার্ড নেই — Office-এর Manager হলো একজন User, তার পাসওয়ার্ড এখানেই Reset করুন।</li>
+          {hasPlain ? <li className="text-[var(--warn)]">Dev মোড: কিছু পুরোনো অ্যাকাউন্ট plain text-এ আছে — সেগুলো এখানে দেখা যাচ্ছে।</li> : null}
+        </ul>
       </div>
+
+      {lastReset ? (
+        <div className="rounded-lg border border-[var(--ok)] bg-[var(--ok-soft)] px-3 py-2.5 text-[12.5px]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              ✅ <strong>{lastReset.name}</strong> ({lastReset.userId}) — নতুন পাসওয়ার্ড:
+              <code className="ml-2 rounded bg-black/10 px-2 py-1 font-mono text-[13px] font-bold">{lastReset.password}</code>
+            </span>
+            <span className="flex gap-1">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigator.clipboard.writeText(lastReset.password).then(() => app.toast("কপি হয়েছে ✓", "success"))}>
+                📋 কপি
+              </button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setLastReset(null)}>
+                ✕ বন্ধ
+              </button>
+            </span>
+          </div>
+          <div className="muted mt-1 text-[11px]">এই পাসওয়ার্ড শুধু একবার দেখানো হচ্ছে — ইউজারকে জানিয়ে দিন, পরে আর দেখা যাবে না।</div>
+        </div>
+      ) : null}
 
       {loading ? (
         <Loader label="Loading users…" />
@@ -745,7 +785,7 @@ function UsersPanel() {
         <EmptyState icon="👥" title="কোনো ইউজার পাওয়া যায়নি" />
       ) : (
         <div className="table-wrap">
-          <table className="data" style={{ minWidth: 1050 }}>
+          <table className="data" style={{ minWidth: 1150 }}>
             <thead>
               <tr>
                 <th>ইউজার</th>
@@ -754,7 +794,7 @@ function UsersPanel() {
                 <th className="text-center">রোল</th>
                 <th className="text-center">স্ট্যাটাস</th>
                 <th>Last Login</th>
-                {showPasswordCol && hasPlain ? <th>পাসওয়ার্ড (dev)</th> : null}
+                {showPasswordCol ? <th>পাসওয়ার্ড</th> : null}
                 <th className="text-center">Action</th>
               </tr>
             </thead>
@@ -781,7 +821,25 @@ function UsersPanel() {
                     <StatusPill status={u.status} />
                   </td>
                   <td className="text-[11.5px] tabular-nums">{u.lastLogin ? toDisplayDateTime(u.lastLogin) : "কখনো না"}</td>
-                  {showPasswordCol && hasPlain ? <td className="font-mono text-[11px]">{u.passwordPlain ?? "(hashed)"}</td> : null}
+                  {showPasswordCol ? (
+                    <td className="text-[11px]">
+                      {u.passwordPlain !== undefined ? (
+                        <span className="flex items-center gap-1">
+                          <code className="font-mono text-[12px]">{revealMap[u.id] ? u.passwordPlain : "••••••••"}</code>
+                          <button type="button" className="btn btn-ghost btn-sm !h-6 !px-1" onClick={() => toggleReveal(u.id)}>
+                            {revealMap[u.id] ? "🙈" : "👁"}
+                          </button>
+                        </span>
+                      ) : u.passwordHashed ? (
+                        <span className="flex items-center gap-1">
+                          <Badge tone="ok">Hashed ✓</Badge>
+                          <span className="muted text-[10.5px]">••••••••</span>
+                        </span>
+                      ) : (
+                        <Badge tone="warn">Plain</Badge>
+                      )}
+                    </td>
+                  ) : null}
                   <td className="text-center">
                     <div className="flex flex-wrap items-center justify-center gap-1">
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => openEdit(u)}>
@@ -803,13 +861,14 @@ function UsersPanel() {
                       )}
                       <button
                         type="button"
-                        className="btn btn-ghost btn-sm"
+                        className="btn btn-primary btn-sm"
                         onClick={() => {
                           setPwUser(u);
                           setPw("");
+                          setShowPwInput(false);
                         }}
                       >
-                        Reset PW
+                        🔑 Reset PW
                       </button>
                       {u.id !== app.user?.id ? (
                         <button type="button" className="btn btn-ghost btn-sm text-[var(--danger)]" onClick={() => setDeleting(u)}>
@@ -887,7 +946,7 @@ function UsersPanel() {
             <TextInput value={form.branch} onChange={set("branch")} />
           </Field>
           {!editing ? (
-            <Field label="পাসওয়ার্ড" required hint="৪+ অক্ষর">
+            <Field label="পাসওয়ার্ড" required hint="৪+ অক্ষর — তৈরির পর একবার দেখাবে">
               <TextInput value={form.password} onChange={set("password")} type="text" />
             </Field>
           ) : null}
@@ -896,8 +955,8 @@ function UsersPanel() {
 
       <Modal
         open={!!pwUser}
-        title={`পাসওয়ার্ড রিসেট — ${pwUser?.name ?? ""}`}
-        subtitle="সব সক্রিয় সেশন বাতিল হবে।"
+        title={`পাসওয়ার্ড রিসেট — ${pwUser?.name ?? ""} (${pwUser?.userId ?? ""})`}
+        subtitle="নতুন পাসওয়ার্ড সেট করুন — সব পুরনো সেশন বাতিল হবে। রিসেটের পর পাসওয়ার্ড একবার দেখাবে।"
         onClose={() => setPwUser(null)}
         footer={
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -911,8 +970,19 @@ function UsersPanel() {
         }
       >
         <Field label="নতুন পাসওয়ার্ড" required hint="কমপক্ষে ৪ অক্ষর">
-          <TextInput value={pw} onChange={(e) => setPw(e.target.value)} placeholder="নতুন পাসওয়ার্ড" />
+          <div className="flex gap-2">
+            <TextInput value={pw} onChange={(e) => setPw(e.target.value)} placeholder="নতুন পাসওয়ার্ড" type={showPwInput ? "text" : "password"} className="flex-1" />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setShowPwInput((v) => !v)}>
+              {showPwInput ? "🙈" : "👁"}
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={genRandomPw}>
+              🎲 Generate
+            </button>
+          </div>
         </Field>
+        <div className="mt-3 rounded bg-[var(--warn-soft)] px-2.5 py-2 text-[11.5px] text-[var(--warn)]">
+          ⚠️ নতুন পাসওয়ার্ড সেট করার পর উপরে সবুজ বক্সে একবার দেখাবে — কপি করে ইউজারকে পাঠিয়ে দিন। পরে আর plain text-এ দেখা যাবে না।
+        </div>
       </Modal>
 
       <ConfirmDialog
@@ -926,6 +996,8 @@ function UsersPanel() {
     </div>
   );
 }
+
+
 
 /* ══════════════════════════════════════════════════════════
  *  Audit trail (spec §97)
