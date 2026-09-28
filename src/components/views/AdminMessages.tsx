@@ -134,13 +134,36 @@ export function AdminMessages({ onUnreadChange }: { onUnreadChange?: (n: number)
               <button type="button" className="btn btn-ghost btn-sm lg:hidden" onClick={() => setActiveId(null)}>
                 ‹
               </button>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="truncate text-[13.5px] font-bold">{active.userName || active.userId}</div>
                 <div className="muted truncate text-[11px]">
                   {active.officeName ? `${active.officeName} • ` : ""}
                   {ROLE_LABEL[active.role as keyof typeof ROLE_LABEL]?.bn ?? active.role} • {active.userId}
                 </div>
               </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  try {
+                    // Find internal user id from userId (login)
+                    const allUsers = await mess<any[]>("admin.users.list").catch(() => []);
+                    const target = Array.isArray(allUsers) ? allUsers.find((u: any) => u.userId === active.userId || u.id === active.userId) : null;
+                    if (!target) {
+                      app.toast("ইউজার পাওয়া যায়নি", "error");
+                      return;
+                    }
+                    if ((window as any).initiateVoiceCall) {
+                      (window as any).initiateVoiceCall(target.id, target.name || active.userName);
+                      app.toast(`${target.name || active.userName} কে কল করা হচ্ছে...`, "success");
+                    }
+                  } catch (err) {
+                    app.toast(err instanceof Error ? err.message : "কল করা যায়নি", "error");
+                  }
+                }}
+              >
+                📞 কল
+              </button>
             </div>
             <div className="modal-scroll flex-1 space-y-2 overflow-y-auto bg-[var(--bg)] p-2.5">
               {messages.map((m) => (

@@ -213,7 +213,6 @@ export const MENU: MenuItem[] = [
   { tab: "extras", bn: "অতিরিক্ত খরচ", en: "Extras", icon: "🧾", capability: "extras.view" },
   { tab: "members", bn: "সদস্য", en: "Members", icon: "👥", capability: "members.view" },
   { tab: "report", bn: "হিসাব / রিপোর্ট", en: "Reports", icon: "📊", capability: "report.view" },
-  { tab: "voice", bn: "ভয়েস কল", en: "Voice Call", icon: "📞", capability: "voice.view" },
   { tab: "sheet", bn: "গুগল শিট", en: "Google Sheet", icon: "☁", capability: "sheet.view" },
   { tab: "admin", bn: "অ্যাডমিন প্যানেল", en: "Admin", icon: "🛡", capability: "user.manage" },
   { tab: "guide", bn: "গাইড", en: "Guide", icon: "📘", capability: "guide.view" },

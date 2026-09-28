@@ -134,6 +134,33 @@ export function UserChat({ open, onClose, onChanged }: { open: boolean; onClose:
   return (
     <Modal open={open} title="💬 অ্যাডমিনের সাথে চ্যাট" onClose={onClose}>
       <div className="flex h-[54vh] flex-col">
+        <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-1 pb-2">
+          <span className="text-[11.5px] font-semibold text-[var(--muted)]">মেসেজ + ভয়েস কল</span>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={async () => {
+              try {
+                const online = await mess<any[]>("voice.users.online");
+                const list = Array.isArray(online) ? online : [];
+                // Find manager or admin in same office
+                const target = list.find((u: any) => u.role === "manager" || u.role === "admin") || list[0];
+                if (!target) {
+                  app.toast("একই অফিসে কোনো অনলাইন ম্যানেজার/অ্যাডমিন নেই", "error");
+                  return;
+                }
+                if ((window as any).initiateVoiceCall) {
+                  (window as any).initiateVoiceCall(target.id, target.name);
+                  app.toast(`${target.name} কে কল করা হচ্ছে...`, "success");
+                }
+              } catch (err) {
+                app.toast(err instanceof Error ? err.message : "কল করা যায়নি", "error");
+              }
+            }}
+          >
+            📞 ভয়েস কল
+          </button>
+        </div>
         <div className="modal-scroll -mx-1 flex-1 space-y-2 overflow-y-auto bg-[var(--bg)] p-2">
           {loading && messages.length === 0 ? (
             <div className="muted py-8 text-center text-[12.5px]">লোড হচ্ছে…</div>
