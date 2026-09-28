@@ -332,9 +332,9 @@ function ContextBar() {
 
   return (
     <div className="border-b border-[var(--border)] bg-[var(--brand-soft)]/60 no-print">
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:px-4">
         {app.user?.canSwitchOffice ? (
-          <label className="flex min-w-0 flex-1 items-center gap-1.5 text-[12px]">
+          <label className="flex w-full min-w-0 items-center gap-1.5 text-[12px] sm:flex-1">
             <span className="muted shrink-0 font-semibold">অফিস:</span>
             <Select
               className="input input-sm h-9 min-w-0 flex-1"
@@ -357,13 +357,13 @@ function ContextBar() {
           </div>
         )}
 
-        <label className="flex min-w-0 items-center gap-1.5 text-[12px] sm:ml-auto">
+        <label className="flex w-full min-w-0 items-center gap-1.5 text-[12px] sm:ml-auto sm:w-auto">
           <span className="muted shrink-0 font-semibold">মাস:</span>
           <Select
-            className="input input-sm h-9 min-w-0"
+            className="input input-sm h-9 min-w-0 flex-1 sm:min-w-[160px]"
             value={app.month?.id ?? ""}
             onChange={(e) => void app.selectMonth(e.target.value)}
-            style={{ maxWidth: 220 }}
+            style={{ maxWidth: 260 }}
           >
             {monthOptions.map((m) => (
               <option key={m.id} value={m.id}>
@@ -373,38 +373,40 @@ function ContextBar() {
           </Select>
         </label>
 
-        {app.can("month.write") && app.month && !app.month.isClosed ? (
-          <button
-            type="button"
-            className="btn btn-soft btn-sm h-9 border-[var(--warn)] text-[var(--warn)]"
-            onClick={() => setCloseOpen(true)}
-            title="চালু মাস বন্ধ করলে সঙ্গে সঙ্গে পরের মাস স্বয়ংক্রিয় শুরু হবে"
-          >
-            🔒 চালু মাস ক্লোজ
-          </button>
-        ) : null}
+        <div className="flex w-full flex-wrap gap-1.5 sm:w-auto">
+          {app.can("month.write") && app.month && !app.month.isClosed ? (
+            <button
+              type="button"
+              className="btn btn-soft btn-sm h-9 flex-1 border-[var(--warn)] text-[var(--warn)] sm:flex-none"
+              onClick={() => setCloseOpen(true)}
+              title="চালু মাস বন্ধ করলে সঙ্গে সঙ্গে পরের মাস স্বয়ংক্রিয় শুরু হবে"
+            >
+              🔒 চালু মাস ক্লোজ
+            </button>
+          ) : null}
 
-        {app.can("office.manage") && app.month?.isClosed ? (
-          <button
-            type="button"
-            className="btn btn-soft btn-sm h-9 border-[var(--brand)] text-[var(--brand)]"
-            onClick={() => setReopenOpen(true)}
-            title="পুরনো/বন্ধ মাস পুনরায় চালু করুন (সংশোধনের পর আবার ক্লোজ করা যাবে)"
-          >
-            🔓 মাস চালু করুন
-          </button>
-        ) : null}
+          {app.can("office.manage") && app.month?.isClosed ? (
+            <button
+              type="button"
+              className="btn btn-soft btn-sm h-9 flex-1 border-[var(--brand)] text-[var(--brand)] sm:flex-none"
+              onClick={() => setReopenOpen(true)}
+              title="পুরনো/বন্ধ মাস পুনরায় চালু করুন (সংশোধনের পর আবার ক্লোজ করা যাবে)"
+            >
+              🔓 মাস চালু করুন
+            </button>
+          ) : null}
 
-        {app.can("office.manage") && app.month ? (
-          <button
-            type="button"
-            className="btn btn-soft btn-sm h-9 border-[var(--danger)] text-[var(--danger)]"
-            onClick={() => setDeleteOpen(true)}
-            title="এই মাসটি তার সব মিল/বাজার/জমা/সদস্যসহ চিরতরে মুছে ফেলুন"
-          >
-            🗑 মাস ডিলিট
-          </button>
-        ) : null}
+          {app.can("office.manage") && app.month ? (
+            <button
+              type="button"
+              className="btn btn-soft btn-sm h-9 flex-1 border-[var(--danger)] text-[var(--danger)] sm:flex-none"
+              onClick={() => setDeleteOpen(true)}
+              title="এই মাসটি তার সব মিল/বাজার/জমা/সদস্যসহ চিরতরে মুছে ফেলুন"
+            >
+              🗑 মাস ডিলিট
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <ConfirmDialog
