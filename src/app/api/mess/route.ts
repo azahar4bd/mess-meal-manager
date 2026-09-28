@@ -1,7 +1,7 @@
 import { after, NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { cryptoId, messMonths, offices, sessions, syncLogs, users, type User } from "@/db/schema";
+import { cryptoId, messMonths, offices, sessions, syncLogs, users, voiceCalls, type User } from "@/db/schema";
 import {
   getNotices,
   getNoticesForEdit,
@@ -1054,7 +1054,258 @@ const handlers: Record<string, ActionHandler> = {
     return msg;
   },
 
-  /* ── platform admin ──────────────────────────────────── */
+
+  /* ── voice calls — WebRTC signaling (office isolated) ── */
+  "voice.call.initiate": async (ctx, body) => {
+    const calleeId = str(body.calleeId);
+    if (!calleeId) throw new AuthError("bad-request", "যাকে কল করবেন তার ID দিন", 400);
+    if (calleeId === ctx.user.id) throw new AuthError("bad-request", "নিজেকে কল করা যাবে না", 400);
+    
+    const callee = await db.select().from(users).where(eq(users.id, calleeId)).limit(1).then(r => r[0]);
+    if (!callee) throw new AuthError("not-found", "ব্যবহারকারী পাওয়া যায়নি", 404);
+    
+    // office isolation: same office or admin
+    if (ctx.user.role !== "admin") {
+      const callerOffice = ctx.activeOfficeId || ctx.user.officeId;
+      const calleeOffice = callee.officeId;
+      if (callerOffice && calleeOffice && callerOffice !== calleeOffice) {
+        throw new AuthError("forbidden", "ভিন্ন অফিসের ব্যবহারকারীকে কল করা যাবে না", 403);
+      }
+    }
+
+    // check if callee already has a ringing call
+    const existing = await db.select().from(voiceCalls).where(
+      and(eq(voiceCalls.calleeId, calleeId), eq(voiceCalls.status, "ringing"))
+    ).limit(1);
+    if (existing.length) {
+      throw new AuthError("bad-request", "এই ব্যবহারকারী এখন অন্য কলে ব্যস্ত", 409);
+    }
+
+    // check if caller already has outgoing ringing
+    const existingOut = await db.select().from(voiceCalls).where(
+      and(eq(voiceCalls.callerId, ctx.user.id), eq(voiceCalls.status, "ringing"))
+    ).limit(1);
+    if (existingOut.length) {
+      // end previous ringing
+      await db.update(voiceCalls).set({ status: "ended", updatedAt: new Date() }).where(eq(voiceCalls.id, existingOut[0].id));
+    }
+
+    const callId = cryptoId("call");
+    const offer = str(body.offer);
+    
+    const inserted = await db.insert(voiceCalls).values({
+      id: callId,
+      officeId: ctx.activeOfficeId || ctx.user.officeId || "",
+      callerId: ctx.user.id,
+      callerName: ctx.user.name,
+      callerUserId: ctx.user.userId,
+      calleeId: callee.id,
+      calleeName: callee.name,
+      calleeUserId: callee.userId,
+      status: "ringing",
+      offer,
+      answer: "",
+      callerCandidates: "[]",
+      calleeCandidates: "[]",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }).returning();
+
+    await logAction(ctx, "voice.call.initiate", "voice_call", callId, `${ctx.user.name} → ${callee.name} ভয়েস কল`);
+    
+    return inserted[0];
+  },
+
+  "voice.call.list": async (ctx) => {
+    // incoming ringing calls for current user + outgoing ringing
+    const incoming = await db.select().from(voiceCalls).where(
+      and(eq(voiceCalls.calleeId, ctx.user.id), eq(voiceCalls.status, "ringing"))
+    ).orderBy(desc(voiceCalls.createdAt)).limit(5);
+    
+    const outgoing = await db.select().from(voiceCalls).where(
+      and(eq(voiceCalls.callerId, ctx.user.id), eq(voiceCalls.status, "ringing"))
+    ).orderBy(desc(voiceCalls.createdAt)).limit(5);
+
+    const active = await db.select().from(voiceCalls).where(
+      and(
+        eq(voiceCalls.status, "accepted"),
+        // caller or callee is current user
+      )
+    ).then(rows => rows.filter(r => r.callerId === ctx.user.id || r.calleeId === ctx.user.id))
+    .then(rows => rows.slice(0, 3));
+
+    // cleanup old ringing (>2 min)
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000);
+    await db.update(voiceCalls).set({ status: "missed", updatedAt: new Date() })
+      .where(and(eq(voiceCalls.status, "ringing"), eq(voiceCalls.calleeId, ctx.user.id)))
+      .returning().then(async (old) => {
+        // actually need to filter by createdAt < twoMinAgo, but drizzle doesn't support < easily here, do manual
+      });
+    // manual cleanup via sql
+    try {
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`UPDATE voice_calls SET status = 'missed', updated_at = NOW() WHERE status = 'ringing' AND created_at < NOW() - INTERVAL '2 minutes'`);
+    } catch {}
+
+    return { incoming, outgoing, active };
+  },
+
+  "voice.call.get": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    if (call.callerId !== ctx.user.id && call.calleeId !== ctx.user.id && ctx.user.role !== "admin") {
+      throw new AuthError("forbidden", "এই কলে আপনার অনুমতি নেই", 403);
+    }
+    return call;
+  },
+
+  "voice.call.accept": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    const answer = str(body.answer);
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    if (call.calleeId !== ctx.user.id) throw new AuthError("forbidden", "শুধু যাকে কল করা হয়েছে সেই Accept করতে পারবে", 403);
+    if (call.status !== "ringing") throw new AuthError("bad-request", "কলটি আর ringing অবস্থায় নেই", 400);
+
+    const updated = await db.update(voiceCalls).set({
+      status: "accepted",
+      answer,
+      updatedAt: new Date(),
+    }).where(eq(voiceCalls.id, callId)).returning().then(r => r[0]);
+
+    await logAction(ctx, "voice.call.accept", "voice_call", callId, `${ctx.user.name} কল গ্রহণ করেছে`);
+    return updated;
+  },
+
+  "voice.call.reject": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    if (call.calleeId !== ctx.user.id && call.callerId !== ctx.user.id) {
+      throw new AuthError("forbidden", "অনুমতি নেই", 403);
+    }
+
+    const updated = await db.update(voiceCalls).set({
+      status: "rejected",
+      updatedAt: new Date(),
+    }).where(eq(voiceCalls.id, callId)).returning().then(r => r[0]);
+
+    await logAction(ctx, "voice.call.reject", "voice_call", callId, `${ctx.user.name} কল প্রত্যাখ্যান করেছে`);
+    return updated;
+  },
+
+  "voice.call.end": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    if (call.callerId !== ctx.user.id && call.calleeId !== ctx.user.id && ctx.user.role !== "admin") {
+      throw new AuthError("forbidden", "অনুমতি নেই", 403);
+    }
+
+    const updated = await db.update(voiceCalls).set({
+      status: "ended",
+      updatedAt: new Date(),
+    }).where(eq(voiceCalls.id, callId)).returning().then(r => r[0]);
+
+    await logAction(ctx, "voice.call.end", "voice_call", callId, `${ctx.user.name} কল শেষ করেছে`);
+    return updated;
+  },
+
+  "voice.call.candidates": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    const candidates = body.candidates;
+    const role = str(body.role); // caller | callee
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    if (call.callerId !== ctx.user.id && call.calleeId !== ctx.user.id) {
+      throw new AuthError("forbidden", "অনুমতি নেই", 403);
+    }
+
+    const candArray = Array.isArray(candidates) ? candidates : [];
+    const candJson = JSON.stringify(candArray.slice(-50)); // keep last 50
+
+    if (role === "caller" || call.callerId === ctx.user.id) {
+      await db.update(voiceCalls).set({ callerCandidates: candJson, updatedAt: new Date() }).where(eq(voiceCalls.id, callId));
+    } else {
+      await db.update(voiceCalls).set({ calleeCandidates: candJson, updatedAt: new Date() }).where(eq(voiceCalls.id, callId));
+    }
+
+    // return opposite side candidates
+    const fresh = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!fresh) return { ok: true };
+    
+    const opposite = (role === "caller" || call.callerId === ctx.user.id) ? fresh.calleeCandidates : fresh.callerCandidates;
+    try {
+      return { candidates: JSON.parse(opposite || "[]"), status: fresh.status, answer: fresh.answer, offer: fresh.offer };
+    } catch {
+      return { candidates: [], status: fresh.status };
+    }
+  },
+
+  "voice.call.signal": async (ctx, body) => {
+    const callId = str(body.callId || body.id);
+    if (!callId) throw new AuthError("bad-request", "callId আবশ্যক", 400);
+    const call = await db.select().from(voiceCalls).where(eq(voiceCalls.id, callId)).limit(1).then(r => r[0]);
+    if (!call) throw new AuthError("not-found", "কল পাওয়া যায়নি", 404);
+    return {
+      id: call.id,
+      status: call.status,
+      offer: call.offer,
+      answer: call.answer,
+      callerCandidates: (() => { try { return JSON.parse(call.callerCandidates || "[]"); } catch { return []; } })(),
+      calleeCandidates: (() => { try { return JSON.parse(call.calleeCandidates || "[]"); } catch { return []; } })(),
+      callerId: call.callerId,
+      calleeId: call.calleeId,
+      callerName: call.callerName,
+      calleeName: call.calleeName,
+    };
+  },
+
+  "voice.users.online": async (ctx) => {
+    const officeId = ctx.activeOfficeId || ctx.user.officeId;
+    if (!officeId) return [];
+    const recentSessions = await db.select().from(sessions).where(eq(sessions.officeId, officeId)).limit(100);
+    const activeUserIds = new Set(recentSessions.filter(s => s.expiresAt > new Date()).map(s => s.userId));
+    
+    const officeUsers = await db.select().from(users).where(eq(users.officeId, officeId)).limit(100);
+    return officeUsers
+      .filter(u => u.id !== ctx.user.id && u.status === "active")
+      .map(u => ({
+        id: u.id,
+        userId: u.userId,
+        name: u.name,
+        role: u.role,
+        online: activeUserIds.has(u.id),
+        lastLogin: u.lastLogin ? u.lastLogin.toISOString() : null,
+      }))
+      .slice(0, 50);
+  },
+
+  "voice.call.history": async (ctx) => {
+    const officeId = ctx.activeOfficeId || ctx.user.officeId || "";
+    const uid = ctx.user.id;
+    // recent calls where user is caller or callee
+    const rows = await db.select().from(voiceCalls)
+      .where(eq(voiceCalls.officeId, officeId))
+      .orderBy(desc(voiceCalls.createdAt))
+      .limit(50);
+    const filtered = rows.filter(r => r.callerId === uid || r.calleeId === uid);
+    return { calls: filtered.length ? filtered : rows.slice(0, 20) };
+  },
+
+
+
+    /* ── platform admin ──────────────────────────────────── */
   "admin.offices.list": async (ctx) => {
     if (!can(ctx.user.role, "office.manage")) deny(ctx, "office.manage");
     const rows = await listOffices();

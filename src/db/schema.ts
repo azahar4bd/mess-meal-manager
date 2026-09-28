@@ -486,6 +486,40 @@ export const supportMessages = pgTable(
  *  KEY / VALUE SETTINGS (platform + per office)
  * ──────────────────────────────────────────────────────────── */
 
+
+/* ────────────────────────────────────────────────────────────
+ *  VOICE CALLS — WebRTC signaling (office isolated)
+ * ──────────────────────────────────────────────────────────── */
+
+export const voiceCalls = pgTable(
+  "voice_calls",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => cryptoId("call")),
+    officeId: text("office_id").notNull().default(""),
+    callerId: text("caller_id").notNull(),
+    callerName: text("caller_name").notNull().default(""),
+    callerUserId: text("caller_user_id").notNull().default(""),
+    calleeId: text("callee_id").notNull(),
+    calleeName: text("callee_name").notNull().default(""),
+    calleeUserId: text("callee_user_id").notNull().default(""),
+    status: text("status").notNull().default("ringing"),
+    offer: text("offer").notNull().default(""),
+    answer: text("answer").notNull().default(""),
+    callerCandidates: text("caller_candidates").notNull().default("[]"),
+    calleeCandidates: text("callee_candidates").notNull().default("[]"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("voice_caller_idx").on(t.callerId, t.status),
+    index("voice_callee_idx").on(t.calleeId, t.status),
+    index("voice_office_idx").on(t.officeId, t.createdAt),
+  ],
+);
+
+
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull().default(""),
@@ -526,6 +560,7 @@ export type ExtraExpense = typeof extraExpenses.$inferSelect;
 export type SyncLog = typeof syncLogs.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type SupportMessage = typeof supportMessages.$inferSelect;
+export type VoiceCall = typeof voiceCalls.$inferSelect;
 
 export type Role = "admin" | "manager" | "member" | "audit";
 export type UserStatus = "pending" | "approved" | "rejected" | "inactive" | "active";

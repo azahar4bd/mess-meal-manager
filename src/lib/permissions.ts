@@ -29,7 +29,8 @@ export type Capability =
   | "user.manage"
   | "audit.view"
   | "guide.view"
-  | "settings.write";
+  | "settings.write"
+  | "voice.view";
 
 const MATRIX: Record<Role, Record<Capability, boolean>> = {
   /* ── Platform Admin: full control over everything (spec §7) ── */
@@ -58,6 +59,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "audit.view": true,
     "guide.view": true,
     "settings.write": true,
+    "voice.view": true,
   },
 
   /* ── Manager: everything inside OWN office only ─────────── */
@@ -89,6 +91,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "guide.view": true,
     // হিরো/হেডার/ফুটার/নোটিশ — সব কন্টেন্ট এডিট শুধুমাত্র প্ল্যাটফর্ম অ্যাডমিন
     "settings.write": false,
+    "voice.view": true,
   },
 
   /* ── Member: Reports menu only (spec §7, §70) ───────────── */
@@ -117,6 +120,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "audit.view": false,
     "guide.view": true,
     "settings.write": false,
+    "voice.view": true,
   },
 
   /* ── Audit: report-only access, zero modification rights ── */
@@ -145,6 +149,7 @@ const MATRIX: Record<Role, Record<Capability, boolean>> = {
     "audit.view": true,
     "guide.view": true,
     "settings.write": false,
+    "voice.view": true,
   },
 };
 
@@ -208,6 +213,7 @@ export const MENU: MenuItem[] = [
   { tab: "extras", bn: "অতিরিক্ত খরচ", en: "Extras", icon: "🧾", capability: "extras.view" },
   { tab: "members", bn: "সদস্য", en: "Members", icon: "👥", capability: "members.view" },
   { tab: "report", bn: "হিসাব / রিপোর্ট", en: "Reports", icon: "📊", capability: "report.view" },
+  { tab: "voice", bn: "ভয়েস কল", en: "Voice Call", icon: "📞", capability: "voice.view" },
   { tab: "sheet", bn: "গুগল শিট", en: "Google Sheet", icon: "☁", capability: "sheet.view" },
   { tab: "admin", bn: "অ্যাডমিন প্যানেল", en: "Admin", icon: "🛡", capability: "user.manage" },
   { tab: "guide", bn: "গাইড", en: "Guide", icon: "📘", capability: "guide.view" },

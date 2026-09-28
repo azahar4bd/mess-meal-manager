@@ -57,6 +57,13 @@
       "when": 1789800000000,
       "tag": "0007_audit_meals",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790586232819,
+      "tag": "0008_voice_calls",
+      "breakpoints": true
     }
   ]
 }

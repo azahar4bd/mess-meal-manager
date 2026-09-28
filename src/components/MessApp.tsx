@@ -27,6 +27,8 @@ import { MembersView } from "@/components/views/MembersView";
 import { ReportView } from "@/components/views/ReportView";
 import { SheetView } from "@/components/views/SheetView";
 import { AdminView } from "@/components/views/AdminView";
+import { VoiceView } from "@/components/views/VoiceView";
+import { VoiceCallManager } from "@/components/VoiceCall";
 import { AdminChatButton } from "@/components/views/AdminMessages";
 import { mess as messCall } from "@/lib/client";
 import { MENU, ROLE_LABEL } from "@/lib/permissions";
@@ -135,6 +137,7 @@ function Shell({ initialTab }: { initialTab?: string }) {
       <GlobalEditButton />
       <SupportChatButton />
       <AdminChatButton />
+      <VoiceCallManager />
       <ToastStack toasts={app.toasts} onClose={app.closeToast} />
     </div>
   );
@@ -205,6 +208,8 @@ function TabRouter() {
       return <MembersView />;
     case "report":
       return <ReportView />;
+    case "voice":
+      return <VoiceView />;
     case "sheet":
       return <SheetView />;
     case "admin":
