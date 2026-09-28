@@ -503,8 +503,17 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 no-print">
-      <button type="button" aria-label="মেনু বন্ধ করুন" className="absolute inset-0 bg-black/45" onClick={onClose} />
-      <aside className="slide-in absolute inset-y-0 left-0 flex w-[86%] max-w-[300px] flex-col border-r border-[var(--border)] bg-[var(--card)] shadow-2xl">
+      <button type="button" aria-label="মেনু বন্ধ করুন" className="absolute inset-0 bg-black/45 backdrop-blur-[1px]" onClick={onClose} />
+      {/* Mobile: full-height drawer from left corner | PC: panel from near ☰ button, not corner */}
+      <aside
+        className="
+          flex flex-col border border-[var(--border)] bg-[var(--card)] shadow-2xl
+          /* mobile — full height left drawer */
+          slide-in absolute inset-y-0 left-0 w-[86%] max-w-[300px]
+          /* PC — panel anchored to header container left, just under ☰ button */
+          md:inset-y-auto md:top-[56px] md:bottom-auto md:left-[max(12px,calc(50%-512px+12px))] md:right-auto md:w-[340px] md:max-h-[calc(100vh-72px)] md:rounded-2xl md:overflow-hidden md:animate-[fadeIn_0.18s_ease-out] md:origin-top-left md:shadow-[0_12px_40px_rgba(0,0,0,0.18)]
+        "
+      >
         <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2.5">
           <div className="text-[14px] font-extrabold">☰ Menu</div>
           <button type="button" onClick={onClose} className="btn btn-ghost btn-sm h-9 w-9 px-0 text-[17px]" aria-label="বন্ধ করুন">
