@@ -431,15 +431,15 @@ export function buildDenaPaonaHtml(input: PrintReportInput): string {
     </tr>`).join("");
 
   return `<!DOCTYPE html>
-<html lang="bn"><head><meta charset="utf-8" /><title>দেনা-পাওনা — ${esc(range)}</title>
+<html lang="bn"><head><meta charset="utf-8" /><title>দেনা-পাওনা — ${esc(office.name)} — ${esc(range)}</title>
 <style>
-  @page{size:A4;margin:10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:0;background:#fff;font-size:12px;}
-  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:12px 16px;} h1{font-size:16px;margin:0 0 2px;text-align:center;} .sub{color:#475467;font-size:10px;text-align:center;}
-  table{width:100%;border-collapse:collapse;margin-top:8px;} th,td{border:1px solid #000;padding:4px 5px;font-size:10.5px;} th{background:#f0f0f0;color:#000;font-weight:700;text-align:left;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} td.b{font-weight:700;} tfoot td{background:#f7f7f7;font-weight:700;} .pill{padding:1px 6px;border-radius:999px;font-size:9px;font-weight:700;border:1px solid #ccc;} .pill.due{background:#fee4e2;color:#b42318;} .pill.receive{background:#d1fadf;color:#027a48;} .pill.settled{background:#e4e7ec;color:#475467;} .toolbar{max-width:210mm;margin:0 auto 10px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:7px 12px;font-size:11px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{padding:0;max-width:none;} .toolbar{display:none;} @page{margin:10mm;}}
+  @page{size:A4;margin:12mm 10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:12px;}
+  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:18px 20px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:5px 6px;font-size:11px;} th{background:#eef7f2;color:#184632;font-weight:700;text-align:left;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} td.b{font-weight:700;} tfoot td{background:#f7faf8;font-weight:700;} .pill{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;} .pill.due{background:#fee4e2;color:#b42318;} .pill.receive{background:#d1fadf;color:#027a48;} .pill.settled{background:#e4e7ec;color:#475467;} .toolbar{max-width:210mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
 </style></head><body>
-<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
 <div class="sheet">
-  <h1>দেনা-পাওনা রিপোর্ট</h1><div class="sub">${esc(range)}</div>
+  <div class="head"><div><h1>📋 দেনা-পাওনা রিপোর্ট</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)}</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট সদস্য: ${summary.activeMembers}</div></div>
   <table><thead><tr><th class="c">#</th><th>সদস্য</th><th class="r">মোট খরচ</th><th class="r">মোট জমা</th><th class="r">দেনা(−)/পাওনা(+)</th><th class="c">স্ট্যাটাস</th><th>ফোন</th></tr></thead>
   <tbody>${rows||`<tr><td colspan="7" class="c">কোনো সদস্য নেই</td></tr>`}</tbody>
   <tfoot><tr><td colspan="4" class="r">মোট</td><td class="r">দিবে ৳${formatMoney(totalDue)} / পাবে ৳${formatMoney(totalReceive)}</td><td colspan="2"></td></tr></tfoot></table>
@@ -472,15 +472,15 @@ export function buildBazarListHtml(input: PrintReportInput): string {
     </tr>`).join("");
 
   return `<!DOCTYPE html>
-<html lang="bn"><head><meta charset="utf-8" /><title>বাজার লিস্ট — ${esc(range)}</title>
+<html lang="bn"><head><meta charset="utf-8" /><title>বাজার লিস্ট — ${esc(office.name)} — ${esc(range)}</title>
 <style>
-  @page{size:A4 landscape;margin:8mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:0;background:#fff;font-size:10.5px;}
-  .sheet{max-width:280mm;margin:0 auto;background:#fff;padding:10px 12px;} h1{font-size:15px;margin:0 0 2px;text-align:center;} .sub{color:#475467;font-size:10px;text-align:center;}
-  table{width:100%;border-collapse:collapse;margin-top:6px;} th,td{border:1px solid #000;padding:3px 4px;font-size:10px;} th{background:#f0f0f0;color:#000;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7f7f7;font-weight:700;} .toolbar{max-width:280mm;margin:0 auto 8px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:5px;padding:6px 10px;font-size:10px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{padding:0;max-width:none;} .toolbar{display:none;} @page{margin:8mm;}}
+  @page{size:A4 landscape;margin:10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:11px;}
+  .sheet{max-width:280mm;margin:0 auto;background:#fff;padding:16px 18px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:4px 5px;font-size:10.5px;} th{background:#eef7f2;color:#184632;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7faf8;font-weight:700;} .toolbar{max-width:280mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:7px 12px;font-size:11px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
 </style></head><body>
-<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
 <div class="sheet">
-  <h1>বাজার লিস্ট — তারিখ ভিত্তিক</h1><div class="sub">${esc(range)} • মোট ${filtered.length}টি • মোট ৳${formatMoney(total)}</div>
+  <div class="head"><div><h1>🧺 বাজার লিস্ট — তারিখ ভিত্তিক</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)} • মোট ${filtered.length}টি এন্ট্রি</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট খরচ: ৳${formatMoney(total)}</div></div>
   <table><thead><tr><th class="c">#</th><th class="c">তারিখ</th><th>ক্রেতা</th><th>ক্যাটাগরি</th><th>আইটেম</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
   <tbody>${rows||`<tr><td colspan="7" class="c">এই তারিখে কোনো বাজার নেই</td></tr>`}</tbody>
   <tfoot><tr><td colspan="5" class="r">মোট</td><td class="r">৳${formatMoney(total)}</td><td></td></tr></tfoot></table>
@@ -571,15 +571,15 @@ export function buildMealCountHtml(input: PrintReportInput): string {
   if (!rows) rows = `<tr><td colspan="3" class="c">এই তারিখে কোনো মিল নেই</td></tr>`;
 
   return `<!DOCTYPE html>
-<html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(range)}</title>
+<html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(office.name)} — ${esc(range)}</title>
 <style>
-  @page{size:A4;margin:10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:0;background:#fff;font-size:11px;}
-  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:12px 16px;} h1{font-size:15px;margin:0 0 2px;text-align:center;} .sub{color:#475467;font-size:10px;text-align:center;}
-  table{width:100%;border-collapse:collapse;margin-top:8px;} th,td{border:1px solid #000;padding:4px 5px;font-size:10.5px;} th{background:#f0f0f0;color:#000;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7f7f7;font-weight:700;} .toolbar{max-width:210mm;margin:0 auto 8px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:7px 12px;font-size:11px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{padding:0;max-width:none;} .toolbar{display:none;} @page{margin:10mm;}}
+  @page{size:A4;margin:12mm 10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:11px;}
+  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:18px 20px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:5px 6px;font-size:11px;} th{background:#eef7f2;color:#184632;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7faf8;font-weight:700;} .toolbar{max-width:210mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
 </style></head><body>
-<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
 <div class="sheet">
-  <h1>মিল সংখ্যা — তারিখ ভিত্তিক</h1><div class="sub">${esc(range)} • মোট ${formatMeal(totalMeals)} মিল</div>
+  <div class="head"><div><h1>🍽️ মিল সংখ্যা — তারিখ ভিত্তিক</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)}</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট মিল: ${formatMeal(totalMeals)}</div></div>
   <table><thead><tr><th class="c">তারিখ</th><th>সদস্য অনুযায়ী মিল</th><th class="c">মোট মিল</th></tr></thead>
   <tbody>${rows}</tbody>
   <tfoot><tr><td colspan="2" class="r">মোট</td><td class="c">${formatMeal(totalMeals)}</td></tr></tfoot></table>
