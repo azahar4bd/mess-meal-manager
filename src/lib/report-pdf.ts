@@ -318,27 +318,27 @@ export function buildPrintHtml(input: PrintReportInput): string {
         if (!mealMap.has(r.memberId)) mealMap.set(r.memberId, new Map());
         mealMap.get(r.memberId)!.set(r.day, Number(r.meals)||0);
       }
-      const header = filteredDays.map(d=>`<th class="c" style="min-width:28px">${d}</th>`).join("");
+      const header = filteredDays.map(d=>`<th class="c" style="min-width:20px;width:20px;font-size:8px;padding:2px 1px">${d}</th>`).join("");
       const rows = members.map(m=>{
         const mMap = mealMap.get(m.id);
         const cells = filteredDays.map(d=>{
           const v = mMap?.get(d) ?? 0;
-          return `<td class="c">${v>0?formatMeal(v):"—"}</td>`;
+          return `<td class="c" style="font-size:8px;padding:2px 1px">${v>0?formatMeal(v):"—"}</td>`;
         }).join("");
         const total = filteredDays.reduce((s,d)=>s+(mMap?.get(d)??0),0);
-        return `<tr><td style="white-space:nowrap">${esc(m.name)}</td>${cells}<td class="c b">${formatMeal(total)}</td></tr>`;
+        return `<tr><td style="white-space:nowrap;font-size:9px;padding:2px 3px;max-width:70px;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</td>${cells}<td class="c b" style="font-size:8px;padding:2px 1px">${formatMeal(total)}</td></tr>`;
       }).join("");
       const totals = filteredDays.map(d=>{
         let sum=0;
         for (const m of members) sum += mealMap.get(m.id)?.get(d) ?? 0;
-        return `<td class="c b">${sum>0?formatMeal(sum):"—"}</td>`;
+        return `<td class="c b" style="font-size:8px;padding:2px 1px">${sum>0?formatMeal(sum):"—"}</td>`;
       }).join("");
       const grandTotal = members.reduce((s,m)=>{
         const mm = mealMap.get(m.id);
         if (!mm) return s;
         return s + filteredDays.reduce((a,d)=>a+(mm.get(d)??0),0);
       },0);
-      return `<div style="overflow-x:auto"><table style="min-width:${filteredDays.length*32+160}px"><thead><tr><th>সদস্য \ তারিখ</th>${header}<th class="c">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b">মোট</td>${totals}<td class="c b">${formatMeal(grandTotal)}</td></tr></tfoot></table></div><div class="note">ল্যান্ডস্কেপ প্রিন্টে ১,২,৩... তারিখ পাশাপাশি দেখাবে। তারিখ ফিল্টার করলে শুধু ওই তারিখগুলো দেখাবে।</div>`;
+      return `<div style="overflow-x:auto"><table style="width:100%;table-layout:fixed;border-collapse:collapse;min-width:${filteredDays.length*20+100}px"><thead><tr><th style="width:70px;font-size:9px;padding:2px 3px">সদস্য \ তারিখ</th>${header}<th class="c" style="width:30px;font-size:8px;padding:2px 1px">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b" style="font-size:9px;padding:2px 3px">মোট</td>${totals}<td class="c b" style="font-size:8px;padding:2px 1px">${formatMeal(grandTotal)}</td></tr></tfoot></table></div><div class="note">ল্যান্ডস্কেপ প্রিন্টে ১,২,৩... ${filteredDays.length} তারিখ পর্যন্ত পাশাপাশি দেখাবে। প্রিন্টে ৩১ দিন ফিট করতে ফন্ট ছোট করা হয়েছে।</div>`;
     })()}
 
     <h2>৩. বাজার এন্ট্রি তালিকা / Bazar Entries — তারিখ ভিত্তিক</h2>
@@ -484,26 +484,26 @@ export function buildMealCountHtml(input: PrintReportInput): string {
     mealMap.get(r.memberId)!.set(r.day, Number(r.meals)||0);
   }
 
-  const header = filteredDays.map(d=>`<th class="c" style="min-width:28px">${d}</th>`).join("");
+      const header = filteredDays.map(d=>`<th class="c" style="min-width:20px;width:20px;font-size:8px;padding:2px 1px">${d}</th>`).join("");
   let totalMeals = 0;
   const rows = members.map(m=>{
     const mMap = mealMap.get(m.id);
     const cells = filteredDays.map(d=>{
       const v = mMap?.get(d) ?? 0;
-      return `<td class="c">${v>0?formatMeal(v):"—"}</td>`;
+      return `<td class="c" style="font-size:8px;padding:2px 1px">${v>0?formatMeal(v):"—"}</td>`;
     }).join("");
     const total = filteredDays.reduce((s,d)=>s+(mMap?.get(d)??0),0);
     totalMeals += total;
-    return `<tr><td style="white-space:nowrap">${esc(m.name)}</td>${cells}<td class="c b">${formatMeal(total)}</td></tr>`;
+    return `<tr><td style="white-space:nowrap;font-size:9px;padding:2px 3px;max-width:70px;overflow:hidden;text-overflow:ellipsis">${esc(m.name)}</td>${cells}<td class="c b" style="font-size:8px;padding:2px 1px">${formatMeal(total)}</td></tr>`;
   }).join("");
 
   const totals = filteredDays.map(d=>{
     let sum=0;
     for (const m of members) sum += mealMap.get(m.id)?.get(d) ?? 0;
-    return `<td class="c b">${sum>0?formatMeal(sum):"—"}</td>`;
+    return `<td class="c b" style="font-size:8px;padding:2px 1px">${sum>0?formatMeal(sum):"—"}</td>`;
   }).join("");
 
-  const tableHtml = `<div style="overflow-x:auto"><table style="min-width:${filteredDays.length*32+160}px"><thead><tr><th>সদস্য \ তারিখ</th>${header}<th class="c">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b">মোট</td>${totals}<td class="c b">${formatMeal(totalMeals)}</td></tr></tfoot></table></div>`;
+  const tableHtml = `<div style="overflow-x:auto"><table style="width:100%;table-layout:fixed;border-collapse:collapse;min-width:${filteredDays.length*20+100}px"><thead><tr><th style="width:70px;font-size:9px;padding:2px 3px">সদস্য \ তারিখ</th>${header}<th class="c" style="width:30px;font-size:8px;padding:2px 1px">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b" style="font-size:9px;padding:2px 3px">মোট</td>${totals}<td class="c b" style="font-size:8px;padding:2px 1px">${formatMeal(totalMeals)}</td></tr></tfoot></table></div>`;
 
   return `<!DOCTYPE html>
 <html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(range)}</title>
