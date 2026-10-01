@@ -298,38 +298,15 @@ export function buildPrintHtml(input: PrintReportInput): string {
         summary.totalOthersIncome,
       )}) ÷ ${formatMeal(summary.totalMill)} = ৳ ${formatRate(summary.perMillRate)}।
       স্থায়ী ফান্ড আলাদা খাত (জমা ও তহবিল পেজ), মিল খরচ থেকে বাদ যায় না; মাস ক্লোজে সদস্যভিত্তিক ফান্ড পরের মাসে কপি হয়।
-      শেয়ার্ড অতিরিক্ত = ${formatMoney(summary.totalSharedExtra)} ÷ ${summary.activeMembers} জন সক্রিয় সদস্য = ৳ ${formatMoney(
-        summary.activeMembers ? summary.totalSharedExtra / summary.activeMembers : 0,
-      )} জনপ্রতি।
-      নিজ টাকার বাজার বা নগদ জমা — যেকোনোটাই আগে প্রারম্ভিক বকেয়া জের মেটায়; বাড়তি অংশই ক্রেডিট হিসেবে বসে।
-    </div>
-    ${paymentTableHtml}
-
-    <h2>২. বাজার খরচ সামারি / Bazar Summary</h2>
-    <div class="two">
-      <div>
-        <table>
-          <thead><tr><th>ক্যাটাগরি</th><th class="r">খরচ</th></tr></thead>
-          <tbody>${catRows || `<tr><td colspan="2" class="c">এই মাসে কোনো বাজার এন্ট্রি নেই</td></tr>`}</tbody>
-          <tfoot><tr><td>মোট বাজার</td><td class="r">৳ ${formatMoney(summary.totalBazarCost)}</td></tr></tfoot>
-        </table>
-      </div>
-      <div>
-        <table>
-          <thead><tr><th>ক্রেতা / Buyer</th><th class="r">খরচ</th></tr></thead>
-          <tbody>${buyerRows || `<tr><td colspan="2" class="c">—</td></tr>`}</tbody>
-          <tfoot><tr><td>মোট</td><td class="r">৳ ${formatMoney(summary.totalBazarCost)}</td></tr></tfoot>
-        </table>
-      </div>
     </div>
 
-    <h2>৩. বাজার এন্ট্রি তালিকা / Bazar Entries</h2>
+    <h2>২. বাজার এন্ট্রি তালিকা / Bazar Entries — তারিখ ভিত্তিক</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>ক্রেতা</th><th>ক্যাটাগরি</th><th>আইটেম</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
       <tbody>${bazarRows || `<tr><td colspan="6" class="c">এই মাসে কোনো বাজার এন্ট্রি নেই</td></tr>`}</tbody>
     </table>
 
-    <h2>৪. আয় সামারি / Other Income</h2>
+    <h2>৩. আয় সামারি / Other Income</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>খাত</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
       <tbody>${incomeRows || `<tr><td colspan="4" class="c">কোনো আয় এন্ট্রি নেই</td></tr>`}</tbody>
@@ -338,7 +315,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
       )}</td><td></td></tr></tfoot>
     </table>
 
-    <h2>৫. জমা ও স্থায়ী তহবিল / Fund</h2>
+    <h2>৪. জমা ও স্থায়ী তহবিল / Fund</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>সদস্য</th><th class="r">পরিমাণ</th><th>ধরন</th><th>নোট</th></tr></thead>
       <tbody>${fundRows || `<tr><td colspan="5" class="c">কোনো জমা এন্ট্রি নেই</td></tr>`}</tbody>
@@ -348,48 +325,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
     </table>
     <div class="note">⚠ স্থায়ী তহবিল = স্থায়ী মূলধন। এটি মাসিক মিল খরচ থেকে কখনো বাদ দেওয়া হয় না।</div>
 
-    <h2>৬. অতিরিক্ত খরচ / Extra Expenses</h2>
-    <table>
-      <thead><tr><th class="c">তারিখ</th><th>খাত</th><th class="c">ধরন</th><th>কার জন্য</th><th>প্রদানকারী</th><th class="r">পরিমাণ</th></tr></thead>
-      <tbody>${extraRows || `<tr><td colspan="6" class="c">কোনো অতিরিক্ত খরচ নেই</td></tr>`}</tbody>
-    </table>
-
-    <h2>৭. দেনা-পাওনা / Dena-Paona</h2>
-    <table>
-      <thead><tr><th>সদস্য</th><th class="r">মোট খরচ (−)</th><th class="r">নিজ টাকার বাজার</th><th class="r">বকেয়া জের সমন্বয়</th><th class="r">অবশিষ্ট জের</th><th class="r">নগদ/সমন্বয় জমা</th><th class="r">দেনা-পাওনা</th><th class="c">স্ট্যাটাস</th></tr></thead>
-      <tbody>
-        ${
-          summary.memberCalculations
-            .map(
-              (m) =>
-                `<tr><td>${esc(m.name)}</td><td class="r">−৳${formatMoney(m.totalCost)}</td><td class="r">${
-                  (m.selfPaidCredit ?? 0) > 0 ? `৳${formatMoney(m.selfPaidCredit ?? 0)}` : "—"
-                }</td><td class="r">${
-                  (m.jerSettled ?? 0) > 0 ? `৳${formatMoney(m.jerSettled ?? 0)}` : "—"
-                }</td><td class="r">${(m.remainingJer ?? 0) > 0 ? `৳${formatMoney(m.remainingJer ?? 0)}` : "—"}</td><td class="r">৳${formatMoney(
-                  m.totalDeposit,
-                )}</td><td class="r b">${m.denaPoana < 0 ? "−" : m.denaPoana > 0 ? "+" : ""}৳${formatMoney(
-                  Math.abs(m.denaPoana),
-                )}</td><td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(
-                  m.status,
-                )} / ${esc(m.statusEn)}</span></td></tr>`,
-            )
-            .join("") || `<tr><td colspan="8" class="c">কোনো সদস্য পাওয়া যায়নি</td></tr>`
-        }
-      </tbody>
-      <tfoot>
-        <tr>
-          <td class="r">মোট</td>
-          <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalCost, 0)))}</td>
-          <td class="r">৳ ${formatMoney(summary.totalSelfPaidCredit ?? 0)}</td>
-          <td class="r">৳ ${formatMoney((summary.totalJerAdjusted ?? 0) + (summary.totalJerCashPaid ?? 0))}</td>
-          <td class="r">৳ ${formatMoney(summary.totalRemainingJer ?? 0)}</td>
-          <td class="r">৳ ${formatMoney(round2(summary.memberCalculations.reduce((s, m) => s + m.totalDeposit, 0)))}</td>
-          <td class="r">দিবে ৳ ${formatMoney(totalDue)} • পাবে ৳ ${formatMoney(totalReceive)}</td>
-          <td class="c">—</td>
-        </tr>
-      </tfoot>
-    </table>
+    <!-- Extra and Dena-Paona removed as per red marking — now available as separate print reports -->
 
     <div class="rules">
       <strong>অপরিবর্তনীয় হিসাব নিয়ম:</strong>
