@@ -375,7 +375,15 @@ function ContextBar() {
           <Select
             className="input input-sm h-9 min-w-0 flex-1 sm:min-w-[160px]"
             value={app.month?.id ?? ""}
-            onChange={(e) => void app.selectMonth(e.target.value)}
+            disabled={!!(app.month && !app.month.isClosed && app.role !== "admin")}
+            title={app.month && !app.month.isClosed ? "মাস ক্লোজ না হওয়া পর্যন্ত মাস পরিবর্তন করা যাবে না" : undefined}
+            onChange={(e) => {
+              if (app.month && !app.month.isClosed && app.role !== "admin") {
+                app.toast("মাস ক্লোজ না হওয়া পর্যন্ত মাস পরিবর্তন করা যাবে না 🔒", "error");
+                return;
+              }
+              void app.selectMonth(e.target.value);
+            }}
             style={{ maxWidth: 260 }}
           >
             {monthOptions.map((m) => (
