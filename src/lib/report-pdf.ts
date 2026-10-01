@@ -411,6 +411,182 @@ export function buildPrintHtml(input: PrintReportInput): string {
 </html>`;
 }
 
+export function buildDenaPaonaHtml(input: PrintReportInput): string {
+  const { office, data, summary, fromDate, toDate } = input;
+  const generatedAt = toDisplayDateTime(new Date().toISOString());
+  const range = fromDate && toDate ? `${toDisplayDate(fromDate)} — ${toDisplayDate(toDate)}` : `${data.monthName}`;
+
+  const totalDue = round2(summary.memberCalculations.filter(m=>m.statusEn==="Due").reduce((s,m)=>s+Math.abs(m.denaPoana),0));
+  const totalReceive = round2(summary.memberCalculations.filter(m=>m.statusEn==="Receive").reduce((s,m)=>s+m.denaPoana,0));
+
+  const rows = summary.memberCalculations.map((m,i)=>`
+    <tr>
+      <td class="c">${i+1}</td>
+      <td>${esc(m.name)}</td>
+      <td class="r">−৳${formatMoney(m.totalCost)}</td>
+      <td class="r">৳${formatMoney(m.totalDeposit)}</td>
+      <td class="r b">${m.denaPoana<0?"−":m.denaPoana>0?"+":""}৳${formatMoney(Math.abs(m.denaPoana))}</td>
+      <td class="c"><span class="pill ${m.statusEn.toLowerCase()}">${esc(m.status)}</span></td>
+      <td class="muted">${esc(m.phone||"")}</td>
+    </tr>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="bn"><head><meta charset="utf-8" /><title>দেনা-পাওনা — ${esc(office.name)} — ${esc(range)}</title>
+<style>
+  @page{size:A4;margin:12mm 10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:12px;}
+  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:18px 20px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:5px 6px;font-size:11px;} th{background:#eef7f2;color:#184632;font-weight:700;text-align:left;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} td.b{font-weight:700;} tfoot td{background:#f7faf8;font-weight:700;} .pill{padding:1px 7px;border-radius:999px;font-size:10px;font-weight:700;} .pill.due{background:#fee4e2;color:#b42318;} .pill.receive{background:#d1fadf;color:#027a48;} .pill.settled{background:#e4e7ec;color:#475467;} .toolbar{max-width:210mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
+</style></head><body>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="sheet">
+  <div class="head"><div><h1>📋 দেনা-পাওনা রিপোর্ট</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)}</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট সদস্য: ${summary.activeMembers}</div></div>
+  <table><thead><tr><th class="c">#</th><th>সদস্য</th><th class="r">মোট খরচ</th><th class="r">মোট জমা</th><th class="r">দেনা(−)/পাওনা(+)</th><th class="c">স্ট্যাটাস</th><th>ফোন</th></tr></thead>
+  <tbody>${rows||`<tr><td colspan="7" class="c">কোনো সদস্য নেই</td></tr>`}</tbody>
+  <tfoot><tr><td colspan="4" class="r">মোট</td><td class="r">দিবে ৳${formatMoney(totalDue)} / পাবে ৳${formatMoney(totalReceive)}</td><td colspan="2"></td></tr></tfoot></table>
+  <div class="sub" style="margin-top:10px">নোট: দেনা = মোট খরচ − মোট জমা। ঋণাত্মক = দিতে হবে, ধনাত্মক = পাবে।</div>
+</div></body></html>`;
+}
+
+export function buildBazarListHtml(input: PrintReportInput): string {
+  const { office, data, fromDate, toDate } = input;
+  const generatedAt = toDisplayDateTime(new Date().toISOString());
+  const range = fromDate && toDate ? `${toDisplayDate(fromDate)} — ${toDisplayDate(toDate)}` : `${data.monthName}`;
+
+  const filtered = [...data.bazarExpenses].filter(r=>{
+    if (fromDate && r.date < fromDate) return false;
+    if (toDate && r.date > toDate) return false;
+    return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const total = round2(filtered.reduce((s,r)=>s+Number(r.amount),0));
+
+  const rows = filtered.map((r,i)=>`
+    <tr>
+      <td class="c">${i+1}</td>
+      <td class="c">${toDisplayDate(r.date)}</td>
+      <td>${esc(r.buyerName||"—")}</td>
+      <td>${esc(r.category)}</td>
+      <td>${esc(r.items)}</td>
+      <td class="r">৳${formatMoney(r.amount)}</td>
+      <td>${esc(r.note||"")}</td>
+    </tr>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="bn"><head><meta charset="utf-8" /><title>বাজার লিস্ট — ${esc(office.name)} — ${esc(range)}</title>
+<style>
+  @page{size:A4 landscape;margin:10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:11px;}
+  .sheet{max-width:280mm;margin:0 auto;background:#fff;padding:16px 18px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:4px 5px;font-size:10.5px;} th{background:#eef7f2;color:#184632;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7faf8;font-weight:700;} .toolbar{max-width:280mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:7px 12px;font-size:11px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
+</style></head><body>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="sheet">
+  <div class="head"><div><h1>🧺 বাজার লিস্ট — তারিখ ভিত্তিক</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)} • মোট ${filtered.length}টি এন্ট্রি</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট খরচ: ৳${formatMoney(total)}</div></div>
+  <table><thead><tr><th class="c">#</th><th class="c">তারিখ</th><th>ক্রেতা</th><th>ক্যাটাগরি</th><th>আইটেম</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
+  <tbody>${rows||`<tr><td colspan="7" class="c">এই তারিখে কোনো বাজার নেই</td></tr>`}</tbody>
+  <tfoot><tr><td colspan="5" class="r">মোট</td><td class="r">৳${formatMoney(total)}</td><td></td></tr></tfoot></table>
+</div></body></html>`;
+}
+
+export function buildMealCountHtml(input: PrintReportInput): string {
+  const { office, data, fromDate, toDate } = input;
+  const generatedAt = toDisplayDateTime(new Date().toISOString());
+  const range = fromDate && toDate ? `${toDisplayDate(fromDate)} — ${toDisplayDate(toDate)}` : `${data.monthName}`;
+
+  const filteredMeals = [...data.dailyMeals].filter(r=>{
+    const d = r.date || (r as any).day ? isoOfDay(data.year, data.month, (r as any).day || 1) : "";
+    // dailyMeals has date field? Check: it has day number, we need to filter by iso date
+    const iso = (r as any).date || isoOfDay(data.year, data.month, (r as any).day || 1);
+    if (fromDate && iso < fromDate) return false;
+    if (toDate && iso > toDate) return false;
+    return true;
+  }).sort((a,b)=>{
+    const da = (a as any).date || isoOfDay(data.year, data.month, (a as any).day || 1);
+    const db = (b as any).date || isoOfDay(data.year, data.month, (b as any).day || 1);
+    return da.localeCompare(db);
+  });
+
+  // Build member map
+  const memberMap = new Map(data.members.map(m=>[m.id, m.name]));
+  // For each day, show meals per member
+  // dailyMeals structure: { day, date?, meals: { memberId: number } } or similar
+  // Let's handle both formats
+
+  let rows = "";
+  let totalMeals = 0;
+  for (const entry of filteredMeals) {
+    const iso = (entry as any).date || isoOfDay(data.year, data.month, (entry as any).day || 1);
+    const dayMeals = (entry as any).meals || (entry as any);
+    let dayTotal = 0;
+    let memberDetails = "";
+    if (typeof dayMeals === "object" && !Array.isArray(dayMeals)) {
+      // If it's a map of memberId->count or has memberId fields
+      if ((entry as any).memberId) {
+        // Single meal row
+        const count = Number((entry as any).count ?? (entry as any).meals ?? 0);
+        dayTotal = count;
+        memberDetails = `${esc(memberMap.get((entry as any).memberId) || (entry as any).memberId || "—")}: ${formatMeal(count)}`;
+      } else {
+        // Map
+        const entries = Object.entries(dayMeals).filter(([k])=>!["day","date","id","officeId","monthId"].includes(k));
+        // If dayMeals itself is the meal map
+        let mealMap = dayMeals;
+        if ((entry as any).meals && typeof (entry as any).meals === "object") mealMap = (entry as any).meals;
+        const parts: string[] = [];
+        for (const [mid, cnt] of Object.entries(mealMap)) {
+          if (typeof cnt === "number") {
+            dayTotal += cnt;
+            const name = memberMap.get(mid) || mid;
+            parts.push(`${esc(name)}: ${formatMeal(cnt)}`);
+          }
+        }
+        memberDetails = parts.join(", ") || "—";
+      }
+    }
+    totalMeals += dayTotal;
+    rows += `<tr><td class="c">${toDisplayDate(iso)}</td><td>${memberDetails}</td><td class="r c">${formatMeal(dayTotal)}</td></tr>`;
+  }
+
+  // If dailyMeals is array of { memberId, day, count } type, we need alternative handling
+  if (!rows && data.dailyMeals.length > 0) {
+    // Group by date
+    const byDate = new Map<string, { total: number; details: string[] }>();
+    for (const m of data.dailyMeals as any[]) {
+      const iso = m.date || isoOfDay(data.year, data.month, m.day || 1);
+      if (fromDate && iso < fromDate) continue;
+      if (toDate && iso > toDate) continue;
+      const cnt = Number(m.count ?? m.meals ?? m.total ?? 0);
+      const name = memberMap.get(m.memberId) || m.memberId || "—";
+      if (!byDate.has(iso)) byDate.set(iso, { total: 0, details: [] });
+      const g = byDate.get(iso)!;
+      g.total += cnt;
+      g.details.push(`${esc(name)}: ${formatMeal(cnt)}`);
+    }
+    const sorted = [...byDate.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+    for (const [iso, g] of sorted) {
+      totalMeals += g.total;
+      rows += `<tr><td class="c">${toDisplayDate(iso)}</td><td>${g.details.join(", ")}</td><td class="r c">${formatMeal(g.total)}</td></tr>`;
+    }
+  }
+
+  if (!rows) rows = `<tr><td colspan="3" class="c">এই তারিখে কোনো মিল নেই</td></tr>`;
+
+  return `<!DOCTYPE html>
+<html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(office.name)} — ${esc(range)}</title>
+<style>
+  @page{size:A4;margin:12mm 10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:11px;}
+  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:18px 20px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
+  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:5px 6px;font-size:11px;} th{background:#eef7f2;color:#184632;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7faf8;font-weight:700;} .toolbar{max-width:210mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
+</style></head><body>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="sheet">
+  <div class="head"><div><h1>🍽️ মিল সংখ্যা — তারিখ ভিত্তিক</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)}</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট মিল: ${formatMeal(totalMeals)}</div></div>
+  <table><thead><tr><th class="c">তারিখ</th><th>সদস্য অনুযায়ী মিল</th><th class="c">মোট মিল</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr><td colspan="2" class="r">মোট</td><td class="c">${formatMeal(totalMeals)}</td></tr></tfoot></table>
+  <div class="sub" style="margin-top:8px">নোট: তারিখ ফিল্টার অনুযায়ী মিল দেখানো হয়েছে।</div>
+</div></body></html>`;
+}
+
 export function printFilename(office: OfficeDTO, data: MessData): string {
   return `Mess-Report_${office.code}_${data.year}-${String(data.month).padStart(2, "0")}`
     .replace(/[^a-zA-Z0-9-_]/g, "_")

@@ -451,6 +451,17 @@ export function ReportView() {
   // বন্ধ (closed) মাসে শুধু অ্যাডমিন লিখতে পারবেন — অন্য সব পেজের মতো একই নিয়ম
   const canWriteFund = app.can("fund.write") && fullMonth && !(month.isClosed && app.role !== "admin");
 
+  const openPrint = (type: "full" | "dena" | "bazar" | "meals") => {
+    const params = new URLSearchParams({ monthId: month.id, type });
+    if (fromDate) params.set("fromDate", fromDate);
+    if (toDate) params.set("toDate", toDate);
+    const url = `/report/print?${params.toString()}`;
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (!win) {
+      window.location.href = url;
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -466,6 +477,25 @@ export function ReportView() {
           </button>
         </div>
       </div>
+
+      {/* Print option — 3 reports as requested */}
+      <Card title="🖨 প্রিন্ট অপশন — ৩টি রিপোর্ট" subtitle="তারিখ ভিত্তিক প্রিন্ট / PDF" bodyClass="p-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <button type="button" className="btn btn-soft border border-[var(--border)] justify-start text-left h-auto py-2.5" onClick={()=>openPrint("dena")}>
+            <span className="flex flex-col"><span className="font-bold">💸 দেনা-পাওনা</span><span className="muted text-[11px]">সদস্যদের দেনা/পাওনা • {fromDate?`${fromDate}→${toDate}`:"পুরো মাস"}</span></span>
+          </button>
+          <button type="button" className="btn btn-soft border border-[var(--border)] justify-start text-left h-auto py-2.5" onClick={()=>openPrint("bazar")}>
+            <span className="flex flex-col"><span className="font-bold">🧺 বাজার লিস্ট — তারিখ ভিত্তিক</span><span className="muted text-[11px]">তারিখ অনুযায়ী বাজার • {fromDate?`${fromDate}→${toDate}`:"পুরো মাস"}</span></span>
+          </button>
+          <button type="button" className="btn btn-soft border border-[var(--border)] justify-start text-left h-auto py-2.5" onClick={()=>openPrint("meals")}>
+            <span className="flex flex-col"><span className="font-bold">🍽️ মিল সংখ্যা — তারিখ ভিত্তিক</span><span className="muted text-[11px]">তারিখ অনুযায়ী মিল • {fromDate?`${fromDate}→${toDate}`:"পুরো মাস"}</span></span>
+          </button>
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          <button type="button" className="btn btn-ghost btn-sm" onClick={()=>openPrint("full")}>📄 Full Report Print</button>
+          <span className="muted text-[11px] self-center">তারিখ ফিল্টার উপরে সেট করুন, তারপর প্রিন্ট বাটনে চাপুন — নতুন ট্যাবে প্রিন্ট রেডি পেজ খুলবে</span>
+        </div>
+      </Card>
 
       {selfOnly ? (
         <div className="rounded-lg border border-[var(--brand)] bg-[var(--brand-soft)] px-3 py-2 text-[12.5px] font-semibold text-[var(--brand)]">
