@@ -300,13 +300,54 @@ export function buildPrintHtml(input: PrintReportInput): string {
       স্থায়ী ফান্ড আলাদা খাত (জমা ও তহবিল পেজ), মিল খরচ থেকে বাদ যায় না; মাস ক্লোজে সদস্যভিত্তিক ফান্ড পরের মাসে কপি হয়।
     </div>
 
-    <h2>২. বাজার এন্ট্রি তালিকা / Bazar Entries — তারিখ ভিত্তিক</h2>
+    <h2>২. তারিখ ভিত্তিক মিল — ১,২,৩... পাশাপাশি (ল্যান্ডস্কেপ)</h2>
+    ${(() => {
+      // Build date-wise meal matrix: members as rows, dates 1..totalDays as columns
+      const members = data.members.filter(m=>m.isActive);
+      const days = Array.from({length: data.totalDays}, (_,i)=>i+1);
+      // Filter days by fromDate/toDate if provided
+      const filteredDays = days.filter(d=>{
+        const iso = isoOfDay(data.year, data.month, d);
+        if (fromDate && iso < fromDate) return false;
+        if (toDate && iso > toDate) return false;
+        return true;
+      });
+      // Map: memberId -> day -> meals
+      const mealMap = new Map<string, Map<number, number>>();
+      for (const r of data.dailyMeals) {
+        if (!mealMap.has(r.memberId)) mealMap.set(r.memberId, new Map());
+        mealMap.get(r.memberId)!.set(r.day, Number(r.meals)||0);
+      }
+      const header = filteredDays.map(d=>`<th class="c" style="min-width:28px">${d}</th>`).join("");
+      const rows = members.map(m=>{
+        const mMap = mealMap.get(m.id);
+        const cells = filteredDays.map(d=>{
+          const v = mMap?.get(d) ?? 0;
+          return `<td class="c">${v>0?formatMeal(v):"—"}</td>`;
+        }).join("");
+        const total = filteredDays.reduce((s,d)=>s+(mMap?.get(d)??0),0);
+        return `<tr><td style="white-space:nowrap">${esc(m.name)}</td>${cells}<td class="c b">${formatMeal(total)}</td></tr>`;
+      }).join("");
+      const totals = filteredDays.map(d=>{
+        let sum=0;
+        for (const m of members) sum += mealMap.get(m.id)?.get(d) ?? 0;
+        return `<td class="c b">${sum>0?formatMeal(sum):"—"}</td>`;
+      }).join("");
+      const grandTotal = members.reduce((s,m)=>{
+        const mm = mealMap.get(m.id);
+        if (!mm) return s;
+        return s + filteredDays.reduce((a,d)=>a+(mm.get(d)??0),0);
+      },0);
+      return `<div style="overflow-x:auto"><table style="min-width:${filteredDays.length*32+160}px"><thead><tr><th>সদস্য \ তারিখ</th>${header}<th class="c">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b">মোট</td>${totals}<td class="c b">${formatMeal(grandTotal)}</td></tr></tfoot></table></div><div class="note">ল্যান্ডস্কেপ প্রিন্টে ১,২,৩... তারিখ পাশাপাশি দেখাবে। তারিখ ফিল্টার করলে শুধু ওই তারিখগুলো দেখাবে।</div>`;
+    })()}
+
+    <h2>৩. বাজার এন্ট্রি তালিকা / Bazar Entries — তারিখ ভিত্তিক</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>ক্রেতা</th><th>ক্যাটাগরি</th><th>আইটেম</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
       <tbody>${bazarRows || `<tr><td colspan="6" class="c">এই মাসে কোনো বাজার এন্ট্রি নেই</td></tr>`}</tbody>
     </table>
 
-    <h2>৩. আয় সামারি / Other Income</h2>
+    <h2>৪. আয় সামারি / Other Income</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>খাত</th><th class="r">পরিমাণ</th><th>নোট</th></tr></thead>
       <tbody>${incomeRows || `<tr><td colspan="4" class="c">কোনো আয় এন্ট্রি নেই</td></tr>`}</tbody>
@@ -315,7 +356,7 @@ export function buildPrintHtml(input: PrintReportInput): string {
       )}</td><td></td></tr></tfoot>
     </table>
 
-    <h2>৪. জমা ও স্থায়ী তহবিল / Fund</h2>
+    <h2>৫. জমা ও স্থায়ী তহবিল / Fund</h2>
     <table>
       <thead><tr><th class="c">তারিখ</th><th>সদস্য</th><th class="r">পরিমাণ</th><th>ধরন</th><th>নোট</th></tr></thead>
       <tbody>${fundRows || `<tr><td colspan="5" class="c">কোনো জমা এন্ট্রি নেই</td></tr>`}</tbody>
@@ -428,98 +469,54 @@ export function buildMealCountHtml(input: PrintReportInput): string {
   const generatedAt = toDisplayDateTime(new Date().toISOString());
   const range = fromDate && toDate ? `${toDisplayDate(fromDate)} — ${toDisplayDate(toDate)}` : `${data.monthName}`;
 
-  const filteredMeals = [...data.dailyMeals].filter(r=>{
-    const d = r.date || (r as any).day ? isoOfDay(data.year, data.month, (r as any).day || 1) : "";
-    // dailyMeals has date field? Check: it has day number, we need to filter by iso date
-    const iso = (r as any).date || isoOfDay(data.year, data.month, (r as any).day || 1);
+  const members = data.members.filter(m=>m.isActive);
+  const days = Array.from({length: data.totalDays}, (_,i)=>i+1);
+  const filteredDays = days.filter(d=>{
+    const iso = isoOfDay(data.year, data.month, d);
     if (fromDate && iso < fromDate) return false;
     if (toDate && iso > toDate) return false;
     return true;
-  }).sort((a,b)=>{
-    const da = (a as any).date || isoOfDay(data.year, data.month, (a as any).day || 1);
-    const db = (b as any).date || isoOfDay(data.year, data.month, (b as any).day || 1);
-    return da.localeCompare(db);
   });
 
-  // Build member map
-  const memberMap = new Map(data.members.map(m=>[m.id, m.name]));
-  // For each day, show meals per member
-  // dailyMeals structure: { day, date?, meals: { memberId: number } } or similar
-  // Let's handle both formats
+  const mealMap = new Map<string, Map<number, number>>();
+  for (const r of data.dailyMeals) {
+    if (!mealMap.has(r.memberId)) mealMap.set(r.memberId, new Map());
+    mealMap.get(r.memberId)!.set(r.day, Number(r.meals)||0);
+  }
 
-  let rows = "";
+  const header = filteredDays.map(d=>`<th class="c" style="min-width:28px">${d}</th>`).join("");
   let totalMeals = 0;
-  for (const entry of filteredMeals) {
-    const iso = (entry as any).date || isoOfDay(data.year, data.month, (entry as any).day || 1);
-    const dayMeals = (entry as any).meals || (entry as any);
-    let dayTotal = 0;
-    let memberDetails = "";
-    if (typeof dayMeals === "object" && !Array.isArray(dayMeals)) {
-      // If it's a map of memberId->count or has memberId fields
-      if ((entry as any).memberId) {
-        // Single meal row
-        const count = Number((entry as any).count ?? (entry as any).meals ?? 0);
-        dayTotal = count;
-        memberDetails = `${esc(memberMap.get((entry as any).memberId) || (entry as any).memberId || "—")}: ${formatMeal(count)}`;
-      } else {
-        // Map
-        const entries = Object.entries(dayMeals).filter(([k])=>!["day","date","id","officeId","monthId"].includes(k));
-        // If dayMeals itself is the meal map
-        let mealMap = dayMeals;
-        if ((entry as any).meals && typeof (entry as any).meals === "object") mealMap = (entry as any).meals;
-        const parts: string[] = [];
-        for (const [mid, cnt] of Object.entries(mealMap)) {
-          if (typeof cnt === "number") {
-            dayTotal += cnt;
-            const name = memberMap.get(mid) || mid;
-            parts.push(`${esc(name)}: ${formatMeal(cnt)}`);
-          }
-        }
-        memberDetails = parts.join(", ") || "—";
-      }
-    }
-    totalMeals += dayTotal;
-    rows += `<tr><td class="c">${toDisplayDate(iso)}</td><td>${memberDetails}</td><td class="r c">${formatMeal(dayTotal)}</td></tr>`;
-  }
+  const rows = members.map(m=>{
+    const mMap = mealMap.get(m.id);
+    const cells = filteredDays.map(d=>{
+      const v = mMap?.get(d) ?? 0;
+      return `<td class="c">${v>0?formatMeal(v):"—"}</td>`;
+    }).join("");
+    const total = filteredDays.reduce((s,d)=>s+(mMap?.get(d)??0),0);
+    totalMeals += total;
+    return `<tr><td style="white-space:nowrap">${esc(m.name)}</td>${cells}<td class="c b">${formatMeal(total)}</td></tr>`;
+  }).join("");
 
-  // If dailyMeals is array of { memberId, day, count } type, we need alternative handling
-  if (!rows && data.dailyMeals.length > 0) {
-    // Group by date
-    const byDate = new Map<string, { total: number; details: string[] }>();
-    for (const m of data.dailyMeals as any[]) {
-      const iso = m.date || isoOfDay(data.year, data.month, m.day || 1);
-      if (fromDate && iso < fromDate) continue;
-      if (toDate && iso > toDate) continue;
-      const cnt = Number(m.count ?? m.meals ?? m.total ?? 0);
-      const name = memberMap.get(m.memberId) || m.memberId || "—";
-      if (!byDate.has(iso)) byDate.set(iso, { total: 0, details: [] });
-      const g = byDate.get(iso)!;
-      g.total += cnt;
-      g.details.push(`${esc(name)}: ${formatMeal(cnt)}`);
-    }
-    const sorted = [...byDate.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
-    for (const [iso, g] of sorted) {
-      totalMeals += g.total;
-      rows += `<tr><td class="c">${toDisplayDate(iso)}</td><td>${g.details.join(", ")}</td><td class="r c">${formatMeal(g.total)}</td></tr>`;
-    }
-  }
+  const totals = filteredDays.map(d=>{
+    let sum=0;
+    for (const m of members) sum += mealMap.get(m.id)?.get(d) ?? 0;
+    return `<td class="c b">${sum>0?formatMeal(sum):"—"}</td>`;
+  }).join("");
 
-  if (!rows) rows = `<tr><td colspan="3" class="c">এই তারিখে কোনো মিল নেই</td></tr>`;
+  const tableHtml = `<div style="overflow-x:auto"><table style="min-width:${filteredDays.length*32+160}px"><thead><tr><th>সদস্য \ তারিখ</th>${header}<th class="c">মোট</th></tr></thead><tbody>${rows||`<tr><td colspan="${filteredDays.length+2}" class="c">কোনো মিল নেই</td></tr>`}</tbody><tfoot><tr><td class="r b">মোট</td>${totals}<td class="c b">${formatMeal(totalMeals)}</td></tr></tfoot></table></div>`;
 
   return `<!DOCTYPE html>
-<html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(office.name)} — ${esc(range)}</title>
+<html lang="bn"><head><meta charset="utf-8" /><title>মিল সংখ্যা — ${esc(range)}</title>
 <style>
-  @page{size:A4;margin:12mm 10mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:16px;background:#f5f7f9;font-size:11px;}
-  .sheet{max-width:210mm;margin:0 auto;background:#fff;padding:18px 20px;border-radius:8px;} h1{font-size:18px;margin:0 0 4px;} .sub{color:#475467;font-size:11px;} .head{display:flex;justify-content:space-between;border-bottom:3px double #226e4a;padding-bottom:8px;}
-  table{width:100%;border-collapse:collapse;margin-top:10px;} th,td{border:1px solid #e4e7ec;padding:5px 6px;font-size:11px;} th{background:#eef7f2;color:#184632;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} tfoot td{background:#f7faf8;font-weight:700;} .toolbar{max-width:210mm;margin:0 auto 12px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{border-radius:0;padding:0;max-width:none;} .toolbar{display:none;}}
+  @page{size:A4 landscape;margin:8mm;} *{box-sizing:border-box;} body{font-family:"Noto Sans Bengali",system-ui,sans-serif;color:#101828;margin:0;padding:0;background:#fff;font-size:10.5px;}
+  .sheet{max-width:280mm;margin:0 auto;background:#fff;padding:10px 12px;} h1{font-size:15px;margin:0 0 2px;text-align:center;} .sub{color:#475467;font-size:10px;text-align:center;}
+  table{width:100%;border-collapse:collapse;margin-top:8px;} th,td{border:1px solid #000;padding:3px 4px;font-size:10px;} th{background:#f0f0f0;color:#000;font-weight:700;} td.r,th.r{text-align:right;} td.c,th.c{text-align:center;} td.b{font-weight:700;} tfoot td{background:#f7f7f7;font-weight:700;} .toolbar{max-width:280mm;margin:0 auto 8px;display:flex;gap:8px;justify-content:flex-end;} .btn{background:#226e4a;color:#fff;border:0;border-radius:5px;padding:6px 10px;font-size:10px;cursor:pointer;} .btn.ghost{background:#fff;color:#226e4a;border:1px solid #226e4a;} @media print{body{background:#fff;padding:0;} .sheet{padding:0;max-width:none;} .toolbar{display:none;} @page{margin:8mm; size: A4 landscape;}}
 </style></head><body>
-<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট / PDF</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
+<div class="toolbar"><button class="btn" onclick="window.print()">🖨 প্রিন্ট</button><button class="btn ghost" onclick="window.close()">বন্ধ</button></div>
 <div class="sheet">
-  <div class="head"><div><h1>🍽️ মিল সংখ্যা — তারিখ ভিত্তিক</h1><div class="sub">${esc(office.name)} ${office.branch?`• ${esc(office.branch)}`:""} • ${esc(office.code)}</div><div class="sub">${esc(data.monthName)} • ${esc(range)}</div></div><div class="sub" style="text-align:right">তৈরি: ${esc(generatedAt)}<br/>মোট মিল: ${formatMeal(totalMeals)}</div></div>
-  <table><thead><tr><th class="c">তারিখ</th><th>সদস্য অনুযায়ী মিল</th><th class="c">মোট মিল</th></tr></thead>
-  <tbody>${rows}</tbody>
-  <tfoot><tr><td colspan="2" class="r">মোট</td><td class="c">${formatMeal(totalMeals)}</td></tr></tfoot></table>
-  <div class="sub" style="margin-top:8px">নোট: তারিখ ফিল্টার অনুযায়ী মিল দেখানো হয়েছে।</div>
+  <h1>মিল সংখ্যা — তারিখ ভিত্তিক (১,২,৩... পাশাপাশি)</h1><div class="sub">${esc(range)} • মোট ${formatMeal(totalMeals)} মিল • ল্যান্ডস্কেপ</div>
+  ${tableHtml}
+  <div class="sub" style="margin-top:8px">নোট: ১,২,৩... তারিখ পাশাপাশি, সদস্য অনুযায়ী মিল। তারিখ ফিল্টার করলে শুধু ওই তারিখগুলো দেখাবে।</div>
 </div></body></html>`;
 }
 
