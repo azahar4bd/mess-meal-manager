@@ -347,41 +347,37 @@ export function MealsView() {
               </table>
             </div>
 
-            {/* ── AM / Audit মিল — শুধু রেকর্ড; কোনো হিসাবেই যুক্ত নয় ── */}
-            <div
-              className="mt-2.5 rounded-xl border border-dashed p-2.5"
-              style={{ borderColor: "var(--warn)", background: "var(--warn-soft)" }}
-            >
-              <div className="flex flex-nowrap items-end gap-2">
-                <label className="block min-w-0 flex-1">
-                  <span className="label block">
-                    AM / Audit মিল <span className="muted font-medium">(হিসাবের বাইরে)</span>
-                  </span>
-                  <input
-                    type="number"
-                    step="0.5"
-                    min={0}
-                    inputMode="decimal"
-                    className="input h-9 w-full min-w-0 text-center"
-                    value={auditVal(day)}
-                    disabled={!canWrite}
-                    onChange={(e) => setAuditVal(day, Number(e.target.value))}
-                    aria-label={`${toDisplayDate(iso)} AM/Audit মিল`}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-ghost h-9 shrink-0 whitespace-nowrap"
-                  disabled={!canWrite || auditSaving}
-                  onClick={() => void saveAuditDay()}
-                >
-                  {auditSaving ? "…" : "💾 Save"}
-                </button>
-              </div>
-              <p className="muted mt-1.5 text-[11px] leading-snug">
-                শুধু রেকর্ডের জন্য — <strong>মোট মিল, মিল-রেট, মিল খরচ বা মোট খরচে কোথাও যুক্ত হবে না।</strong> মাসের মোট AM/Audit মিল:{" "}
-                <strong className="tabular-nums">{formatMeal(auditMonthTotal)}</strong>
-              </p>
+            {/* ── AM / Audit মিল — ছোট, সুন্দর, নজরে আসে ── */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-full border border-amber-200 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 px-3 py-1.5 shadow-[0_2px_8px_rgba(251,191,36,0.15)] backdrop-blur-sm">
+              <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                📋 AM/Audit
+              </span>
+              <span className="text-[10.5px] font-semibold text-amber-900">হিসাবের বাইরে</span>
+              <input
+                type="number"
+                step="0.5"
+                min={0}
+                inputMode="decimal"
+                className="h-7 w-14 rounded-full border border-amber-200 bg-white text-center text-[12px] font-bold tabular-nums shadow-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-300"
+                value={auditVal(day)}
+                disabled={!canWrite}
+                onChange={(e) => setAuditVal(day, Number(e.target.value))}
+                aria-label={`${toDisplayDate(iso)} AM/Audit মিল`}
+                placeholder="0"
+              />
+              <button
+                type="button"
+                className="grid h-7 w-7 place-items-center rounded-full bg-amber-500 text-[12px] text-white shadow-sm transition hover:bg-amber-600 disabled:opacity-50"
+                disabled={!canWrite || auditSaving}
+                onClick={() => void saveAuditDay()}
+                title="Save AM/Audit"
+              >
+                {auditSaving ? "…" : "💾"}
+              </button>
+              <span className="ml-auto flex items-center gap-1 text-[10px] font-medium text-amber-800">
+                <span className="hidden sm:inline">শুধু রেকর্ড — হিসাবে যোগ হবে না •</span>
+                মাসের মোট: <strong className="tabular-nums">{formatMeal(auditMonthTotal)}</strong>
+              </span>
             </div>
 
             {/* ── কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভেসে ওঠে, ঘর বাছলে তবেই ── */}
