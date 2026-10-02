@@ -22,6 +22,7 @@ export interface BazarItemsModalProps {
   onChange: (lines: BazarLine[]) => void;
   onClose: () => void;
   onApply: (lines: BazarLine[], total: number) => void;
+  onResetDraft?: () => void;
   disabled?: boolean;
   historyItems?: string[];
 }
@@ -42,7 +43,7 @@ export function linesToText(lines: BazarLine[]): string {
     .slice(0, 300);
 }
 
-export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disabled, historyItems = [] }: BazarItemsModalProps) {
+export function BazarItemsModal({ open, lines, onChange, onClose, onApply, onResetDraft, disabled, historyItems = [] }: BazarItemsModalProps) {
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
@@ -91,6 +92,15 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
     setManual([]);
     setEditing(null);
     setError("");
+  };
+
+  const clearAllDraft = () => {
+    if (onResetDraft) {
+      onResetDraft();
+    } else {
+      onChange([]);
+    }
+    clearInputs();
   };
 
   /**
@@ -152,8 +162,8 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
   return (
     <Modal
       open={open}
-      title="🧾 আইটেম হিসাব"
-      subtitle="আইটেম যোগ করে সেভ চাপলে মোট টাকা পরিমাণের ঘরে বসে যাবে"
+      title="🧾 আইটেম হিসাব — Draft Auto Save"
+      subtitle="আইটেম যোগ করলে auto save হবে — হার্ড রিফ্রেশ, app close, 10 দিন পরও থাকবে। শুধু Final Save ও Reset এ মুছবে"
       onClose={onClose}
       wide
       z="z-[120]"
@@ -287,7 +297,10 @@ export function BazarItemsModal({ open, lines, onChange, onClose, onApply, disab
             {editing === null ? "➕ এড" : "✓ আপডেট"}
           </button>
           <button type="button" className="btn btn-ghost" onClick={clearInputs} disabled={disabled}>
-            রিসেট
+            ইনপুট রিসেট
+          </button>
+          <button type="button" className="btn btn-ghost text-[var(--danger)] border border-[var(--danger)]" onClick={clearAllDraft} disabled={disabled} title="সব আইটেম মুছবে — localStorage থেকেও">
+            🗑️ সব মুছুন (Reset)
           </button>
           <span className="muted ml-auto text-[11.5px]">যেকোনো <strong>দুটি</strong> ঘর দিলেই সেভ হবে • Quantity না দিলে Total ÷ Unit price থেকে অটো হবে</span>
         </div>

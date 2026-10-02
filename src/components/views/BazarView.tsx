@@ -18,10 +18,48 @@ export function BazarView() {
   const month = app.month;
   const canWrite = app.can("bazar.write") && !(month?.isClosed && app.role !== "admin");
 
-  /* আইটেম পপআপের ড্রাফট — এন্ট্রি সেভ না করা পর্যন্ত থেকে যায় */
+  /* আইটেম পপআপের ড্রাফট — এন্ট্রি সেভ না করা পর্যন্ত থেকে যায়, localStorage এ persist */
   const [itemsOpen, setItemsOpen] = useState(false);
   const [lines, setLines] = useState<BazarLine[]>([]);
   const setFieldRef = useRef<(key: string, value: string) => void>(() => {});
+  const draftKey = React.useMemo(() => {
+    const officeId = app.office?.id || "no-office";
+    const monthId = month?.id || "no-month";
+    return `bazar_items_draft_v1_${officeId}_${monthId}`;
+  }, [app.office?.id, month?.id]);
+
+  // Load draft from localStorage on mount / office/month change
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setLines(parsed);
+        }
+      }
+    } catch {}
+  }, [draftKey]);
+
+  // Persist draft to localStorage whenever lines changes
+  React.useEffect(() => {
+    try {
+      if (lines.length > 0) {
+        localStorage.setItem(draftKey, JSON.stringify(lines));
+      } else {
+        // Keep empty draft? Only clear on explicit reset/final save, not on every empty
+        // So don't remove if empty from editing existing row
+        // We will explicitly remove on final save and reset
+      }
+    } catch {}
+  }, [lines, draftKey]);
+
+  const clearDraft = React.useCallback(() => {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {}
+    setLines([]);
+  }, [draftKey]);
 
   const defaultDate = useMemo(() => {
     if (!month) return todayIso();
@@ -78,10 +116,50 @@ export function BazarView() {
     note: row.note ?? "",
   });
 
-  /** এন্ট্রি ফর্ম খুললে আইটেম ড্রাফট লোড/রিসেট হয় */
+  /** এন্ট্রি ফর্ম খুললে আইটেম ড্রাফট লোড/রিসেট হয় — নতুন এন্ট্রিতে localStorage draft থাকলে তা থাকবে */
   const onFormOpen = (editingId: string | null) => {
-    const row = editingId ? rows.find((r) => r.id === editingId) : null;
-    setLines(row?.lines?.length ? row.lines.map((l) => ({ ...l })) : []);
+    if (editingId) {
+      const row = rows.find((r) => r.id === editingId);
+      if (row?.lines?.length) {
+        setLines(row.lines.map((l) => ({ ...l })));
+      } else {
+        // Editing existing without lines — try to load draft if any, else empty
+        try {
+          const raw = localStorage.getItem(draftKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setLines(parsed);
+              return;
+            }
+          }
+        } catch {}
+        setLines([]);
+      }
+    } else {
+      // New entry — load draft from localStorage if exists (persists across refresh, 10 days, other entries)
+      try {
+        const raw = localStorage.getItem(draftKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLines(parsed);
+            return;
+          }
+        }
+      } catch {}
+      // No draft, start empty (don't clear storage yet)
+      // Keep existing lines if already loaded from storage effect
+      // Only if lines empty, keep empty
+      if (lines.length === 0) {
+        try {
+          const raw = localStorage.getItem(draftKey);
+          if (!raw) setLines([]);
+        } catch {
+          setLines([]);
+        }
+      }
+    }
   };
 
   const onSubmit = async (values: FormState, editingId: string | null): Promise<boolean> => {
@@ -111,6 +189,10 @@ export function BazarView() {
     const res = await app.call<BazarDTO>(action, editingId ? { id: editingId, ...payload } : payload);
     if (!res) return false;
     app.toast(editingId ? "বাজার এন্ট্রি হালনাগাদ হয়েছে ✓" : `বাজার যোগ হয়েছে ✓ ৳ ${formatMoney0(payload.amount)}`, "success");
+    // Final save — clear draft from localStorage (only way to lose list besides reset)
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {}
     setLines([]);
     return true;
   };
@@ -249,6 +331,7 @@ export function BazarView() {
         onChange={setLines}
         onClose={() => setItemsOpen(false)}
         onApply={applyItems}
+        onResetDraft={clearDraft}
         disabled={!canWrite}
         historyItems={historyItems}
       />
