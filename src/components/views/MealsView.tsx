@@ -318,19 +318,21 @@ export function MealsView() {
                 <tbody>
                   <tr>
                     {dayRows.map(({ member, meals }, i) => {
-                      const v = toNumber(draft[member.id] ?? meals);
+                      const raw = draft[member.id] ?? meals;
+                      const v = toNumber(raw);
                       const selected = selIdx === i;
+                      const isEmpty = !(v > 0);
                       return (
                         <td key={member.id} className="p-1 text-center">
                           <button
                             type="button"
-                            className={`meal-cell ${v === 0 ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
+                            className={`meal-cell ${isEmpty ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
                             style={{ width: 56, minWidth: 56 }}
                             disabled={!canWrite || !member.isActive}
                             onClick={() => selectCell(i)}
                             aria-label={`${member.name} মিল`}
                           >
-                            {formatMeal(v)}
+                            {isEmpty ? "" : formatMeal(v)}
                           </button>
                         </td>
                       );
@@ -354,16 +356,18 @@ export function MealsView() {
               </span>
               <span className="text-[10.5px] font-semibold text-amber-900">হিসাবের বাইরে</span>
               <input
-                type="number"
-                step="0.5"
-                min={0}
+                type="text"
                 inputMode="decimal"
                 className="h-7 w-14 rounded-full border border-amber-200 bg-white text-center text-[12px] font-bold tabular-nums shadow-sm focus:border-amber-400 focus:ring-1 focus:ring-amber-300"
-                value={auditVal(day)}
+                value={auditVal(day) > 0 ? String(auditVal(day)) : ""}
                 disabled={!canWrite}
-                onChange={(e) => setAuditVal(day, Number(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value.trim();
+                  if (val === "") setAuditVal(day, 0);
+                  else setAuditVal(day, Number(val) || 0);
+                }}
                 aria-label={`${toDisplayDate(iso)} AM/Audit মিল`}
-                placeholder="0"
+                placeholder=""
               />
               <button
                 type="button"
@@ -540,17 +544,28 @@ export function MealsView() {
                       </td>
                       {Array.from({ length: month.totalDays }).map((_, i) => {
                         const d = i + 1;
+                        const rawVal = (grid[d] ?? {})[m.id];
+                        const numVal = toNumber(rawVal);
+                        const isEmpty = !(numVal > 0);
                         return (
                           <td key={d} className="num p-1">
                             <input
-                              type="number"
-                              step="0.5"
-                              min={0}
-                              className={`meal-cell ${toNumber((grid[d] ?? {})[m.id]) === 0 ? "zero" : ""}`}
+                              type="text"
+                              inputMode="decimal"
+                              className={`meal-cell ${isEmpty ? "zero" : ""}`}
                               style={{ width: 46, minWidth: 46 }}
-                              value={toNumber((grid[d] ?? {})[m.id])}
+                              value={isEmpty ? "" : String(numVal)}
+                              placeholder=""
                               disabled={!canWrite || !m.isActive}
-                              onChange={(e) => setGridCell(d, m.id, Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = e.target.value.trim();
+                                if (val === "") setGridCell(d, m.id, 0);
+                                else setGridCell(d, m.id, Number(val) || 0);
+                              }}
+                              onFocus={(e) => {
+                                // If value is 0, clear on focus so 1 press gives 1 not 10
+                                if (isEmpty) e.currentTarget.value = "";
+                              }}
                               aria-label={`${m.name} দিন ${d}`}
                             />
                           </td>
@@ -570,17 +585,23 @@ export function MealsView() {
                     </td>
                     {Array.from({ length: month.totalDays }).map((_, i) => {
                       const d = i + 1;
+                      const av = auditVal(d);
+                      const isEmpty = !(av > 0);
                       return (
                         <td key={d} className="num p-1">
                           <input
-                            type="number"
-                            step="0.5"
-                            min={0}
-                            className={`meal-cell meal-cell-audit ${toNumber(auditVal(d)) === 0 ? "zero" : ""}`}
+                            type="text"
+                            inputMode="decimal"
+                            className={`meal-cell meal-cell-audit ${isEmpty ? "zero" : ""}`}
                             style={{ width: 46, minWidth: 46 }}
-                            value={auditVal(d)}
+                            value={isEmpty ? "" : String(av)}
+                            placeholder=""
                             disabled={!canWrite}
-                            onChange={(e) => setAuditVal(d, Number(e.target.value))}
+                            onChange={(e) => {
+                              const val = e.target.value.trim();
+                              if (val === "") setAuditVal(d, 0);
+                              else setAuditVal(d, Number(val) || 0);
+                            }}
                             aria-label={`AM/Audit মিল দিন ${d}`}
                           />
                         </td>
