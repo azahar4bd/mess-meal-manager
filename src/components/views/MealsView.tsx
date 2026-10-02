@@ -299,16 +299,7 @@ export function MealsView() {
               <button type="button" className="btn btn-ghost btn-sm h-9" onClick={() => setDate(todayIso())}>
                 আজ
               </button>
-              {canWrite ? (
-                <div className="ml-auto flex flex-wrap items-center gap-1.5">
-                  <span className="muted text-[11.5px] font-semibold">সবাইকে:</span>
-                  {[0, 1, 1.5, 2, 3].map((v) => (
-                    <button key={v} type="button" className="btn btn-ghost btn-sm h-8 px-2 text-[12px]" onClick={() => bulkSet(v)}>
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+              {/* সবাইকে quick buttons removed as per user request */}
             </div>
 
             <div className="table-wrap" style={{ overflow: "auto", WebkitOverflowScrolling: "touch" }}>
