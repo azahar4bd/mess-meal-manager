@@ -261,13 +261,26 @@ export function BazarView() {
   };
 
   const columns: ColumnDef<BazarDTO>[] = [
-    { key: "date", header: "তারিখ", render: (r) => <span className="tabular-nums font-semibold">{toDisplayDate(r.date)}</span> },
+    { key: "date", header: "তারিখ / Date", render: (r) => <span className="tabular-nums">{toDisplayDate(r.date)}</span> },
+    {
+      key: "buyer",
+      header: "ক্রেতা / Buyer",
+      render: (r) => (
+        <span className="flex items-center gap-1.5">
+          <span className="font-semibold">{r.buyerName || "—"}</span>
+          {r.paidByMemberId ? <span className="pill pill-warn">নিজের টাকা</span> : null}
+          {r.paidByMemberId && (memberById.get(r.paidByMemberId)?.openingDue ?? 0) > 0 ? (
+            <span className="pill pill-ok">জের সমন্বয়</span>
+          ) : null}
+        </span>
+      ),
+    },
     {
       key: "items",
-      header: "আইটেম",
+      header: "আইটেম / Items",
       render: (r) => (
         <span
-          className="block max-w-[320px] whitespace-normal break-words text-[12px] leading-snug"
+          className="block max-w-[230px] whitespace-normal break-words text-[11px] leading-snug"
           title={r.items || undefined}
         >
           {r.items || "—"}
@@ -276,11 +289,12 @@ export function BazarView() {
     },
     {
       key: "amount",
-      header: "টাকা",
+      header: "পরিমাণ / Amount",
       align: "right",
       render: (r) => <span className="font-bold tabular-nums">৳ {formatMoney0(r.amount)}</span>,
       footer: (list) => `৳ ${formatMoney0(list.reduce((s, r) => s + toNumber(r.amount), 0))}`,
     },
+    { key: "note", header: "নোট / Note", hideOnMobile: true, render: (r) => <span className="muted max-w-[180px] truncate">{r.note || "—"}</span> },
   ];
 
   const closedNotice = month?.isClosed && app.role !== "admin" ? "🔒 এই মাসটি বন্ধ — শুধু অ্যাডমিন পরিবর্তন করতে পারবেন।" : null;

@@ -716,67 +716,59 @@ export function ReportView() {
             </div>
           )}
 
-          {/* ── bazar + income summary ──────────────── */}
-          <div className="grid gap-3 lg:grid-cols-2">
-            <Card title="বাজার সামারি" bodyClass="p-3">
-              {Object.keys(categories).length === 0 ? (
-                <EmptyState icon="🧺" title="এই মাসে কোনো বাজার এন্ট্রি নেই" />
-              ) : (
-                <>
-                  <div className="space-y-1">
-                    {Object.entries(categories)
-                      .sort((a, b) => b[1] - a[1])
-                      .map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between gap-2 text-[12.5px]">
-                          <span className="font-semibold">{k}</span>
-                          <span className="tabular-nums">৳ {formatMoney(v)}</span>
-                        </div>
-                      ))}
-                  </div>
-                  <div className="mt-2 border-t border-[var(--border)] pt-2 text-[13px] font-bold">
-                    <div className="flex justify-between">
-                      <span>মোট বাজার</span>
-                      <span className="tabular-nums">৳ {formatMoney(summary.totalBazarCost)}</span>
-                    </div>
-                  </div>
-                  <details className="mt-2">
-                    <summary className="muted cursor-pointer text-[12px] font-semibold">ক্রেতা অনুযায়ী দেখুন</summary>
-                    <div className="mt-1.5 space-y-1">
-                      {Object.entries(buyers)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([k, v]) => (
-                          <div key={k} className="flex items-center justify-between gap-2 text-[12px]">
-                            <span>{k}</span>
-                            <span className="tabular-nums">৳ {formatMoney(v)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </details>
-                </>
-              )}
-            </Card>
-
-            <Card title="দেনা-পাওনা সারাংশ" bodyClass="p-3">
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger-soft)]/50 p-2">
-                  <div className="text-[11px] font-bold text-[var(--danger)]">দিবে / Due</div>
-                  <div className="text-[16px] font-extrabold tabular-nums text-[var(--danger)]">৳ {formatMoney(totalDue)}</div>
-                  <div className="muted text-[10.5px]">{calcs.filter((m) => m.statusEn === "Due").length} জন</div>
-                </div>
-                <div className="rounded-lg border border-[var(--ok)] bg-[var(--ok-soft)]/50 p-2">
-                  <div className="text-[11px] font-bold text-[var(--ok)]">পাবে / Receive</div>
-                  <div className="text-[16px] font-extrabold tabular-nums text-[var(--ok)]">৳ {formatMoney(totalReceive)}</div>
-                  <div className="muted text-[10.5px]">{calcs.filter((m) => m.statusEn === "Receive").length} জন</div>
-                </div>
-                <div className="rounded-lg border border-[var(--border)] p-2">
-                  <div className="muted text-[11px] font-bold">সমান / Settled</div>
-                  <div className="text-[16px] font-extrabold tabular-nums">{calcs.filter((m) => m.statusEn === "Settled").length}</div>
-                  <div className="muted text-[10.5px]">জন</div>
-                </div>
+          {/* ── bazar list full month — date, item, money only (as per user request) ── */}
+          <Card title="🧺 বাজার সামারি — পুরো মাসের বাজার লিস্ট" subtitle="তারিখ, আইটেম, টাকা — আর কিছু না" bodyClass="p-0">
+            {!data || data.bazarExpenses.length === 0 ? (
+              <div className="p-3"><EmptyState icon="🧺" title="এই মাসে কোনো বাজার নেই" /></div>
+            ) : (
+              <div className="table-wrap" style={{ borderRadius: 0, borderWidth: 0 }}>
+                <table className="data" style={{ minWidth: 0 }}>
+                  <thead>
+                    <tr>
+                      <th className="c" style={{ width: 90 }}>তারিখ</th>
+                      <th>আইটেম</th>
+                      <th className="r" style={{ width: 100 }}>টাকা</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.bazarExpenses].sort((a,b)=>a.date.localeCompare(b.date)).map((r)=>(
+                      <tr key={r.id}>
+                        <td className="c tabular-nums text-[12px]">{toDisplayDate(r.date)}</td>
+                        <td className="text-[12px] leading-snug">{r.items || "—"}</td>
+                        <td className="r font-bold tabular-nums">৳ {formatMoney(r.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={2} className="r font-bold">মোট বাজার</td>
+                      <td className="r font-extrabold">৳ {formatMoney(data.bazarExpenses.reduce((s,r)=>s+Number(r.amount),0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
-              
-            </Card>
-          </div>
+            )}
+          </Card>
+
+          <Card title="দেনা-পাওনা সারাংশ" bodyClass="p-3">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg border border-[var(--danger)] bg-[var(--danger-soft)]/50 p-2">
+                <div className="text-[11px] font-bold text-[var(--danger)]">দিবে / Due</div>
+                <div className="text-[16px] font-extrabold tabular-nums text-[var(--danger)]">৳ {formatMoney(totalDue)}</div>
+                <div className="muted text-[10.5px]">{calcs.filter((m) => m.statusEn === "Due").length} জন</div>
+              </div>
+              <div className="rounded-lg border border-[var(--ok)] bg-[var(--ok-soft)]/50 p-2">
+                <div className="text-[11px] font-bold text-[var(--ok)]">পাবে / Receive</div>
+                <div className="text-[16px] font-extrabold tabular-nums text-[var(--ok)]">৳ {formatMoney(totalReceive)}</div>
+                <div className="muted text-[10.5px]">{calcs.filter((m) => m.statusEn === "Receive").length} জন</div>
+              </div>
+              <div className="rounded-lg border border-[var(--border)] p-2">
+                <div className="muted text-[11px] font-bold">সমান / Settled</div>
+                <div className="text-[16px] font-extrabold tabular-nums">{calcs.filter((m) => m.statusEn === "Settled").length}</div>
+                <div className="muted text-[10.5px]">জন</div>
+              </div>
+            </div>
+          </Card>
 
         </>
       )}
