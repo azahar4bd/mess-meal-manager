@@ -21,6 +21,18 @@ export function MealsView() {
   // কাস্টম কিবোর্ড: নির্বাচিত সদস্য-ঘর ও টাইপ-বাফার
   const [selIdx, setSelIdx] = useState<number | null>(null);
   const [buffer, setBuffer] = useState<string>("");
+  /* পিসি/ডেস্কটপ ডিটেকশন — ডেস্কটপে ঘর সরাসরি টাইপ করা যাবে;
+   * মোবাইলে আগের মতোই <button> + কাস্টম কিবোর্ড (নেটিভ কিবোর্ড উঠবে না) */
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const upd = () => setIsDesktop(mq.matches);
+    upd();
+    mq.addEventListener?.("change", upd);
+    return () => mq.removeEventListener?.("change", upd);
+  }, []);
+  /* ডেস্কটপে টাইপ করার সময় raw text (যেন "1." লিখতে "1" হয়ে না যায়) */
+  const [rawText, setRawText] = useState<Record<string, string>>({});
   // AM / Audit মিল (হিসাবের বাইরে) — দিন-ভিত্তিক খসড়া; সেভ করলে খালি হয়
   const [auditDraft, setAuditDraft] = useState<Record<number, number>>({});
   const [auditSaving, setAuditSaving] = useState(false);
@@ -59,6 +71,7 @@ export function MealsView() {
     setDraft(next);
     setSelIdx(null);
     setBuffer("");
+    setRawText({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, month?.id, data?.members.length]);
 
@@ -230,12 +243,14 @@ export function MealsView() {
     if (nextPos >= editableIdx.length) nextPos = 0;
     setSelIdx(editableIdx[nextPos]);
     setBuffer("");
+    setRawText({});
   };
   const resetDay = () => {
     const next: Record<string, number> = {};
     for (const r of dayRows) next[r.member.id] = r.meals;
     setDraft(next);
     setBuffer("");
+    setRawText({});
     app.toast("এই দিনের অসংরক্ষিত পরিবর্তন বাতিল হয়েছে", "info");
   };
 
@@ -322,18 +337,59 @@ export function MealsView() {
                       const v = toNumber(raw);
                       const selected = selIdx === i;
                       const isEmpty = !(v > 0);
+                      const typing = rawText[member.id];
+                      const shown = typing !== undefined ? typing : isEmpty ? "" : formatMeal(v);
                       return (
                         <td key={member.id} className="p-1 text-center">
-                          <button
-                            type="button"
-                            className={`meal-cell ${isEmpty ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
-                            style={{ width: 78, minWidth: 78, height: 46 }}
-                            disabled={!canWrite || !member.isActive}
-                            onClick={() => selectCell(i)}
-                            aria-label={`${member.name} মিল`}
-                          >
-                            {isEmpty ? "" : formatMeal(v)}
-                          </button>
+                          {isDesktop ? (
+                            /* ── পিসি/ডেস্কটপ: সরাসরি টাইপ করা যায় ── */
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              className={`meal-cell ${isEmpty ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
+                              style={{ width: 78, minWidth: 78, height: 46 }}
+                              value={shown}
+                              placeholder=""
+                              disabled={!canWrite || !member.isActive}
+                              onFocus={(e) => {
+                                setSelIdx(i);
+                                e.currentTarget.select();
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, "");
+                                setRawText((p) => ({ ...p, [member.id]: val }));
+                                const num = val === "" || val === "." ? 0 : Number(val);
+                                setDraft((p) => ({ ...p, [member.id]: Number.isFinite(num) ? Math.max(0, num) : 0 }));
+                              }}
+                              onBlur={() => {
+                                setRawText((p) => {
+                                  const n = { ...p };
+                                  delete n[member.id];
+                                  return n;
+                                });
+                              }}
+                              onKeyDown={(e) => {
+                                /* Enter → সেভ, Tab/Arrow → পরের সদস্য */
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  void saveDay();
+                                }
+                              }}
+                              aria-label={`${member.name} মিল`}
+                            />
+                          ) : (
+                            /* ── মোবাইল: ট্যাপ করলে কাস্টম কিবোর্ড ── */
+                            <button
+                              type="button"
+                              className={`meal-cell ${isEmpty ? "zero" : ""} ${selected ? "meal-cell-selected" : ""}`}
+                              style={{ width: 78, minWidth: 78, height: 46 }}
+                              disabled={!canWrite || !member.isActive}
+                              onClick={() => selectCell(i)}
+                              aria-label={`${member.name} মিল`}
+                            >
+                              {isEmpty ? "" : formatMeal(v)}
+                            </button>
+                          )}
                         </td>
                       );
                     })}
