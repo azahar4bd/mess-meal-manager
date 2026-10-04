@@ -563,25 +563,25 @@ export function MealsView() {
               ) : null
             }
           >
-            <div className="table-wrap" style={{ maxHeight: "62vh" }}>
-            <table className="data" style={{ minWidth: 130 + month.totalDays * 50 + 60 }}>
+            <div className="table-wrap" style={{ maxHeight: "78vh" }}>
+            <table className="data grid-compact" style={{ minWidth: 104 + month.totalDays * 40 + 48 }}>
               <thead>
                 <tr>
-                  <th className="sticky left-0 top-0 z-20 bg-[var(--brand-soft)]" style={{ minWidth: 118 }}>
+                  <th className="sticky left-0 top-0 z-20 bg-[var(--brand-soft)]" style={{ minWidth: 96 }}>
                     সদস্য / Staff
                   </th>
                   {Array.from({ length: month.totalDays }).map((_, i) => {
                     const d = i + 1;
                     return (
-                      <th key={d} className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 44 }}>
-                        <span className="block text-[12.5px] font-extrabold tabular-nums">{d}</span>
-                        <span className="block whitespace-nowrap text-center text-[9.5px] font-semibold text-[var(--muted)]">
+                      <th key={d} className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 37 }}>
+                        <span className="block text-[11px] font-extrabold tabular-nums leading-none">{d}</span>
+                        <span className="block whitespace-nowrap text-center text-[8.5px] font-semibold leading-tight text-[var(--muted)]">
                           {weekdayBnShort(isoOfDay(month.year, month.month, d))}
                         </span>
                       </th>
                     );
                   })}
-                  <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 56 }}>
+                  <th className="num sticky top-0 z-10 bg-[var(--brand-soft)]" style={{ minWidth: 46 }}>
                     মোট
                   </th>
                 </tr>
@@ -596,7 +596,7 @@ export function MealsView() {
                   return (
                     <tr key={m.id} className={m.isActive ? "" : "opacity-60"}>
                       <td className="sticky left-0 z-10 bg-[var(--card)]">
-                        <span className="block max-w-[116px] truncate text-[13px] font-bold">{m.name}</span>
+                        <span className="block max-w-[92px] truncate text-[12px] font-bold leading-tight">{m.name}</span>
                         {m.isActive ? null : <span className="muted block text-[10px]">নিষ্ক্রিয়</span>}
                       </td>
                       {Array.from({ length: month.totalDays }).map((_, i) => {
@@ -605,12 +605,12 @@ export function MealsView() {
                         const numVal = toNumber(rawVal);
                         const isEmpty = !(numVal > 0);
                         return (
-                          <td key={d} className="num p-1">
+                          <td key={d} className="num p-0.5">
                             <input
                               type="text"
                               inputMode="decimal"
-                              className={`meal-cell ${isEmpty ? "zero" : ""}`}
-                              style={{ width: 46, minWidth: 46 }}
+                              className={`meal-cell-compact ${isEmpty ? "zero" : ""}`}
+                              style={{ width: 37, minWidth: 37 }}
                               value={isEmpty ? "" : String(numVal)}
                               placeholder=""
                               disabled={!canWrite || !m.isActive}
@@ -635,22 +635,22 @@ export function MealsView() {
                   {/* AM / Audit মিল — শুধু রেকর্ডের জন্য; দৈনিক/মাসিক কোনো হিসাবেই নেই */}
                   <tr>
                     <td className="sticky left-0 z-10 bg-[var(--warn-soft)]">
-                      <span className="block max-w-[116px] truncate text-[12px] font-bold" style={{ color: "var(--warn)" }}>
+                      <span className="block max-w-[92px] truncate text-[11px] font-bold leading-tight" style={{ color: "var(--warn)" }}>
                         AM / Audit
                       </span>
-                      <span className="muted block text-[10px]">হিসাবের বাইরে</span>
+                      <span className="muted block text-[9px] leading-tight">হিসাবের বাইরে</span>
                     </td>
                     {Array.from({ length: month.totalDays }).map((_, i) => {
                       const d = i + 1;
                       const av = auditVal(d);
                       const isEmpty = !(av > 0);
                       return (
-                        <td key={d} className="num p-1">
+                        <td key={d} className="num p-0.5">
                           <input
                             type="text"
                             inputMode="decimal"
-                            className={`meal-cell meal-cell-audit ${isEmpty ? "zero" : ""}`}
-                            style={{ width: 46, minWidth: 46 }}
+                            className={`meal-cell-compact meal-cell-audit ${isEmpty ? "zero" : ""}`}
+                            style={{ width: 37, minWidth: 37 }}
                             value={isEmpty ? "" : String(av)}
                             placeholder=""
                             disabled={!canWrite}

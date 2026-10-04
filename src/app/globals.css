@@ -444,6 +444,41 @@ body {
   color: var(--brand) !important;
 }
 
+/* ── মাস গ্রিড — কম্প্যাক্ট সেল (পিসিতে উপর-নিচ স্ক্রল না লাগে) ── */
+.meal-cell-compact {
+  @apply rounded-[5px] border px-0.5 py-0 text-center text-[12px] font-bold tabular-nums outline-none;
+  height: 23px;
+  line-height: 1;
+  background: #f6e7d3; /* হালকা বিস্কিট */
+  border-color: #e3cdb0;
+  color: #6b4a24;
+}
+.meal-cell-compact:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 20%, transparent);
+}
+.meal-cell-compact.zero {
+  background: #fdf6ec;
+  color: #a98d6d;
+  font-weight: 500;
+}
+.meal-cell-compact.meal-cell-audit {
+  border-style: dashed;
+  border-color: var(--warn);
+  color: var(--warn);
+}
+/* মাস গ্রিডের সারি — আরও চ্যাপ্টা */
+table.data.grid-compact th {
+  padding: 2px 3px;
+}
+table.data.grid-compact td {
+  padding: 1px 3px;
+}
+table.data.grid-compact tbody tr td,
+table.data.grid-compact tfoot tr td {
+  height: 26px;
+}
+
 /* ── দৈনিক মিলের কাস্টম কিবোর্ড — মোবাইল কিবোর্ডের মতো নিচ থেকে ভাসে ── */
 .meal-pad-sheet {
   position: fixed;
