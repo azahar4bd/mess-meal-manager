@@ -1,11 +1,77 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, EmptyState, Loader } from "@/components/ui";
 import { formatMeal, formatMoney, formatRate, round2, toNumber } from "@/lib/format";
 import { isoOfDay, isValidIso, toDisplayDate, toIsoDate, weekdayBn, weekdayBnShort, todayIso } from "@/lib/date";
+
+/* ══════════════════════════════════════════════════════════
+ *  মাস গ্রিডের একটি ঘর — নিজস্ব local text state
+ *  • "1." টাইপ করলে "1" হয়ে যায় না → "1.5" লেখা যায়
+ *  • React.memo → টাইপ করলে শুধু এই একটা ঘর রি-রেন্ডার হয় (ল্যাগ নেই)
+ * ══════════════════════════════════════════════════════════ */
+type GridCellProps = {
+  day: number;
+  memberId: string;
+  value: number;
+  disabled: boolean;
+  audit?: boolean;
+  label: string;
+  onCommitCell: (d: number, memberId: string, v: number) => void;
+  onCommitAudit: (d: number, v: number) => void;
+};
+
+const GridCellInput = React.memo(function GridCellInput({
+  day,
+  memberId,
+  value,
+  disabled,
+  audit,
+  label,
+  onCommitCell,
+  onCommitAudit,
+}: GridCellProps) {
+  const [text, setText] = useState(value > 0 ? String(value) : "");
+  const editing = React.useRef(false);
+
+  /* ফোকাস না থাকলে বাইরের value দিয়ে নিজেকে মেলায় */
+  useEffect(() => {
+    if (!editing.current) setText(value > 0 ? String(value) : "");
+  }, [value]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={`meal-cell-compact ${value > 0 ? "" : "zero"}${audit ? " meal-cell-audit" : ""}`}
+      style={{ width: 37, minWidth: 37 }}
+      value={text}
+      placeholder=""
+      disabled={disabled}
+      onFocus={() => {
+        editing.current = true;
+      }}
+      onChange={(e) => {
+        const t = e.target.value.replace(/[^0-9.]/g, "");
+        setText(t);
+        const n = t === "" || t === "." ? 0 : Number(t);
+        const v = Number.isFinite(n) ? Math.max(0, n) : 0;
+        if (audit) onCommitAudit(day, v);
+        else onCommitCell(day, memberId, v);
+      }}
+      onBlur={() => {
+        editing.current = false;
+        setText(value > 0 ? String(value) : "");
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+      aria-label={label}
+    />
+  );
+});
 
 export function MealsView() {
   const app = useApp();
@@ -170,6 +236,13 @@ export function MealsView() {
   const setGridCell = (d: number, memberId: string, value: number) => {
     setGridDraft((prev) => ({ ...prev, [d]: { ...(prev[d] ?? {}), [memberId]: value } }));
   };
+  /* React.memo-এর জন্য স্থায়ী (stable) কলব্যাক — রি-রেন্ডার আটকে দেয় না */
+  const commitCell = useCallback((d: number, memberId: string, value: number) => {
+    setGridDraft((prev) => ({ ...prev, [d]: { ...(prev[d] ?? {}), [memberId]: value } }));
+  }, []);
+  const commitAudit = useCallback((d: number, value: number) => {
+    setAuditDraft((prev) => ({ ...prev, [d]: Math.max(0, value) }));
+  }, []);
 
   const saveGrid = async () => {
     if (!canWrite) return;
@@ -601,29 +674,17 @@ export function MealsView() {
                       </td>
                       {Array.from({ length: month.totalDays }).map((_, i) => {
                         const d = i + 1;
-                        const rawVal = (grid[d] ?? {})[m.id];
-                        const numVal = toNumber(rawVal);
-                        const isEmpty = !(numVal > 0);
+                        const numVal = toNumber((grid[d] ?? {})[m.id]);
                         return (
                           <td key={d} className="num p-0.5">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              className={`meal-cell-compact ${isEmpty ? "zero" : ""}`}
-                              style={{ width: 37, minWidth: 37 }}
-                              value={isEmpty ? "" : String(numVal)}
-                              placeholder=""
+                            <GridCellInput
+                              day={d}
+                              memberId={m.id}
+                              value={numVal}
                               disabled={!canWrite || !m.isActive}
-                              onChange={(e) => {
-                                const val = e.target.value.trim();
-                                if (val === "") setGridCell(d, m.id, 0);
-                                else setGridCell(d, m.id, Number(val) || 0);
-                              }}
-                              onFocus={(e) => {
-                                // If value is 0, clear on focus so 1 press gives 1 not 10
-                                if (isEmpty) e.currentTarget.value = "";
-                              }}
-                              aria-label={`${m.name} দিন ${d}`}
+                              label={`${m.name} দিন ${d}`}
+                              onCommitCell={commitCell}
+                              onCommitAudit={commitAudit}
                             />
                           </td>
                         );
@@ -643,23 +704,17 @@ export function MealsView() {
                     {Array.from({ length: month.totalDays }).map((_, i) => {
                       const d = i + 1;
                       const av = auditVal(d);
-                      const isEmpty = !(av > 0);
                       return (
                         <td key={d} className="num p-0.5">
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            className={`meal-cell-compact meal-cell-audit ${isEmpty ? "zero" : ""}`}
-                            style={{ width: 37, minWidth: 37 }}
-                            value={isEmpty ? "" : String(av)}
-                            placeholder=""
+                          <GridCellInput
+                            day={d}
+                            memberId="__audit__"
+                            value={av}
+                            audit
                             disabled={!canWrite}
-                            onChange={(e) => {
-                              const val = e.target.value.trim();
-                              if (val === "") setAuditVal(d, 0);
-                              else setAuditVal(d, Number(val) || 0);
-                            }}
-                            aria-label={`AM/Audit মিল দিন ${d}`}
+                            label={`AM/Audit মিল দিন ${d}`}
+                            onCommitCell={commitCell}
+                            onCommitAudit={commitAudit}
                           />
                         </td>
                       );
