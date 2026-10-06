@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "@/components/app-context";
 import { GuideLine } from "@/components/GuideLine";
 import { Badge, Card, EmptyState, Loader } from "@/components/ui";
@@ -131,15 +131,30 @@ export function MealsView() {
     }));
   }, [data, day]);
 
+  /* ── draft sync ───────────────────────────────────────────────
+   * আগে data রিফ্রেশ হলেই draft সম্পূর্ণ রিসেট হতো → টাইপ করা মিল
+   * (বিশেষ করে প্রথম সদস্যের) হারিয়ে যেত। এখন:
+   *   • দিন/মাস বদলালেই শুধু সার্ভারের মান দিয়ে রিসেট
+   *   • অন্য সময় ইউজারের টাইপ করা অসংরক্ষিত মান অক্ষুণ্ণ থাকে */
+  const dayKeyRef = useRef<string>("");
   useEffect(() => {
-    const next: Record<string, number> = {};
-    for (const r of dayRows) next[r.member.id] = r.meals;
-    setDraft(next);
-    setSelIdx(null);
-    setBuffer("");
-    setRawText({});
+    const key = `${month?.id ?? ""}#${day}`;
+    const dayChanged = dayKeyRef.current !== key;
+    dayKeyRef.current = key;
+    setDraft((prev) => {
+      const next: Record<string, number> = {};
+      for (const r of dayRows) {
+        next[r.member.id] = dayChanged ? r.meals : prev[r.member.id] ?? r.meals;
+      }
+      return next;
+    });
+    if (dayChanged) {
+      setSelIdx(null);
+      setBuffer("");
+      setRawText({});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day, month?.id, data?.members.length]);
+  }, [day, month?.id, dayRows]);
 
   /* ── AM / Audit মিল (হিসাবের বাইরে) ─────────────────
    * data.auditMeals কখনো calculateMonth()-এ যায় না — এখানে শুধু দেখা/এন্ট্রি। */
